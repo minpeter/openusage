@@ -30,6 +30,7 @@ final class OverviewView {
     private var currentSpend: [(String, Double)] = []
     private var selectedSpendPeriod = "Today"
     private var connections: [SignalConnection] = []
+    private var urgentRows: [Widget] = []
 
     init() {
         root = ScrolledWindow()
@@ -87,13 +88,19 @@ final class OverviewView {
 
         let urgent = urgentQuotas(snapshots)
         urgentGroup.visible = !urgent.isEmpty
-        replaceRows(in: urgentGroup, rows: urgent.map(urgentRow(_:)))
+        replaceUrgentRows(urgent.map(urgentRow(_:)))
 
         replaceRows(in: healthGroup, rows: snapshots.map(healthRow(_:)))
 
         content.append(spendGroup)
         content.append(urgentGroup)
         content.append(healthGroup)
+    }
+
+    private func replaceUrgentRows(_ rows: [Widget]) {
+        urgentRows.forEach(urgentGroup.remove)
+        rows.forEach(urgentGroup.add)
+        urgentRows = rows
     }
 
     private func renderSpend() {
