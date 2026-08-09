@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.minpeter.OpenUsage</id>
+  <name>OpenUsage</name>
+  <summary>Track Claude and Codex subscription usage</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.minpeter">
+    <name>OpenUsage contributors</name>
+  </developer>
+  <description>
+    <p>
+      OpenUsage is a native GTK 4 and libadwaita dashboard for checking Claude and Codex
+      subscription quota windows from a GNOME desktop.
+    </p>
+    <p>
+      It reuses credentials from the local command-line tools, presents cached usage immediately,
+      and refreshes provider usage without storing credentials in its cache.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.minpeter.OpenUsage.desktop</launchable>
+  <provides>
+    <binary>OpenUsageGNOME</binary>
+  </provides>
+  <url type="homepage">https://github.com/minpeter/openusage</url>
+  <url type="bugtracker">https://github.com/minpeter/openusage/issues</url>
+  <url type="vcs-browser">https://github.com/minpeter/openusage</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#62a0ea</color>
+    <color type="primary" scheme_preference="dark">#1c71d8</color>
+  </branding>
+  <releases>
+    <release version="0.7.7-beta.1" date="2026-07-19">
+      <description>
+        <p>Initial Flatpak-ready GNOME release.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

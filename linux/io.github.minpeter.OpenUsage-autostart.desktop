@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=OpenUsage
+Comment=Track AI subscription usage
+Exec=OpenUsageGNOME
+Icon=io.github.minpeter.OpenUsage
+Terminal=false
+OnlyShowIn=GNOME;KDE;Unity;XFCE;LXQt;MATE;Cinnamon;
+X-GNOME-Autostart-enabled=true
+StartupNotify=false

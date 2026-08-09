@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=OpenUsage
+GenericName=AI Usage Monitor
+Comment=Track Claude and Codex subscription usage
+Exec=OpenUsageGNOME
+Icon=io.github.minpeter.OpenUsage
+Terminal=false
+Categories=System;Monitor;
+Keywords=AI;Claude;Codex;Usage;Quota;Subscription;
+StartupNotify=true
+DBusActivatable=false

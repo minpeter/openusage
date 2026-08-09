@@ -1,0 +1,14 @@
+[Unit]
+Description=OpenUsage AI subscription usage monitor
+Documentation=https://github.com/minpeter/openusage
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/flatpak run io.github.minpeter.OpenUsage
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=graphical-session.target

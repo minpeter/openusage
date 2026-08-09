@@ -1,0 +1,72 @@
+app-id: io.github.minpeter.OpenUsage
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+branch: stable
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.swift6
+command: OpenUsageGNOME
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --filesystem=~/.claude:ro
+  - --filesystem=~/.codex:ro
+  - --filesystem=~/.grok:ro
+  - --filesystem=~/.cursor:ro
+  - --filesystem=xdg-config/claude:ro
+  - --filesystem=xdg-config/codex:ro
+  - --filesystem=xdg-config/Cursor:ro
+  - --filesystem=xdg-config/cursor:ro
+  - --filesystem=xdg-config/github-copilot:ro
+  - --filesystem=xdg-config/gh:ro
+  - --filesystem=xdg-config/openrouter:ro
+  - --filesystem=xdg-config/zai:ro
+  - --filesystem=xdg-config/devin:ro
+  - --filesystem=xdg-data/opencode:ro
+  - --filesystem=xdg-data/devin:ro
+
+build-options:
+  append-path: /usr/lib/sdk/swift6/bin
+  prepend-ld-library-path: /usr/lib/sdk/swift6/lib
+  env:
+    SWIFTPM_ENABLE_PLUGINS: "0"
+
+modules:
+  - name: openusage
+    buildsystem: simple
+    build-commands:
+      # The dependency is fetched by flatpak-builder before its network-isolated
+      # build sandbox starts. SwiftPM only sees this local mirror.
+      - swift package config set-mirror --original https://github.com/makoni/swift-adwaita.git --mirror file://${PWD}/swiftpm/swift-adwaita
+      - cp linux/Package.resolved Package.resolved
+      - swift package resolve --disable-sandbox --disable-automatic-resolution --disable-prefetching
+      - swift build --configuration release --product OpenUsageGNOME --disable-sandbox --disable-automatic-resolution --disable-prefetching --static-swift-stdlib
+      - swift build --configuration release --product openusage --disable-sandbox --disable-automatic-resolution --disable-prefetching --static-swift-stdlib
+      - swift build --configuration release --product openusage-api --disable-sandbox --disable-automatic-resolution --disable-prefetching --static-swift-stdlib
+      - install -Dm755 .build/release/OpenUsageGNOME /app/bin/OpenUsageGNOME
+      - install -Dm755 .build/release/openusage /app/bin/openusage
+      - install -Dm755 .build/release/openusage-api /app/bin/openusage-api
+      - cp -a .build/release/OpenUsage_OpenUsagePricingResources.resources /app/bin/
+      - install -Dm644 linux/io.github.minpeter.OpenUsage.desktop /app/share/applications/io.github.minpeter.OpenUsage.desktop
+      - install -Dm644 linux/io.github.minpeter.OpenUsage.metainfo.xml /app/share/metainfo/io.github.minpeter.OpenUsage.metainfo.xml
+      - install -Dm644 linux/io.github.minpeter.OpenUsage.svg /app/share/icons/hicolor/scalable/apps/io.github.minpeter.OpenUsage.svg
+      - install -Dm644 linux/io.github.minpeter.OpenUsage.service /app/share/openusage/systemd/user/io.github.minpeter.OpenUsage.service
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .build
+          - .git
+          - .swiftpm
+      - type: git
+        url: https://github.com/makoni/swift-adwaita.git
+        commit: d66e7f86e4ce6cbbe503b81f08b89fe8b9ad8b42
+        tag: 1.1.0
+        dest: swiftpm/swift-adwaita
