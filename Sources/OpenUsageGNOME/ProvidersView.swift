@@ -1,0 +1,248 @@
+import Adwaita
+import Foundation
+import OpenUsageLinuxCore
+
+/// Providers view: one boxed list of provider/account rows with disclosure
+/// into complete metric details. The row tree is persistent — rows survive
+/// refreshes, keep their expansion state, and only the metric cluster of a
+/// changed snapshot is rebuilt.
+@MainActor
+final class ProvidersView {
+    let root: ScrolledWindow
+
+    private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
+    private let group = PreferencesGroup(title: "Connected Accounts")
+    private let emptyPage: StatusPage
+    private var rows: [String: ProviderRow] = [:]
+    private var onRefresh: () -> Void = {}
+
+    init() {
+        root = ScrolledWindow()
+        root.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
+        root.kineticScrolling = true
+
+        content.setMargins(GNOMEStyle.outerMargin)
+        group.description = "Quotas, spend, and reset windows for every connected account."
+
+        emptyPage = StatusPage(
+            title: "No Providers Connected",
+            description: "Sign in on this machine with Claude Code or Codex, then refresh. "
+                + "OpenUsage reads the credentials they already store.",
+            iconName: "system-users-symbolic"
+        )
+
+        let clamp = Clamp()
+        clamp.maximumSize = GNOMEStyle.contentClamp
+        clamp.tighteningThreshold = GNOMEStyle.clampTightening
+        clamp.child = content
+        root.child = clamp
+    }
+
+    func setRefreshHandler(_ handler: @escaping @MainActor () -> Void) {
+        onRefresh = handler
+        let button = Button(label: "Check Again", onClicked: { [weak self] in self?.onRefresh() })
+        button.addCSSClass(.suggestedAction)
+        button.addCSSClass(.pill)
+        button.halign = GTK_ALIGN_CENTER
+        button.setAccessibleLabel("Check for provider credentials again")
+        emptyPage.child = button
+    }
+
+    /// Updates the row tree in place. `snapshots` must already be ordered.
+    func update(snapshots: [ProviderUsageSnapshot], isRefreshing: Bool) {
+        let showEmpty = snapshots.isEmpty
+        emptyPage.visible = showEmpty
+        group.visible = !showEmpty
+        if content.firstChild == nil {
+            content.append(emptyPage)
+            content.append(group)
+        }
+        guard !showEmpty else { return }
+
+        let seen = snapshots.map(\.instanceID)
+        for (id, row) in rows where !seen.contains(id) {
+            group.remove(row.expander)
+            rows.removeValue(forKey: id)
+        }
+        for snapshot in snapshots {
+            let row = rows[snapshot.instanceID] ?? insertRow(for: snapshot)
+            row.update(snapshot: snapshot)
+            if DemoFixtures.expandProviders {
+                row.expander.expanded = true
+            }
+        }
+    }
+
+    private func insertRow(for snapshot: ProviderUsageSnapshot) -> ProviderRow {
+        let row = ProviderRow(providerID: snapshot.providerID, displayName: snapshot.displayName) {
+            [weak self] in self?.onRefresh()
+        }
+        rows[snapshot.instanceID] = row
+        group.add(row.expander)
+        return row
+    }
+}
+
+/// One provider/account row: avatar, name, plan pill, state message, and a
+/// disclosure with every metric, quick links, and stale/error annotations.
+@MainActor
+private final class ProviderRow {
+    let expander: ExpanderRow
+
+    private let planPill = Label("")
+    private let stateIcon = Image()
+    private let detail = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
+    private let refreshedLabel = Label("")
+    private let onRetry: () -> Void
+    private var lastSnapshot: ProviderUsageSnapshot?
+    private var connections: [SignalConnection] = []
+
+    init(providerID: String, displayName: String, onRetry: @escaping @MainActor () -> Void) {
+        self.onRetry = onRetry
+        expander = ExpanderRow(title: "")
+        expander.addPrefix(ProviderIcon.make(providerID: providerID, displayName: displayName))
+
+        planPill.addCSSClass("ou-pill")
+        planPill.addCSSClass(.accent)
+        planPill.addCSSClass(.caption)
+        planPill.valign = GTK_ALIGN_CENTER
+
+        let suffix = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
+        suffix.valign = GTK_ALIGN_CENTER
+        suffix.append(planPill)
+        suffix.append(stateIcon)
+        expander.addSuffix(suffix)
+
+        detail.setMargins(GNOMEStyle.sectionSpacing)
+        expander.addRow(detail)
+        refreshedLabel.xalign = 0
+        refreshedLabel.addCSSClass(.caption)
+        refreshedLabel.addCSSClass(.dimLabel)
+    }
+
+    func update(snapshot: ProviderUsageSnapshot) {
+        refreshedLabel.text = GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
+        if let lastSnapshot, snapshot.hasSameDisplayContent(as: lastSnapshot) {
+            self.lastSnapshot = snapshot
+            return
+        }
+        lastSnapshot = snapshot
+
+        expander.title = snapshot.displayName
+        expander.subtitle = snapshot.accountLabel ?? stateSummary(snapshot)
+
+        planPill.visible = !(snapshot.plan ?? "").isEmpty
+        planPill.text = snapshot.plan ?? ""
+
+        if snapshot.errorMessage != nil {
+            stateIcon.iconName = "dialog-error-symbolic"
+            stateIcon.addCSSClass(.error)
+            stateIcon.removeCSSClass("warning")
+            stateIcon.visible = true
+            stateIcon.setAccessibleLabel("Provider error")
+        } else if snapshot.warning != nil {
+            stateIcon.iconName = "dialog-warning-symbolic"
+            stateIcon.addCSSClass(.warning)
+            stateIcon.removeCSSClass("error")
+            stateIcon.visible = true
+            stateIcon.setAccessibleLabel("Provider warning")
+        } else {
+            stateIcon.visible = false
+        }
+
+        rebuildDetail(snapshot)
+    }
+
+    private func stateSummary(_ snapshot: ProviderUsageSnapshot) -> String {
+        if let error = snapshot.errorMessage { return error }
+        if let warning = snapshot.warning { return warning }
+        return "Usage up to date"
+    }
+
+    private func rebuildDetail(_ snapshot: ProviderUsageSnapshot) {
+        connections.forEach { $0.disconnect() }
+        connections.removeAll(keepingCapacity: true)
+        while let child = detail.firstChild {
+            detail.remove(child)
+        }
+
+        let stale = snapshot.errorMessage != nil && !snapshot.metrics.isEmpty
+        if stale, let error = snapshot.errorMessage {
+            detail.append(annotationRow(
+                icon: "dialog-warning-symbolic", cssClass: .warning,
+                message: "Showing the last successful values. \(error)"))
+        } else if let error = snapshot.errorMessage {
+            detail.append(annotationRow(
+                icon: "dialog-error-symbolic", cssClass: .error,
+                message: actionableError(providerID: snapshot.providerID, message: error)))
+        }
+
+        if let warning = snapshot.warning {
+            detail.append(annotationRow(
+                icon: "dialog-information-symbolic", cssClass: .warning, message: warning))
+        }
+
+        for metric in snapshot.metrics {
+            detail.append(MetricViews.widget(for: metric, providerName: snapshot.displayName))
+        }
+
+        if snapshot.errorMessage == nil && snapshot.metrics.isEmpty {
+            let label = Label("No quota metrics were returned.")
+            label.xalign = 0
+            label.wrap = true
+            label.addCSSClass(.dimLabel)
+            detail.append(label)
+        }
+
+        for link in snapshot.links {
+            detail.append(linkRow(link))
+        }
+
+        detail.append(refreshedLabel)
+    }
+
+    private func annotationRow(icon: String, cssClass: CSSClass, message: String) -> Widget {
+        let row = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
+        row.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
+
+        let image = Image(iconName: icon)
+        image.addCSSClass(cssClass)
+        image.valign = GTK_ALIGN_CENTER
+        row.append(image)
+
+        let label = Label(message)
+        label.wrap = true
+        label.xalign = 0
+        label.hexpand = true
+        label.addCSSClass(cssClass)
+        row.append(label)
+
+        let retry = Button(label: "Retry", onClicked: { [weak self] in self?.onRetry() })
+        retry.addCSSClass(.flat)
+        retry.valign = GTK_ALIGN_CENTER
+        retry.setAccessibleLabel("Retry refreshing this provider")
+        row.append(retry)
+        return row
+    }
+
+    private func linkRow(_ link: ProviderLink) -> Widget {
+        let row = ActionRow(title: link.label)
+        row.subtitle = link.url
+        row.addSuffix(Image(iconName: "adw-external-link-symbolic"))
+        row.setAccessibleLabel("Open \(link.label) in the browser")
+        connections.append(row.onActivated {
+            UriLauncher(uri: link.url).launch()
+        })
+        return row
+    }
+
+    private func actionableError(providerID: String, message: String) -> String {
+        if providerID == "claude", message.contains("credentials were not found") {
+            return "Sign in with Claude Code, then refresh. Credentials were not found in ~/.claude."
+        }
+        if providerID == "codex", message.contains("HTTP 401") {
+            return "Your Codex session expired. Sign in with Codex again, then refresh."
+        }
+        return message
+    }
+}

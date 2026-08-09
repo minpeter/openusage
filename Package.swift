@@ -1,6 +1,84 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.1
 import PackageDescription
 
+#if os(Linux)
+let package = Package(
+    name: "OpenUsage",
+    products: [
+        .library(name: "OpenUsageLinuxCore", targets: ["OpenUsageLinuxCore"]),
+        .executable(name: "OpenUsageGNOME", targets: ["OpenUsageGNOME"]),
+        .executable(name: "openusage", targets: ["OpenUsageLinuxCLI"]),
+        .executable(name: "openusage-api", targets: ["OpenUsageLinuxAPI"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/makoni/swift-adwaita.git", from: "1.0.0")
+    ],
+    targets: [
+        .target(
+            name: "OpenUsagePricingResources",
+            path: "Sources/OpenUsage/Resources",
+            sources: ["LinuxPricingResources.swift"],
+            resources: [
+                .copy("ProviderIcons"),
+                .copy("pricing_supplement.json"),
+                .copy("pricing_litellm_snapshot.json"),
+                .copy("pricing_models_dev_snapshot.json")
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .target(
+            name: "OpenUsageLinuxCore",
+            dependencies: ["OpenUsagePricingResources"],
+            path: "Sources/OpenUsageLinuxCore",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .executableTarget(
+            name: "OpenUsageGNOME",
+            dependencies: [
+                "OpenUsageLinuxCore",
+                "OpenUsagePricingResources",
+                .product(name: "Adwaita", package: "swift-adwaita")
+            ],
+            path: "Sources/OpenUsageGNOME",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "OpenUsageLinuxCLI",
+            dependencies: ["OpenUsageLinuxCore"],
+            path: "Sources/OpenUsageLinuxCLI",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "OpenUsageLinuxAPI",
+            dependencies: ["OpenUsageLinuxCore"],
+            path: "Sources/OpenUsageLinuxAPI",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "OpenUsageLinuxCoreTests",
+            dependencies: ["OpenUsageLinuxCore"],
+            path: "Tests/OpenUsageLinuxCoreTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "OpenUsageLinuxCLITests",
+            dependencies: ["OpenUsageLinuxCore"],
+            path: "Tests/OpenUsageLinuxCLITests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "OpenUsageLinuxAPITests",
+            dependencies: ["OpenUsageLinuxCore"],
+            path: "Tests/OpenUsageLinuxAPITests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        )
+    ]
+)
+#else
 let package = Package(
     name: "OpenUsage",
     platforms: [
@@ -72,3 +150,4 @@ let package = Package(
         )
     ]
 )
+#endif

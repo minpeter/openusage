@@ -72,7 +72,11 @@ enum ProviderMarks {
         if let cached = cache[id] { return cached }
         if missing.contains(id) { return nil }
         guard
-            let url = Bundle.openUsageResources.url(forResource: id, withExtension: "svg", subdirectory: "ProviderIcons"),
+            let url = Bundle.openUsageResources.url(
+                forResource: "\(id)-symbolic",
+                withExtension: "svg",
+                subdirectory: "ProviderIcons"
+            ),
             let text = try? String(contentsOf: url, encoding: .utf8),
             let d = extractD(text)
         else {
