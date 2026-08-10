@@ -64,6 +64,99 @@ enum TimeFormatSetting: String, Codable, CaseIterable, Sendable {
     }
 }
 
+struct MetricPreferenceKey: Codable, Equatable, Hashable, Sendable {
+    let kind: String
+    let label: String
+
+    init(metric: UsageMetric) {
+        kind = metric.kind.rawValue
+        label = metric.label
+    }
+}
+
+enum MetricVisibilitySection: String, Codable, Sendable {
+    case alwaysVisible
+    case onDemand
+}
+
+struct MetricLayoutEntry: Codable, Equatable, Sendable {
+    let key: MetricPreferenceKey
+    var isEnabled: Bool
+    var section: MetricVisibilitySection
+}
+
+struct ProviderMetricLayout: Codable, Equatable, Sendable {
+    var entries: [MetricLayoutEntry]
+
+    init(entries: [MetricLayoutEntry] = []) {
+        self.entries = entries
+    }
+
+    mutating func reconcile(with metrics: [UsageMetric]) {
+        var knownKeys: Set<MetricPreferenceKey> = []
+        entries = entries.filter { knownKeys.insert($0.key).inserted }
+
+        for metric in metrics {
+            let key = MetricPreferenceKey(metric: metric)
+            guard knownKeys.insert(key).inserted else { continue }
+            entries.append(.init(key: key, isEnabled: true, section: .alwaysVisible))
+        }
+    }
+
+    func entry(for key: MetricPreferenceKey) -> MetricLayoutEntry? {
+        entries.first { $0.key == key }
+    }
+
+    mutating func setEnabled(_ isEnabled: Bool, for key: MetricPreferenceKey) {
+        guard let index = entries.firstIndex(where: { $0.key == key }) else { return }
+        entries[index].isEnabled = isEnabled
+    }
+
+    mutating func move(
+        _ key: MetricPreferenceKey,
+        to section: MetricVisibilitySection,
+        at requestedIndex: Int
+    ) {
+        guard let sourceIndex = entries.firstIndex(where: { $0.key == key }) else { return }
+        var entry = entries.remove(at: sourceIndex)
+        entry.section = section
+
+        let sectionIndices = entries.indices.filter { entries[$0].section == section }
+        let targetIndex = max(requestedIndex, 0)
+        let insertionIndex: Int
+        if targetIndex < sectionIndices.count {
+            insertionIndex = sectionIndices[targetIndex]
+        } else if let lastIndex = sectionIndices.last {
+            insertionIndex = lastIndex + 1
+        } else if section == .alwaysVisible,
+                  let firstOnDemand = entries.firstIndex(where: { $0.section == .onDemand })
+        {
+            insertionIndex = firstOnDemand
+        } else {
+            insertionIndex = entries.endIndex
+        }
+        entries.insert(entry, at: insertionIndex)
+    }
+
+    func displayedMetrics(
+        from metrics: [UsageMetric],
+        in section: MetricVisibilitySection
+    ) -> [UsageMetric] {
+        var metricsByKey: [MetricPreferenceKey: UsageMetric] = [:]
+        for metric in metrics {
+            let key = MetricPreferenceKey(metric: metric)
+            if metricsByKey[key] == nil {
+                metricsByKey[key] = metric
+            }
+        }
+
+        return entries.compactMap { entry in
+            guard entry.isEnabled, entry.section == section else { return nil }
+            return metricsByKey[entry.key]
+        }
+    }
+}
+
 /// Versioned XDG JSON settings for the GNOME shell (Linux parity matrix:
 /// UserDefaults/settings -> versioned XDG JSON). Secrets never enter this
 /// file; credentials stay in the Secret Service.
@@ -85,6 +178,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var alwaysShowPacing = false
     var density: DensitySetting = .regular
     var timeFormat: TimeFormatSetting = .auto
+    var metricLayouts: [String: ProviderMetricLayout] = [:]
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -100,7 +194,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
         case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
-        case density, timeFormat
+        case density, timeFormat, metricLayouts
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -131,6 +225,10 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         alwaysShowPacing = try values.decodeIfPresent(Bool.self, forKey: .alwaysShowPacing) ?? false
         density = try values.decodeIfPresent(DensitySetting.self, forKey: .density) ?? .regular
         timeFormat = try values.decodeIfPresent(TimeFormatSetting.self, forKey: .timeFormat) ?? .auto
+        metricLayouts = try values.decodeIfPresent(
+            [String: ProviderMetricLayout].self,
+            forKey: .metricLayouts
+        ) ?? [:]
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []
