@@ -99,6 +99,18 @@ extension DashboardController {
         let exportCSVAction = SimpleAction(name: "export-csv") { [weak self] in
             self?.exportSnapshots(format: .csv)
         }
+        let storeAPIKeyAction = SimpleAction(name: "store-api-key") { [weak self] in
+            guard let provider = Self.qaAPIKeyProvider,
+                  let value = ProcessInfo.processInfo.environment["OPENUSAGE_API_KEY_VALUE"]
+            else {
+                return
+            }
+            self?.storeAPIKey(value, for: provider)
+        }
+        let clearAPIKeyAction = SimpleAction(name: "clear-api-key") { [weak self] in
+            guard let provider = Self.qaAPIKeyProvider else { return }
+            self?.clearAPIKey(for: provider)
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
@@ -109,6 +121,8 @@ extension DashboardController {
             importUsageAction,
             exportJSONAction,
             exportCSVAction,
+            storeAPIKeyAction,
+            clearAPIKeyAction,
         ]
         for action in retainedActions {
             application.addAction(action)

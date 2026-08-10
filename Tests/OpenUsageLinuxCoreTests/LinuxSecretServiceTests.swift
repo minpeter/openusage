@@ -73,6 +73,62 @@ struct LinuxSecretServiceTests {
     }
 }
 
+@Suite("Linux API key management")
+struct LinuxAPIKeyManagerTests {
+    @Test("Managed providers store trimmed API keys in their Secret Service slots")
+    func storesProviderScopedKeys() throws {
+        let backend = MemoryCredentialBackend()
+        let manager = LinuxAPIKeyManager(backend: backend)
+
+        #expect(ManagedAPIKeyProvider.allCases.map(\.providerID) == ["openrouter", "zai"])
+        try manager.store("  sk-openrouter-test\n", for: .openRouter)
+
+        #expect(try manager.hasStoredKey(for: .openRouter))
+        #expect(try !manager.hasStoredKey(for: .zai))
+        #expect(try SecretServiceAPIKeySource(
+            backend: backend,
+            key: ManagedAPIKeyProvider.openRouter.credentialKey
+        ).loadAPIKey() == "sk-openrouter-test")
+    }
+
+    @Test("Blank updates fail without replacing the stored key")
+    func blankUpdatePreservesStoredKey() throws {
+        let backend = MemoryCredentialBackend()
+        let manager = LinuxAPIKeyManager(backend: backend)
+        try manager.store("existing-key", for: .zai)
+
+        #expect(throws: LinuxAPIKeyManagementError.emptyKey) {
+            try manager.store(" \n ", for: .zai)
+        }
+        #expect(try manager.load(for: .zai) == "existing-key")
+    }
+
+    @Test("Oversized updates fail at the UI boundary without touching Secret Service")
+    func oversizedUpdatePreservesStoredKey() throws {
+        let backend = MemoryCredentialBackend()
+        let manager = LinuxAPIKeyManager(backend: backend)
+        try manager.store("existing-key", for: .openRouter)
+
+        #expect(throws: LinuxAPIKeyManagementError.keyTooLarge(maximumBytes: 8_192)) {
+            try manager.store(String(repeating: "x", count: 8_193), for: .openRouter)
+        }
+        #expect(try manager.load(for: .openRouter) == "existing-key")
+    }
+
+    @Test("Clear removes only the selected provider key")
+    func clearIsProviderScoped() throws {
+        let backend = MemoryCredentialBackend()
+        let manager = LinuxAPIKeyManager(backend: backend)
+        try manager.store("openrouter-key", for: .openRouter)
+        try manager.store("zai-key", for: .zai)
+
+        try manager.clear(.openRouter)
+
+        #expect(try !manager.hasStoredKey(for: .openRouter))
+        #expect(try manager.load(for: .zai) == "zai-key")
+    }
+}
+
 @Suite("Linux launch at login")
 struct LinuxLaunchAtLoginTests {
     @Test("Launch service prefers systemd and uses XDG fallback when unavailable")

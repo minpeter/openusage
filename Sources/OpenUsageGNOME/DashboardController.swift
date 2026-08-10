@@ -27,6 +27,7 @@ final class DashboardController {
 
     let repository = LinuxUsageRepository()
     let settingsStore = GNOMESettingsStore()
+    let apiKeyManager = LinuxAPIKeyManager()
     let analyticsClient: LinuxAnalyticsClient
     let launchAtLoginService: LinuxLaunchAtLoginService
     var settings: GNOMESettings

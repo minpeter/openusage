@@ -227,6 +227,29 @@ final class DashboardCallback: @unchecked Sendable {
         controller?.applyRefreshed(snapshots)
     }
 
+    @MainActor
+    func applyAPIKeyStatuses(
+        _ statuses: [(ManagedAPIKeyProvider, String)]
+    ) {
+        controller?.applyAPIKeyStatuses(statuses)
+    }
+
+    @MainActor
+    func finishAPIKeyStore(
+        provider: ManagedAPIKeyProvider,
+        error: String?
+    ) {
+        controller?.finishAPIKeyStore(provider: provider, error: error)
+    }
+
+    @MainActor
+    func finishAPIKeyClear(
+        provider: ManagedAPIKeyProvider,
+        error: String?
+    ) {
+        controller?.finishAPIKeyClear(provider: provider, error: error)
+    }
+
     func presentWindow() async {
         await withCheckedContinuation { continuation in
             scheduleOnGTK { [weak self] in

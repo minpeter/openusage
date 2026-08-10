@@ -38,6 +38,8 @@ final class SettingsView {
     var onSyncDirectoryReset: () -> Void = {}
     var onImportRequested: () -> Void = {}
     var onExportRequested: (UsageExportFormat) -> Void = { _ in }
+    var onAPIKeySave: (ManagedAPIKeyProvider, String) -> Void = { _, _ in }
+    var onAPIKeyClear: (ManagedAPIKeyProvider) -> Void = { _ in }
 
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let appearanceRow: ComboRow
@@ -65,6 +67,10 @@ final class SettingsView {
     let apiPortRow = SpinRow(title: "Port", min: 1_024, max: 65_535, step: 1)
     let syncDirectoryRow: ActionRow
     let defaultSyncPath: String
+    let openRouterAPIKeyRow = PasswordEntryRow(title: "OpenRouter API Key")
+    let zaiAPIKeyRow = PasswordEntryRow(title: "Z.ai API Key")
+    let openRouterAPIKeyStatus = Label("Checking…")
+    let zaiAPIKeyStatus = Label("Checking…")
     let orderGroup = PreferencesGroup(
         title: "Provider Order",
         description: "Controls the order of providers in every view."
@@ -256,6 +262,23 @@ final class SettingsView {
         exportRow.addSuffix(exportActions)
         privacyGroup.add(exportRow)
 
+        let apiKeyGroup = PreferencesGroup(
+            title: "API Keys",
+            description: "Keys are stored in the system Secret Service, never in settings."
+        )
+        addAPIKeyRow(
+            openRouterAPIKeyRow,
+            status: openRouterAPIKeyStatus,
+            provider: .openRouter
+        )
+        addAPIKeyRow(
+            zaiAPIKeyRow,
+            status: zaiAPIKeyStatus,
+            provider: .zai
+        )
+        apiKeyGroup.add(openRouterAPIKeyRow)
+        apiKeyGroup.add(zaiAPIKeyRow)
+
         // About group
         let aboutGroup = PreferencesGroup(title: "About")
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
@@ -271,6 +294,7 @@ final class SettingsView {
         content.append(apiGroup)
         content.append(shortcutsGroup)
         content.append(privacyGroup)
+        content.append(apiKeyGroup)
         content.append(aboutGroup)
 
         let clamp = Clamp()
@@ -332,5 +356,57 @@ final class SettingsView {
     func updateMetricCustomization(_ snapshots: [ProviderUsageSnapshot]) {
         customizationSnapshots = snapshots
         rebuildMetricCustomizationRows()
+    }
+
+    func updateAPIKeyStatus(
+        _ provider: ManagedAPIKeyProvider,
+        text: String
+    ) {
+        apiKeyStatus(for: provider).text = text
+    }
+
+    func clearAPIKeyEntry(_ provider: ManagedAPIKeyProvider) {
+        apiKeyRow(for: provider).text = ""
+    }
+
+    private func addAPIKeyRow(
+        _ row: PasswordEntryRow,
+        status: Label,
+        provider: ManagedAPIKeyProvider
+    ) {
+        status.addCSSClass(.caption)
+        row.addSuffix(status)
+        let actions = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: GNOMEStyle.controlSpacing
+        )
+        actions.append(Button(label: "Save", onClicked: { [weak self, weak row] in
+            guard let row else { return }
+            self?.onAPIKeySave(provider, row.text)
+        }))
+        actions.append(Button(label: "Clear", onClicked: { [weak self] in
+            self?.onAPIKeyClear(provider)
+        }))
+        row.addSuffix(actions)
+        row.onApply { [weak self, weak row] in
+            guard let row else { return }
+            self?.onAPIKeySave(provider, row.text)
+        }
+    }
+
+    private func apiKeyRow(
+        for provider: ManagedAPIKeyProvider
+    ) -> PasswordEntryRow {
+        switch provider {
+        case .openRouter: openRouterAPIKeyRow
+        case .zai: zaiAPIKeyRow
+        }
+    }
+
+    private func apiKeyStatus(for provider: ManagedAPIKeyProvider) -> Label {
+        switch provider {
+        case .openRouter: openRouterAPIKeyStatus
+        case .zai: zaiAPIKeyStatus
+        }
     }
 }

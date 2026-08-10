@@ -147,6 +147,13 @@ extension DashboardController {
         settingsView.onExportRequested = { [weak self] format in
             self?.exportSnapshots(format: format)
         }
+        settingsView.onAPIKeySave = { [weak self] provider, value in
+            self?.storeAPIKey(value, for: provider)
+        }
+        settingsView.onAPIKeyClear = { [weak self] provider in
+            self?.clearAPIKey(for: provider)
+        }
+        refreshAPIKeyStatuses()
     }
 
     private func saveAndApplyDisplaySettings() {

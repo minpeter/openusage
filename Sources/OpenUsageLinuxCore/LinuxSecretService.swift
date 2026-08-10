@@ -159,3 +159,90 @@ public struct SecretServiceAPIKeySource: ProviderAPIKeySource {
         return value
     }
 }
+
+public enum ManagedAPIKeyProvider: String, CaseIterable, Sendable {
+    case openRouter
+    case zai
+
+    public var providerID: String {
+        switch self {
+        case .openRouter: "openrouter"
+        case .zai: "zai"
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .openRouter: "OpenRouter"
+        case .zai: "Z.ai"
+        }
+    }
+
+    public var credentialKey: LinuxCredentialKey {
+        LinuxCredentialKey(
+            instance: LinuxProviderInstanceID(providerID: providerID),
+            kind: "api-key"
+        )
+    }
+}
+
+public enum LinuxAPIKeyManagementError: Error, Equatable, LocalizedError {
+    case emptyKey
+    case keyTooLarge(maximumBytes: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyKey:
+            "API keys cannot be blank."
+        case .keyTooLarge(let maximumBytes):
+            "API keys cannot exceed \(maximumBytes) bytes."
+        }
+    }
+}
+
+public struct LinuxAPIKeyManager: Sendable {
+    public static let maximumBytes = 8_192
+    private let backend: any LinuxCredentialBackend
+
+    public init(
+        backend: any LinuxCredentialBackend = SecretServiceCredentialBackend()
+    ) {
+        self.backend = backend
+    }
+
+    public func load(for provider: ManagedAPIKeyProvider) throws -> String? {
+        guard let data = try backend.load(for: provider.credentialKey),
+              let value = String(data: data, encoding: .utf8)?
+                  .trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty
+        else {
+            return nil
+        }
+        return value
+    }
+
+    public func hasStoredKey(for provider: ManagedAPIKeyProvider) throws -> Bool {
+        try load(for: provider) != nil
+    }
+
+    public func store(
+        _ value: String,
+        for provider: ManagedAPIKeyProvider
+    ) throws {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            throw LinuxAPIKeyManagementError.emptyKey
+        }
+        let data = Data(normalized.utf8)
+        guard data.count <= Self.maximumBytes else {
+            throw LinuxAPIKeyManagementError.keyTooLarge(
+                maximumBytes: Self.maximumBytes
+            )
+        }
+        try backend.store(data, for: provider.credentialKey)
+    }
+
+    public func clear(_ provider: ManagedAPIKeyProvider) throws {
+        try backend.remove(provider.credentialKey)
+    }
+}
