@@ -41,6 +41,7 @@ final class SettingsView {
     var order: [String] = []
     var hiddenProviderIDs: Set<String> = []
     var providerNames: [String: String] = [:]
+    var providerRows: [String: SwitchRow] = [:]
     var connections: [SignalConnection] = []
     var orderConnections: [SignalConnection] = []
     var applyingSettings = false

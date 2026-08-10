@@ -15,7 +15,7 @@ extension DashboardController {
 
         isRefreshing = true
         refreshButton.sensitive = false
-        overview.update(snapshots: snapshots, isRefreshing: true)
+        overview.update(snapshots: visibleOrdered(snapshots), isRefreshing: true)
 
         let repository = repository
         let callback = DashboardCallback(self)
@@ -73,20 +73,23 @@ extension DashboardController {
 
     /// Persisted provider order first, then account label.
     func ordered(_ snapshots: [ProviderUsageSnapshot]) -> [ProviderUsageSnapshot] {
-        snapshots.sorted { lhs, rhs in
-            let left = settings.providerOrder.firstIndex(of: lhs.providerID) ?? Int.max
-            let right = settings.providerOrder.firstIndex(of: rhs.providerID) ?? Int.max
-            if left != right { return left < right }
-            let leftLabel = lhs.accountLabel ?? lhs.displayName
-            let rightLabel = rhs.accountLabel ?? rhs.displayName
-            return leftLabel.localizedStandardCompare(rightLabel) == .orderedAscending
-        }
+        ProviderSnapshotPresentation.ordered(
+            snapshots,
+            providerOrder: settings.providerOrder
+        )
+    }
+
+    func visibleOrdered(_ snapshots: [ProviderUsageSnapshot]) -> [ProviderUsageSnapshot] {
+        ProviderSnapshotPresentation.visibleOrdered(
+            snapshots,
+            providerOrder: settings.providerOrder,
+            hiddenProviderIDs: settings.hiddenProviderIDs ?? []
+        )
     }
 
     func applySnapshots() {
         let ordered = ordered(snapshots)
-        let hidden = Set(settings.hiddenProviderIDs ?? [])
-        let visible = ordered.filter { !hidden.contains($0.providerID) }
+        let visible = visibleOrdered(snapshots)
         overview.update(snapshots: visible, isRefreshing: isRefreshing)
         providersView.update(snapshots: visible, isRefreshing: isRefreshing)
         historyView.update(snapshots: visible)
@@ -107,22 +110,10 @@ extension DashboardController {
 
     func applyRefreshed(_ refreshed: [ProviderUsageSnapshot]) {
         let merged = mergedWithLastGood(refreshed)
-        let displayChanged = snapshots.count != merged.count
-            || !zip(snapshots, merged).allSatisfy { current, next in
-                current.hasSameDisplayContent(as: next)
-            }
         snapshots = merged
         isRefreshing = false
         refreshButton.sensitive = true
-        if displayChanged {
-            applySnapshots()
-        } else {
-            let hidden = Set(settings.hiddenProviderIDs ?? [])
-            providersView.update(
-                snapshots: ordered(merged).filter { !hidden.contains($0.providerID) },
-                isRefreshing: false
-            )
-        }
+        applySnapshots()
         recordAnalyticsIfNeeded()
         if let desktopIntegration {
             Task.detached {

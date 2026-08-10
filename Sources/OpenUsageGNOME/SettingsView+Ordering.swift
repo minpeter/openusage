@@ -8,6 +8,7 @@ extension SettingsView {
     func rebuildOrderRows() {
         orderConnections.forEach { $0.disconnect() }
         orderConnections.removeAll(keepingCapacity: true)
+        providerRows.removeAll(keepingCapacity: true)
         while let existing = orderGroup.getRow(0) {
             orderGroup.remove(existing)
         }
@@ -27,8 +28,9 @@ extension SettingsView {
                 displayName: providerNames[id] ?? id,
                 size: 24
             ))
-            orderConnections.append(row.onNotify(.active) { [weak self, weak row] in
-                guard let self, let row, !self.applyingSettings else { return }
+            providerRows[id] = row
+            orderConnections.append(row.onNotify(.active) { [weak self] in
+                guard let self, let row = self.providerRows[id], !self.applyingSettings else { return }
                 if row.active {
                     self.hiddenProviderIDs.remove(id)
                 } else {
