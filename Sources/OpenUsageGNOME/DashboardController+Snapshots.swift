@@ -19,7 +19,8 @@ extension DashboardController {
         overview.update(
             snapshots: visible,
             isRefreshing: true,
-            metricPresentationSettings: settings.metricPresentationSettings
+            metricPresentationSettings: settings.metricPresentationSettings,
+            density: settings.density
         )
         updateToolbarSummary(snapshots: visible, isRefreshing: true)
 
@@ -99,12 +100,14 @@ extension DashboardController {
         overview.update(
             snapshots: visible,
             isRefreshing: isRefreshing,
-            metricPresentationSettings: settings.metricPresentationSettings
+            metricPresentationSettings: settings.metricPresentationSettings,
+            density: settings.density
         )
         providersView.update(
             snapshots: visible,
             isRefreshing: isRefreshing,
-            metricPresentationSettings: settings.metricPresentationSettings
+            metricPresentationSettings: settings.metricPresentationSettings,
+            density: settings.density
         )
         historyView.update(snapshots: visible)
         updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)

@@ -32,6 +32,7 @@ final class OverviewView {
     private var connections: [SignalConnection] = []
     private var urgentRows: [Widget] = []
     var metricPresentationSettings = GNOMEMetricPresentationSettings()
+    var density: DensitySetting = .regular
 
     init() {
         root = ScrolledWindow()
@@ -75,9 +76,15 @@ final class OverviewView {
     func update(
         snapshots: [ProviderUsageSnapshot],
         isRefreshing: Bool,
-        metricPresentationSettings: GNOMEMetricPresentationSettings
+        metricPresentationSettings: GNOMEMetricPresentationSettings,
+        density: DensitySetting
     ) {
         self.metricPresentationSettings = metricPresentationSettings
+        self.density = density
+        let densityMetrics = density.metrics
+        content.spacing = densityMetrics.sectionSpacing
+        content.setMargins(densityMetrics.outerMargin)
+        spinnerBox.spacing = densityMetrics.sectionSpacing
         while let child = content.firstChild {
             content.remove(child)
         }

@@ -17,13 +17,17 @@ extension OverviewView {
 
     func urgentRow(_ entry: (provider: String, metric: UsageMetric)) -> Widget {
         let presentation = metricPresentationSettings.presentation(for: entry.metric)
+        let densityMetrics = density.metrics
         let wrapper = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
         let row = ActionRow(title: entry.metric.label)
         row.subtitle = [entry.provider, presentation.pacingText]
             .compactMap { $0 }
             .joined(separator: " · ")
 
-        let trailing = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
+        let trailing = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: densityMetrics.controlSpacing
+        )
         trailing.valign = GTK_ALIGN_CENTER
         if let resetText = presentation.resetText {
             let resetLabel = Label(resetText)
@@ -39,7 +43,7 @@ extension OverviewView {
         if let fraction = entry.metric.fraction {
             let bar = ProgressBar()
             bar.fraction = fraction
-            bar.setMargins(GNOMEStyle.sectionSpacing)
+            bar.setMargins(densityMetrics.sectionSpacing)
             bar.marginTop = 0
             bar.setAccessibleLabel("\(entry.provider) \(entry.metric.label)")
             bar.setAccessibleDescription(presentation.valueText)
@@ -56,6 +60,7 @@ extension OverviewView {
     }
 
     func healthRow(_ snapshot: ProviderUsageSnapshot) -> Widget {
+        let densityMetrics = density.metrics
         let row = ActionRow(title: snapshot.displayName)
         row.addPrefix(ProviderIcon.make(
             providerID: snapshot.providerID,
@@ -77,7 +82,10 @@ extension OverviewView {
                 ?? GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
         }
 
-        let trailing = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
+        let trailing = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: densityMetrics.controlSpacing
+        )
         trailing.valign = GTK_ALIGN_CENTER
 
         let status = Image()

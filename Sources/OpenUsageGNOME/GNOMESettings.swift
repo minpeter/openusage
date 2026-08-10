@@ -50,6 +50,37 @@ enum DensitySetting: String, Codable, CaseIterable, Sendable {
     }
 }
 
+struct GNOMEDensityMetrics: Equatable, Sendable {
+    let outerMargin: Int
+    let sectionSpacing: Int
+    let rowSpacing: Int
+    let controlSpacing: Int
+    let minimumTargetHeight: Int
+}
+
+extension DensitySetting {
+    var metrics: GNOMEDensityMetrics {
+        switch self {
+        case .regular:
+            .init(
+                outerMargin: 18,
+                sectionSpacing: 12,
+                rowSpacing: 6,
+                controlSpacing: 8,
+                minimumTargetHeight: 40
+            )
+        case .compact:
+            .init(
+                outerMargin: 12,
+                sectionSpacing: 8,
+                rowSpacing: 4,
+                controlSpacing: 6,
+                minimumTargetHeight: 40
+            )
+        }
+    }
+}
+
 enum TimeFormatSetting: String, Codable, CaseIterable, Sendable {
     case auto
     case twelveHour = "12h"

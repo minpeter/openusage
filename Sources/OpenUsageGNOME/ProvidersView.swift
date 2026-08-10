@@ -53,9 +53,13 @@ final class ProvidersView {
     func update(
         snapshots: [ProviderUsageSnapshot],
         isRefreshing: Bool,
-        metricPresentationSettings: GNOMEMetricPresentationSettings
+        metricPresentationSettings: GNOMEMetricPresentationSettings,
+        density: DensitySetting
     ) {
         self.metricPresentationSettings = metricPresentationSettings
+        let densityMetrics = density.metrics
+        content.spacing = densityMetrics.sectionSpacing
+        content.setMargins(densityMetrics.outerMargin)
         let showEmpty = snapshots.isEmpty
         emptyPage.visible = showEmpty
         group.visible = !showEmpty
@@ -74,7 +78,8 @@ final class ProvidersView {
             let row = rows[snapshot.instanceID] ?? insertRow(for: snapshot)
             row.update(
                 snapshot: snapshot,
-                metricPresentationSettings: metricPresentationSettings
+                metricPresentationSettings: metricPresentationSettings,
+                density: density
             )
             if DemoFixtures.expandProviders {
                 row.expander.expanded = true
@@ -105,6 +110,8 @@ private final class ProviderRow {
     private let onRetry: () -> Void
     private var lastSnapshot: ProviderUsageSnapshot?
     private var lastMetricPresentationSettings: GNOMEMetricPresentationSettings?
+    private var lastDensity: DensitySetting?
+    private var densityMetrics = DensitySetting.regular.metrics
     private var connections: [SignalConnection] = []
 
     init(providerID: String, displayName: String, onRetry: @escaping @MainActor () -> Void) {
@@ -132,18 +139,24 @@ private final class ProviderRow {
 
     func update(
         snapshot: ProviderUsageSnapshot,
-        metricPresentationSettings: GNOMEMetricPresentationSettings
+        metricPresentationSettings: GNOMEMetricPresentationSettings,
+        density: DensitySetting
     ) {
         refreshedLabel.text = GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
         if let lastSnapshot,
            snapshot.hasSameDisplayContent(as: lastSnapshot),
-           metricPresentationSettings == lastMetricPresentationSettings
+           metricPresentationSettings == lastMetricPresentationSettings,
+           density == lastDensity
         {
             self.lastSnapshot = snapshot
             return
         }
         lastSnapshot = snapshot
         lastMetricPresentationSettings = metricPresentationSettings
+        lastDensity = density
+        densityMetrics = density.metrics
+        detail.spacing = densityMetrics.sectionSpacing
+        detail.setMargins(densityMetrics.sectionSpacing)
 
         expander.title = snapshot.displayName
         expander.subtitle = snapshot.accountLabel ?? stateSummary(snapshot)
@@ -226,8 +239,11 @@ private final class ProviderRow {
     }
 
     private func annotationRow(icon: String, cssClass: CSSClass, message: String) -> Widget {
-        let row = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
-        row.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
+        let row = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: densityMetrics.controlSpacing
+        )
+        row.setSizeRequest(height: densityMetrics.minimumTargetHeight)
 
         let image = Image(iconName: icon)
         image.addCSSClass(cssClass)
