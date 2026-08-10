@@ -119,6 +119,69 @@ struct LinuxUsageAPIContractTests {
         server.waitUntilStopped()
     }
 
+    @Test("Cross-origin browser requests are not granted read access")
+    func crossOriginRequestsAreNotCORSReadable() throws {
+        let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
+        try server.start()
+        defer {
+            server.stop()
+            server.waitUntilStopped()
+        }
+
+        let client = try LoopbackClient(port: server.port)
+        try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:\(server.port)\r\nOrigin: https://attacker.example\r\n\r\n")
+        let response = try client.readToEnd(timeoutMilliseconds: 1_000)
+
+        #expect(response.contains("HTTP/1.1 200 OK"))
+        #expect(!response.lowercased().contains("access-control-allow-origin:"))
+    }
+
+    @Test("Idle clients expire and release every connection slot")
+    func idleClientsReleaseConnectionSlots() throws {
+        let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
+        try server.start()
+        defer {
+            server.stop()
+            server.waitUntilStopped()
+        }
+
+        let idleClients = try occupyEveryConnectionSlot(on: server)
+        try expectServerBusy(on: server)
+        try waitForPeerClosure(
+            idleClients,
+            timeoutMilliseconds: 2_000
+        )
+
+        let replacement = try LoopbackClient(port: server.port)
+        try replacement.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        #expect(try replacement.readToEnd(timeoutMilliseconds: 1_000).contains("HTTP/1.1 200 OK"))
+    }
+
+    @Test("Stopping closes accepted idle clients and waits for their tasks")
+    func stopClosesAcceptedIdleClients() throws {
+        let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
+        try server.start()
+
+        let idleClients = try occupyEveryConnectionSlot(on: server)
+        try expectServerBusy(on: server)
+        server.stop()
+        try waitForPeerClosure(idleClients, timeoutMilliseconds: 1_000)
+        server.waitUntilStopped()
+    }
+
+    private func occupyEveryConnectionSlot(on server: LoopbackHTTPServer) throws -> [LoopbackClient] {
+        try (0..<LoopbackHTTPServer.maximumConcurrentConnections).map { _ in
+            let client = try LoopbackClient(port: server.port)
+            try client.send("GET /v1/usage HTTP/1.1\r\n")
+            return client
+        }
+    }
+
+    private func expectServerBusy(on server: LoopbackHTTPServer) throws {
+        let overflow = try LoopbackClient(port: server.port)
+        #expect(try overflow.readToEnd(timeoutMilliseconds: 1_000).contains("HTTP/1.1 503 Service Unavailable"))
+    }
+
     private func exerciseRealBinary(signal: Int32) async throws {
         let executable = URL(fileURLWithPath: CommandLine.arguments[0])
             .deletingLastPathComponent()
@@ -176,6 +239,101 @@ struct LinuxUsageAPIContractTests {
         #expect(response.body.map { $0.count < 100 } == true)
     }
 }
+
+#if os(Linux)
+private final class LoopbackClient {
+    let descriptor: Int32
+
+    init(port: Int) throws {
+        descriptor = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
+        guard descriptor >= 0 else { throw SocketTestError.operation("socket", errno) }
+        var address = sockaddr_in(
+            sin_family: sa_family_t(AF_INET),
+            sin_port: in_port_t(port).bigEndian,
+            sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")),
+            sin_zero: (0, 0, 0, 0, 0, 0, 0, 0)
+        )
+        let result = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Glibc.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard result == 0 else {
+            let code = errno
+            _ = Glibc.close(descriptor)
+            throw SocketTestError.operation("connect", code)
+        }
+    }
+
+    deinit { _ = Glibc.close(descriptor) }
+
+    func send(_ request: String) throws {
+        let data = Data(request.utf8)
+        let result = data.withUnsafeBytes { bytes in
+            Glibc.send(descriptor, bytes.baseAddress, data.count, Int32(MSG_NOSIGNAL))
+        }
+        guard result == data.count else { throw SocketTestError.operation("send", errno) }
+    }
+
+    func readToEnd(timeoutMilliseconds: Int32) throws -> String {
+        var bytes = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while true {
+            try waitForSocketEvent(descriptor, timeoutMilliseconds: timeoutMilliseconds)
+            let count = Glibc.recv(descriptor, &buffer, buffer.count, 0)
+            if count == 0 { return String(decoding: bytes, as: UTF8.self) }
+            guard count > 0 else { throw SocketTestError.operation("recv", errno) }
+            bytes.append(buffer, count: count)
+        }
+    }
+}
+
+private enum SocketTestError: Error {
+    case operation(String, Int32)
+    case timeout
+    case peerDidNotClose
+}
+
+private func waitForSocketEvent(_ descriptor: Int32, timeoutMilliseconds: Int32) throws {
+    var pollDescriptor = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+    let result = Glibc.poll(&pollDescriptor, 1, timeoutMilliseconds)
+    guard result > 0 else {
+        if result == 0 { throw SocketTestError.timeout }
+        throw SocketTestError.operation("poll", errno)
+    }
+}
+
+private func waitForPeerClosure(_ clients: [LoopbackClient], timeoutMilliseconds: Int32) throws {
+    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(timeoutMilliseconds) * 1_000_000
+    var openDescriptors = Set(clients.map(\.descriptor))
+    while !openDescriptors.isEmpty {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now < deadline else { throw SocketTestError.timeout }
+        let remaining = deadline - now
+        let timeout = Int32(min((remaining + 999_999) / 1_000_000, UInt64(Int32.max)))
+        var descriptors = openDescriptors.map {
+            pollfd(fd: $0, events: Int16(POLLIN | POLLHUP), revents: 0)
+        }
+        let ready = Glibc.poll(&descriptors, nfds_t(descriptors.count), timeout)
+        if ready < 0, errno == EINTR { continue }
+        guard ready > 0 else {
+            if ready == 0 { throw SocketTestError.timeout }
+            throw SocketTestError.operation("poll", errno)
+        }
+        for descriptor in descriptors where descriptor.revents != 0 {
+            var byte: UInt8 = 0
+            let count = Glibc.recv(descriptor.fd, &byte, 1, Int32(MSG_DONTWAIT))
+            if count == 0 {
+                openDescriptors.remove(descriptor.fd)
+            } else if count > 0 {
+                throw SocketTestError.peerDidNotClose
+            } else if errno != EAGAIN && errno != EWOULDBLOCK {
+                throw SocketTestError.operation("recv", errno)
+            }
+        }
+    }
+}
+#endif
 
 private actor APIFixtureSource: ProviderSnapshotSource {
     func knownProviderIDs() -> Set<String> { ["fixture"] }

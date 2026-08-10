@@ -25,14 +25,19 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     public static let defaultPort = 6736
     public static let maximumRequestHeadBytes = 8_192
     public static let maximumConcurrentConnections = 16
+    static let requestHeadReadDeadlineMilliseconds: Int32 = 1_000
 
     private let requestedPort: Int
     private let source: any ProviderSnapshotSource
     private let queue = DispatchQueue(label: "openusage.linux.local-api")
+    private let clientQueue = DispatchQueue(
+        label: "openusage.linux.local-api.clients",
+        attributes: .concurrent
+    )
     private let lock = NSLock()
-    private let stopped = DispatchSemaphore(value: 0)
+    private let workers = DispatchGroup()
     private var listener: Int32 = -1
-    private var activeConnections = 0
+    private var activeClients: Set<Int32> = []
     private var didStop = false
     public private(set) var port: Int
 
@@ -86,7 +91,8 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
             port = Int(in_port_t(bigEndian: bound.sin_port))
         }
         listener = descriptor
-        queue.async { [weak self] in self?.acceptLoop(descriptor) }
+        workers.enter()
+        queue.async { self.acceptLoop(descriptor) }
     }
 
     public func stop() {
@@ -98,6 +104,9 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         didStop = true
         let descriptor = listener
         listener = -1
+        for client in activeClients {
+            _ = shutdown(client, Int32(SHUT_RDWR))
+        }
         lock.unlock()
         if descriptor >= 0 {
             _ = shutdown(descriptor, Int32(SHUT_RDWR))
@@ -106,13 +115,13 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     }
 
     public func waitUntilStopped() {
-        stopped.wait()
+        workers.wait()
     }
 
     deinit { stop() }
 
     private func acceptLoop(_ descriptor: Int32) {
-        defer { stopped.signal() }
+        defer { workers.leave() }
         while true {
             let client = Glibc.accept(descriptor, nil, nil)
             if client < 0 {
@@ -122,47 +131,64 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
                 if stopping { return }
                 continue
             }
-            guard reserveConnection() else {
+            guard reserveConnection(client) else {
                 send(Self.http(LinuxUsageAPI.busyResponse), to: client)
                 _ = Glibc.close(client)
                 continue
             }
-            Task { [weak self] in
-                guard let self else { _ = Glibc.close(client); return }
-                await self.handle(client)
-                self.releaseConnection()
+            clientQueue.async {
+                self.handle(client)
+                self.finishConnection(client)
             }
         }
     }
 
-    private func reserveConnection() -> Bool {
+    private func reserveConnection(_ client: Int32) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        guard activeConnections < Self.maximumConcurrentConnections else { return false }
-        activeConnections += 1
+        guard !didStop, activeClients.count < Self.maximumConcurrentConnections else { return false }
+        activeClients.insert(client)
+        workers.enter()
         return true
     }
 
-    private func releaseConnection() {
+    private func finishConnection(_ client: Int32) {
         lock.lock()
-        activeConnections -= 1
+        _ = Glibc.close(client)
+        let wasActive = activeClients.remove(client) != nil
         lock.unlock()
+        if wasActive { workers.leave() }
     }
 
-    private func handle(_ client: Int32) async {
-        defer { _ = Glibc.close(client) }
+    private func handle(_ client: Int32) {
         guard let request = Self.readRequest(client) else { return }
-        let snapshots = await source.snapshots(force: false)
-        let known = await source.knownProviderIDs()
-        let state = LinuxUsageAPIState(knownProviderIDs: known, snapshots: snapshots)
-        let response = LinuxUsageAPI.respond(method: request.method, path: request.path, state: state)
-        send(Self.http(response), to: client)
+        let completed = DispatchSemaphore(value: 0)
+        Task {
+            let snapshots = await source.snapshots(force: false)
+            let known = await source.knownProviderIDs()
+            let state = LinuxUsageAPIState(knownProviderIDs: known, snapshots: snapshots)
+            let response = LinuxUsageAPI.respond(method: request.method, path: request.path, state: state)
+            send(Self.http(response), to: client)
+            completed.signal()
+        }
+        completed.wait()
     }
 
     private static func readRequest(_ descriptor: Int32) -> (method: String, path: String)? {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 1_024)
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            + UInt64(requestHeadReadDeadlineMilliseconds) * 1_000_000
         while data.count < maximumRequestHeadBytes {
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline else { return nil }
+            let remaining = deadline - now
+            let timeout = Int32(min((remaining + 999_999) / 1_000_000, UInt64(Int32.max)))
+            var pollDescriptor = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+            let ready = Glibc.poll(&pollDescriptor, 1, timeout)
+            if ready < 0, errno == EINTR { continue }
+            guard ready > 0 else { return nil }
+
             let count = Glibc.recv(descriptor, &buffer, min(buffer.count, maximumRequestHeadBytes - data.count), 0)
             guard count > 0 else { return nil }
             data.append(buffer, count: count)
@@ -194,9 +220,6 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         }
         let body = response.body ?? Data()
         var head = "HTTP/1.1 \(response.status) \(reason)\r\n"
-        head += "Access-Control-Allow-Origin: *\r\n"
-        head += "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-        head += "Access-Control-Allow-Headers: Content-Type\r\n"
         head += "Connection: close\r\n"
         if response.body != nil { head += "Content-Type: application/json\r\n" }
         head += "Content-Length: \(body.count)\r\n\r\n"

@@ -178,11 +178,15 @@ In both response shapes, `displayName` is the card's current name — if you ren
 
 Codes: `provider_not_found`, `not_found`, `method_not_allowed`, `server_busy`.
 
-## CORS and privacy
+## Browser origins and privacy
 
-All responses include permissive CORS headers (`Access-Control-Allow-Origin: *`, methods `GET, OPTIONS`). `OPTIONS` requests return **204** for preflight.
+The server does not grant browser cross-origin access: responses omit `Access-Control-Allow-Origin` and the other CORS opt-in headers. `OPTIONS` remains a valid route and returns **204**, but its response does not authorize a browser preflight. A page from another origin therefore cannot read usage snapshots through browser JavaScript.
 
-The server only listens on the loopback interface (`127.0.0.1`), so it is not reachable from other machines on your network. Because the CORS header is permissive, though, a web page open in your browser can read your usage snapshots from this API while the app is running. The data exposed is the same usage numbers shown in the menu bar — no credentials or tokens are ever served. This matches the original app's behavior so existing integrations keep working.
+The server only listens on the loopback interface (`127.0.0.1`), so it is not reachable from other machines on your network. Existing native integrations, command-line tools, and local HTTP clients continue to work because they do not rely on browser CORS permission. The API never serves credentials or tokens.
+
+## Connection lifecycle
+
+The server accepts at most 16 concurrent clients. A client has one second from acceptance to send its complete HTTP request head; incomplete or idle connections are then closed and their slot is released. Stopping the server also shuts down every accepted client and waits for its handler to finish, so stalled clients cannot keep the process or connection slots alive.
 
 ## Caching behavior
 
