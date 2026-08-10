@@ -8,18 +8,23 @@ import OpenUsageLinuxCore
 @MainActor
 enum MetricViews {
 
-    static func widget(for metric: UsageMetric, providerName: String) -> Widget {
+    static func widget(
+        for metric: UsageMetric,
+        providerName: String,
+        metricPresentationSettings: GNOMEMetricPresentationSettings
+    ) -> Widget {
+        let presentation = metricPresentationSettings.presentation(for: metric)
         switch metric.kind {
         case .progress:
-            return progress(metric)
+            return progress(metric, presentation: presentation)
         case .value:
-            return value(metric)
+            return value(metric, presentation: presentation)
         case .values:
-            return values(metric)
+            return values(metric, presentation: presentation)
         case .badge:
             return badge(metric)
         case .chart:
-            return chart(metric, providerName: providerName)
+            return chart(metric, providerName: providerName, presentation: presentation)
         case .text:
             return text(metric)
         }
@@ -27,7 +32,10 @@ enum MetricViews {
 
     // MARK: - Progress: label, trailing percentage, bar, reset copy
 
-    private static func progress(_ metric: UsageMetric) -> Widget {
+    private static func progress(
+        _ metric: UsageMetric,
+        presentation: GNOMEMetricPresentation
+    ) -> Widget {
         let box = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.rowSpacing)
         let heading = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
 
@@ -38,7 +46,7 @@ enum MetricViews {
         label.addCSSClass(.heading)
         heading.append(label)
 
-        let primary = primaryValue(metric)
+        let primary = primaryValue(metric, presentation: presentation)
         let value = Label(primary)
         value.xalign = 1
         value.wrap = true
@@ -55,7 +63,7 @@ enum MetricViews {
             box.append(bar)
         }
 
-        if let caption = secondaryCopy(metric) {
+        if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -63,7 +71,10 @@ enum MetricViews {
 
     // MARK: - Value / values: title, primary value, optional detail
 
-    private static func value(_ metric: UsageMetric) -> Widget {
+    private static func value(
+        _ metric: UsageMetric,
+        presentation: GNOMEMetricPresentation
+    ) -> Widget {
         let box = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.rowSpacing)
         let heading = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
 
@@ -80,13 +91,16 @@ enum MetricViews {
         heading.append(valueLabel)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric) {
+        if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
     }
 
-    private static func values(_ metric: UsageMetric) -> Widget {
+    private static func values(
+        _ metric: UsageMetric,
+        presentation: GNOMEMetricPresentation
+    ) -> Widget {
         let box = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.rowSpacing)
         let heading = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
 
@@ -106,7 +120,7 @@ enum MetricViews {
         heading.append(primary)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric) {
+        if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -145,7 +159,11 @@ enum MetricViews {
 
     // MARK: - Chart: single Cairo area with accessible tabular copy
 
-    private static func chart(_ metric: UsageMetric, providerName: String) -> Widget {
+    private static func chart(
+        _ metric: UsageMetric,
+        providerName: String,
+        presentation: GNOMEMetricPresentation
+    ) -> Widget {
         let box = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.rowSpacing)
         let label = Label(metric.label)
         label.xalign = 0
@@ -156,7 +174,7 @@ enum MetricViews {
                               unitLabel: "tokens")
         box.append(chart.widget)
 
-        if let caption = secondaryCopy(metric) {
+        if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -185,17 +203,25 @@ enum MetricViews {
         return caption
     }
 
-    private static func primaryValue(_ metric: UsageMetric) -> String {
+    private static func primaryValue(
+        _ metric: UsageMetric,
+        presentation: GNOMEMetricPresentation? = nil
+    ) -> String {
         if metric.kind == .progress {
-            return GNOMEFormat.percent(metric.used)
+            return presentation?.valueText ?? GNOMEFormat.percent(metric.used)
         }
         return GNOMEFormat.currency(metric.used)
     }
 
-    private static func secondaryCopy(_ metric: UsageMetric) -> String? {
-        let reset = metric.resetsAt.map { GNOMEFormat.relativeReset($0) }
+    private static func secondaryCopy(
+        _ metric: UsageMetric,
+        presentation: GNOMEMetricPresentation
+    ) -> String? {
         let expiry = metric.expiriesAt?.first.map { "Credits expire \(GNOMEFormat.shortDay($0))" }
-        return [metric.detail, reset, expiry].compactMap { $0 }.joined(separator: " · ").nilIfEmpty
+        return [metric.detail, presentation.resetText, presentation.pacingText, expiry]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+            .nilIfEmpty
     }
 
     private static func formatValue(_ value: UsageValue) -> String {

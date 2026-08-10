@@ -31,6 +31,7 @@ final class OverviewView {
     private var selectedSpendPeriod = "Today"
     private var connections: [SignalConnection] = []
     private var urgentRows: [Widget] = []
+    var metricPresentationSettings = GNOMEMetricPresentationSettings()
 
     init() {
         root = ScrolledWindow()
@@ -71,7 +72,12 @@ final class OverviewView {
     }
 
     /// Rebuilds the three sections. `snapshots` must already be ordered.
-    func update(snapshots: [ProviderUsageSnapshot], isRefreshing: Bool) {
+    func update(
+        snapshots: [ProviderUsageSnapshot],
+        isRefreshing: Bool,
+        metricPresentationSettings: GNOMEMetricPresentationSettings
+    ) {
+        self.metricPresentationSettings = metricPresentationSettings
         while let child = content.firstChild {
             content.remove(child)
         }

@@ -13,7 +13,18 @@ enum PanelUsagePresentation {
             return .usage(snapshots: snapshots, displayMode: displayMode)
         }
 
-        let tooltip = pinnedMetrics.map(\.tooltip).joined(separator: " | ")
+        let displayedMetrics: [PinnedPanelMetric]
+        switch style {
+        case .text:
+            displayedMetrics = pinnedMetrics
+        case .bars:
+            displayedMetrics = Array(pinnedMetrics.filter { $0.fraction != nil }.prefix(4))
+        }
+        guard !displayedMetrics.isEmpty else {
+            return .usage(snapshots: snapshots, displayMode: displayMode)
+        }
+
+        let tooltip = displayedMetrics.map(\.tooltip).joined(separator: " | ")
         guard displayMode == .mostUrgent else {
             return .init(label: "", tooltip: tooltip)
         }
@@ -21,13 +32,9 @@ enum PanelUsagePresentation {
         let label: String
         switch style {
         case .text:
-            label = textLabel(for: pinnedMetrics)
+            label = textLabel(for: displayedMetrics)
         case .bars:
-            let bars = pinnedMetrics.compactMap(\.fraction).prefix(4).map(bar)
-            guard !bars.isEmpty else {
-                return .usage(snapshots: snapshots, displayMode: displayMode)
-            }
-            label = bars.joined(separator: " ")
+            label = displayedMetrics.compactMap(\.fraction).map(bar).joined(separator: " ")
         }
         return .init(title: label, label: label, tooltip: tooltip)
     }

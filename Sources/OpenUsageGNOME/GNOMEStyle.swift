@@ -1,5 +1,6 @@
 import Adwaita
 import Foundation
+import OpenUsageLinuxCore
 
 /// Design tokens for the OpenUsage GNOME shell.
 ///
@@ -109,7 +110,6 @@ enum GNOMEStyle {
 }
 
 /// Shared copy builders so every view formats values identically.
-@MainActor
 enum GNOMEFormat {
 
     static func relativeReset(_ date: Date, now: Date = Date()) -> String {
@@ -147,6 +147,201 @@ enum GNOMEFormat {
 
     static func percent(_ used: Double) -> String {
         "\(Int(used.rounded()))% used"
+    }
+}
+
+struct GNOMEMetricPresentationSettings: Equatable, Sendable {
+    let displayMode: WidgetDisplayMode
+    let resetMode: ResetDisplayMode
+    let timeFormat: TimeFormatSetting
+    let alwaysShowPacing: Bool
+
+    init(
+        displayMode: WidgetDisplayMode = .used,
+        resetMode: ResetDisplayMode = .relative,
+        timeFormat: TimeFormatSetting = .auto,
+        alwaysShowPacing: Bool = false
+    ) {
+        self.displayMode = displayMode
+        self.resetMode = resetMode
+        self.timeFormat = timeFormat
+        self.alwaysShowPacing = alwaysShowPacing
+    }
+
+    func presentation(
+        for metric: UsageMetric,
+        now: Date = Date(),
+        locale: Locale = .current,
+        timeZone: TimeZone = .current
+    ) -> GNOMEMetricPresentation {
+        GNOMEMetricPresentation(
+            metric: metric,
+            displayMode: displayMode,
+            resetMode: resetMode,
+            timeFormat: timeFormat,
+            alwaysShowPacing: alwaysShowPacing,
+            now: now,
+            locale: locale,
+            timeZone: timeZone
+        )
+    }
+}
+
+extension GNOMESettings {
+    var metricPresentationSettings: GNOMEMetricPresentationSettings {
+        .init(
+            displayMode: widgetDisplayMode,
+            resetMode: resetDisplayMode,
+            timeFormat: timeFormat,
+            alwaysShowPacing: alwaysShowPacing
+        )
+    }
+}
+
+struct GNOMEMetricPresentation: Equatable, Sendable {
+    let valueText: String
+    let resetText: String?
+    let pacingText: String?
+
+    init(
+        metric: UsageMetric,
+        displayMode: WidgetDisplayMode,
+        resetMode: ResetDisplayMode,
+        timeFormat: TimeFormatSetting,
+        alwaysShowPacing: Bool,
+        now: Date = Date(),
+        locale: Locale = .current,
+        timeZone: TimeZone = .current
+    ) {
+        valueText = Self.valueText(metric: metric, displayMode: displayMode)
+        resetText = Self.resetText(
+            metric: metric,
+            mode: resetMode,
+            timeFormat: timeFormat,
+            now: now,
+            locale: locale,
+            timeZone: timeZone
+        )
+        pacingText = Self.pacingText(
+            metric: metric,
+            alwaysShow: alwaysShowPacing,
+            now: now
+        )
+    }
+
+    private static func valueText(
+        metric: UsageMetric,
+        displayMode: WidgetDisplayMode
+    ) -> String {
+        guard let fraction = metric.fraction else {
+            return metric.detail ?? String(format: "%.0f", metric.used)
+        }
+        let displayedFraction = displayMode == .used ? fraction : 1 - fraction
+        let percent = Int((displayedFraction * 100).rounded())
+        return "\(percent)% \(displayMode.label.lowercased())"
+    }
+
+    private static func resetText(
+        metric: UsageMetric,
+        mode: ResetDisplayMode,
+        timeFormat: TimeFormatSetting,
+        now: Date,
+        locale: Locale,
+        timeZone: TimeZone
+    ) -> String? {
+        guard let resetsAt = metric.resetsAt else { return nil }
+        switch mode {
+        case .relative:
+            return GNOMEFormat.relativeReset(resetsAt, now: now)
+        case .absolute:
+            return exactResetText(
+                resetsAt,
+                now: now,
+                timeFormat: timeFormat,
+                locale: locale,
+                timeZone: timeZone
+            )
+        }
+    }
+
+    private static func exactResetText(
+        _ date: Date,
+        now: Date,
+        timeFormat: TimeFormatSetting,
+        locale: Locale,
+        timeZone: TimeZone
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        calendar.timeZone = timeZone
+
+        let day: String
+        if calendar.isDate(date, inSameDayAs: now) {
+            day = "today"
+        } else if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+                  calendar.isDate(date, inSameDayAs: tomorrow)
+        {
+            day = "tomorrow"
+        } else {
+            let dayFormatter = DateFormatter()
+            dayFormatter.locale = locale
+            dayFormatter.timeZone = timeZone
+            dayFormatter.setLocalizedDateFormatFromTemplate("MMM d")
+            day = dayFormatter.string(from: date)
+        }
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = locale
+        timeFormatter.timeZone = timeZone
+        switch timeFormat {
+        case .auto:
+            timeFormatter.setLocalizedDateFormatFromTemplate("j:mm")
+        case .twelveHour:
+            timeFormatter.dateFormat = "h:mm a"
+        case .twentyFourHour:
+            timeFormatter.dateFormat = "HH:mm"
+        }
+        return "Resets \(day) at \(timeFormatter.string(from: date))"
+    }
+
+    private static func pacingText(
+        metric: UsageMetric,
+        alwaysShow: Bool,
+        now: Date
+    ) -> String? {
+        guard metric.kind == .progress,
+              let limit = metric.limit,
+              metric.used.isFinite,
+              limit.isFinite,
+              limit > 0,
+              let resetsAt = metric.resetsAt,
+              let periodMilliseconds = metric.periodDurationMilliseconds,
+              periodMilliseconds > 0
+        else {
+            return nil
+        }
+
+        let period = TimeInterval(periodMilliseconds) / 1_000
+        let startedAt = resetsAt.addingTimeInterval(-period)
+        let elapsed = now.timeIntervalSince(startedAt)
+        guard period.isFinite,
+              elapsed.isFinite,
+              elapsed > 0,
+              elapsed < period
+        else {
+            return nil
+        }
+
+        let projectedPercent = max(metric.used, 0) / limit / (elapsed / period) * 100
+        let roundedProjection = Int(projectedPercent.rounded())
+        if projectedPercent <= 90 {
+            guard alwaysShow else { return nil }
+            return "On pace · ~\(roundedProjection)% at reset"
+        }
+        if projectedPercent <= 100 {
+            return "Close · ~\(roundedProjection)% at reset"
+        }
+        return "Will run out · ~\(roundedProjection)% at reset"
     }
 }
 

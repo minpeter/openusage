@@ -14,6 +14,7 @@ final class ProvidersView {
     private let group = PreferencesGroup(title: "Connected Accounts")
     private let emptyPage: StatusPage
     private var rows: [String: ProviderRow] = [:]
+    private var metricPresentationSettings = GNOMEMetricPresentationSettings()
     private var onRefresh: () -> Void = {}
 
     init() {
@@ -49,7 +50,12 @@ final class ProvidersView {
     }
 
     /// Updates the row tree in place. `snapshots` must already be ordered.
-    func update(snapshots: [ProviderUsageSnapshot], isRefreshing: Bool) {
+    func update(
+        snapshots: [ProviderUsageSnapshot],
+        isRefreshing: Bool,
+        metricPresentationSettings: GNOMEMetricPresentationSettings
+    ) {
+        self.metricPresentationSettings = metricPresentationSettings
         let showEmpty = snapshots.isEmpty
         emptyPage.visible = showEmpty
         group.visible = !showEmpty
@@ -66,7 +72,10 @@ final class ProvidersView {
         }
         for snapshot in snapshots {
             let row = rows[snapshot.instanceID] ?? insertRow(for: snapshot)
-            row.update(snapshot: snapshot)
+            row.update(
+                snapshot: snapshot,
+                metricPresentationSettings: metricPresentationSettings
+            )
             if DemoFixtures.expandProviders {
                 row.expander.expanded = true
             }
@@ -95,6 +104,7 @@ private final class ProviderRow {
     private let refreshedLabel = Label("")
     private let onRetry: () -> Void
     private var lastSnapshot: ProviderUsageSnapshot?
+    private var lastMetricPresentationSettings: GNOMEMetricPresentationSettings?
     private var connections: [SignalConnection] = []
 
     init(providerID: String, displayName: String, onRetry: @escaping @MainActor () -> Void) {
@@ -120,13 +130,20 @@ private final class ProviderRow {
         refreshedLabel.addCSSClass(.dimLabel)
     }
 
-    func update(snapshot: ProviderUsageSnapshot) {
+    func update(
+        snapshot: ProviderUsageSnapshot,
+        metricPresentationSettings: GNOMEMetricPresentationSettings
+    ) {
         refreshedLabel.text = GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
-        if let lastSnapshot, snapshot.hasSameDisplayContent(as: lastSnapshot) {
+        if let lastSnapshot,
+           snapshot.hasSameDisplayContent(as: lastSnapshot),
+           metricPresentationSettings == lastMetricPresentationSettings
+        {
             self.lastSnapshot = snapshot
             return
         }
         lastSnapshot = snapshot
+        lastMetricPresentationSettings = metricPresentationSettings
 
         expander.title = snapshot.displayName
         expander.subtitle = snapshot.accountLabel ?? stateSummary(snapshot)
@@ -150,7 +167,7 @@ private final class ProviderRow {
             stateIcon.visible = false
         }
 
-        rebuildDetail(snapshot)
+        rebuildDetail(snapshot, metricPresentationSettings: metricPresentationSettings)
     }
 
     private func stateSummary(_ snapshot: ProviderUsageSnapshot) -> String {
@@ -159,7 +176,10 @@ private final class ProviderRow {
         return "Usage up to date"
     }
 
-    private func rebuildDetail(_ snapshot: ProviderUsageSnapshot) {
+    private func rebuildDetail(
+        _ snapshot: ProviderUsageSnapshot,
+        metricPresentationSettings: GNOMEMetricPresentationSettings
+    ) {
         connections.forEach { $0.disconnect() }
         connections.removeAll(keepingCapacity: true)
         while let child = detail.firstChild {
@@ -183,7 +203,11 @@ private final class ProviderRow {
         }
 
         for metric in snapshot.metrics {
-            detail.append(MetricViews.widget(for: metric, providerName: snapshot.displayName))
+            detail.append(MetricViews.widget(
+                for: metric,
+                providerName: snapshot.displayName,
+                metricPresentationSettings: metricPresentationSettings
+            ))
         }
 
         if snapshot.errorMessage == nil && snapshot.metrics.isEmpty {

@@ -16,7 +16,11 @@ extension DashboardController {
         isRefreshing = true
         refreshButton.sensitive = false
         let visible = visibleOrdered(snapshots)
-        overview.update(snapshots: visible, isRefreshing: true)
+        overview.update(
+            snapshots: visible,
+            isRefreshing: true,
+            metricPresentationSettings: settings.metricPresentationSettings
+        )
         updateToolbarSummary(snapshots: visible, isRefreshing: true)
 
         let repository = repository
@@ -92,8 +96,16 @@ extension DashboardController {
     func applySnapshots() {
         let ordered = ordered(snapshots)
         let visible = visibleOrdered(snapshots)
-        overview.update(snapshots: visible, isRefreshing: isRefreshing)
-        providersView.update(snapshots: visible, isRefreshing: isRefreshing)
+        overview.update(
+            snapshots: visible,
+            isRefreshing: isRefreshing,
+            metricPresentationSettings: settings.metricPresentationSettings
+        )
+        providersView.update(
+            snapshots: visible,
+            isRefreshing: isRefreshing,
+            metricPresentationSettings: settings.metricPresentationSettings
+        )
         historyView.update(snapshots: visible)
         updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)
         updateTrayUsage(visible)

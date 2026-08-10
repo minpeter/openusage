@@ -16,19 +16,22 @@ extension OverviewView {
     }
 
     func urgentRow(_ entry: (provider: String, metric: UsageMetric)) -> Widget {
+        let presentation = metricPresentationSettings.presentation(for: entry.metric)
         let wrapper = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
         let row = ActionRow(title: entry.metric.label)
-        row.subtitle = entry.provider
+        row.subtitle = [entry.provider, presentation.pacingText]
+            .compactMap { $0 }
+            .joined(separator: " · ")
 
         let trailing = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
         trailing.valign = GTK_ALIGN_CENTER
-        if let reset = entry.metric.resetsAt {
-            let resetLabel = Label(GNOMEFormat.relativeReset(reset))
+        if let resetText = presentation.resetText {
+            let resetLabel = Label(resetText)
             resetLabel.addCSSClass(.caption)
             resetLabel.addCSSClass(.dimLabel)
             trailing.append(resetLabel)
         }
-        let value = Label(GNOMEFormat.percent(entry.metric.used))
+        let value = Label(presentation.valueText)
         value.addCSSClass(.numeric)
         trailing.append(value)
         row.addSuffix(trailing)
@@ -39,10 +42,10 @@ extension OverviewView {
             bar.setMargins(GNOMEStyle.sectionSpacing)
             bar.marginTop = 0
             bar.setAccessibleLabel("\(entry.provider) \(entry.metric.label)")
-            bar.setAccessibleDescription(GNOMEFormat.percent(entry.metric.used))
+            bar.setAccessibleDescription(presentation.valueText)
             if fraction >= 0.9 {
                 bar.addCSSClass(.error)
-            } else if fraction >= 0.75 {
+            } else if fraction >= 0.8 {
                 bar.addCSSClass(.warning)
             }
             wrapper.append(row)
