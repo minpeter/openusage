@@ -44,7 +44,8 @@ public actor AntigravityRefreshedTokenCache: AntigravityRefreshedTokenCaching {
             discard()
             return nil
         }
-        guard let attributes = try? fileManager.attributesOfItem(atPath: path.path),
+        guard PrivateAtomicFileWriter.isPrivateFile(path, fileManager: fileManager),
+              let attributes = try? fileManager.attributesOfItem(atPath: path.path),
               let size = attributes[.size] as? NSNumber,
               size.intValue <= Self.maximumBytes,
               let data = try? Data(contentsOf: path),
@@ -77,12 +78,7 @@ public actor AntigravityRefreshedTokenCache: AntigravityRefreshedTokenCaching {
         )
         guard let data = try? JSONEncoder().encode(cached) else { return }
         do {
-            try fileManager.createDirectory(
-                at: path.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try data.write(to: path, options: .atomic)
-            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+            try PrivateAtomicFileWriter.write(data, to: path, fileManager: fileManager)
         } catch {
             try? fileManager.removeItem(at: path)
         }

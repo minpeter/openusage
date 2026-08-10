@@ -32,6 +32,7 @@ public struct ClaudeConfigDirDiscovery: Sendable {
     /// Finds account-attributable Claude homes only. Identity plus exact credential shape is the gate;
     /// arbitrary project and temporary directories are never searched.
     public func discover() -> [ClaudeAccount] {
+        let reader = BoundedProviderFileReader()
         let defaults = Set(paths.claudeConfigDirectories.map(canonical))
         let homeChildren = directories(in: paths.homeDirectory).filter { $0.lastPathComponent.hasPrefix(".") }
         let configChildren = directories(in: paths.homeDirectory.appendingPathComponent(".config"))
@@ -39,11 +40,11 @@ public struct ClaudeConfigDirDiscovery: Sendable {
             guard !defaults.contains(canonical(directory)) else { return nil }
             let identityFile = directory.appendingPathComponent(".claude.json")
             let credentialFile = directory.appendingPathComponent(".credentials.json")
-            guard let identityData = try? Data(contentsOf: identityFile),
+            guard let identityData = try? reader.read(identityFile),
                   let root = try? JSONSerialization.jsonObject(with: identityData) as? [String: Any],
                   let account = root["oauthAccount"] as? [String: Any],
                   let accountID = nonempty(account["accountUuid"] as? String)?.lowercased(),
-                  let credentialData = try? Data(contentsOf: credentialFile),
+                  let credentialData = try? reader.read(credentialFile),
                   let credentialRoot = parityJSON(credentialData),
                   let oauth = credentialRoot["claudeAiOauth"] as? [String: Any],
                   nonempty(oauth["accessToken"] as? String) != nil else { return nil }

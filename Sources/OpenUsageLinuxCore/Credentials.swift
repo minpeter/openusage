@@ -110,6 +110,7 @@ public struct CodexCredentials: Codable, Equatable, Sendable {
 }
 
 public struct LinuxCredentialStore: Sendable {
+    private static let maximumDocumentBytes = 1_048_576
     public let paths: LinuxPaths
 
     public init(paths: LinuxPaths = LinuxPaths()) {
@@ -136,14 +137,13 @@ public struct LinuxCredentialStore: Sendable {
 
     public func saveClaude(_ credentials: ClaudeCredentials, configDirectory: URL) throws {
         let path = configDirectory.appendingPathComponent(".credentials.json")
-        var object = (try? Data(contentsOf: path)).flatMap {
+        var object = try readIfPresent(path: path, provider: "Claude").flatMap {
             try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
         } ?? [:]
         let encoded = try JSONEncoder().encode(credentials)
         object["claudeAiOauth"] = try JSONSerialization.jsonObject(with: encoded)
-        try FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
-        try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            .write(to: path, options: .atomic)
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        try PrivateAtomicFileWriter.write(data, to: path)
     }
 
     public func loadCodex() throws -> CodexCredentials {
@@ -165,7 +165,7 @@ public struct LinuxCredentialStore: Sendable {
         let path = paths.codexAuthCandidates.first(where: {
             fileManager.fileExists(atPath: $0.path)
         }) ?? paths.codexAuthCandidates[0]
-        let existing = (try? Data(contentsOf: path))
+        let existing = try readIfPresent(path: path, provider: "Codex")
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         var document = existing
         var tokens = document["tokens"] as? [String: Any] ?? [:]
@@ -178,21 +178,33 @@ public struct LinuxCredentialStore: Sendable {
         if let apiKey = credentials.apiKey {
             document["OPENAI_API_KEY"] = apiKey
         }
-        try fileManager.createDirectory(
-            at: path.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
         let data = try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: path, options: .atomic)
+        try PrivateAtomicFileWriter.write(data, to: path, fileManager: fileManager)
     }
 
     private func read(path: URL, provider: String) throws -> Data {
         guard FileManager.default.fileExists(atPath: path.path) else {
             throw LinuxUsageError.credentialsMissing(provider)
         }
+        guard let data = try readIfPresent(path: path, provider: provider) else {
+            throw LinuxUsageError.credentialsMissing(provider)
+        }
+        return data
+    }
+
+    private func readIfPresent(path: URL, provider: String) throws -> Data? {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: path.path) else { return nil }
         do {
-            return try Data(contentsOf: path)
+            let attributes = try fileManager.attributesOfItem(atPath: path.path)
+            guard let size = attributes[.size] as? NSNumber,
+                  size.intValue <= Self.maximumDocumentBytes
+            else {
+                throw LinuxUsageError.invalidCredentials(provider)
+            }
+            return try Data(contentsOf: path, options: [.mappedIfSafe])
         } catch {
+            if let usageError = error as? LinuxUsageError { throw usageError }
             throw LinuxUsageError.invalidCredentials(provider)
         }
     }

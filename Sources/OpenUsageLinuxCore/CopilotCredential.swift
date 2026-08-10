@@ -64,7 +64,7 @@ public struct CopilotLinuxCredentialStore: Sendable {
         var malformed = false
         for path in editorCandidates where FileManager.default.fileExists(atPath: path.path) {
             do {
-                let text = try String(contentsOf: path, encoding: .utf8)
+                let text = try Self.readBoundedText(path)
                 if let credential = Self.editorCredential(text) { return credential }
                 if text.data(using: .utf8).flatMap({ try? JSONSerialization.jsonObject(with: $0) }) == nil {
                     malformed = true
@@ -74,7 +74,7 @@ public struct CopilotLinuxCredentialStore: Sendable {
 
         var ghText: String?
         if FileManager.default.fileExists(atPath: ghHosts.path) {
-            do { ghText = try String(contentsOf: ghHosts, encoding: .utf8) } catch { malformed = true }
+            do { ghText = try Self.readBoundedText(ghHosts) } catch { malformed = true }
         }
         if let ghText, let token = Self.yamlValue(ghText, key: "oauth_token") {
             return CopilotLinuxCredential(token: token, accountLabel: Self.yamlValue(ghText, key: "user"))
@@ -121,21 +121,49 @@ public struct CopilotLinuxCredentialStore: Sendable {
         return nil
     }
 
+    /// Reads a local credential/config file as UTF-8 text with a hard byte ceiling, so a corrupt
+    /// or hostile file cannot force an unbounded allocation before parsing.
+    private static func readBoundedText(_ url: URL) throws -> String {
+        let data = try BoundedProviderFileReader().read(url)
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw ProviderFileReadError.unreadable(path: url.path)
+        }
+        return text
+    }
+
     private static func readSecretService(_ service: String, _ account: String?) throws -> String? {
-        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/secret-tool") else { return nil }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/secret-tool")
         var arguments = ["lookup", "service", service]
         if let account { arguments += ["account", account] }
+        guard let data = try boundedCommandOutput(
+            executablePath: "/usr/bin/secret-tool",
+            arguments: arguments,
+            maximumBytes: BoundedProviderFileReader.defaultMaximumBytes
+        ) else { return nil }
+        return copilotCredentialNonEmpty(String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Runs a local helper command and returns its stdout, capping the buffered output at
+    /// `maximumBytes`. Oversize output terminates the process and throws instead of draining an
+    /// unbounded stream; a missing executable or non-zero exit yields nil.
+    static func boundedCommandOutput(executablePath: String, arguments: [String], maximumBytes: Int) throws -> Data? {
+        guard FileManager.default.isExecutableFile(atPath: executablePath) else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
         let output = Pipe()
         process.standardOutput = output
         process.standardError = Pipe()
         try process.run()
+        let data = try output.fileHandleForReading.read(upToCount: maximumBytes + 1) ?? Data()
+        if data.count > maximumBytes {
+            process.terminate()
+            process.waitUntilExit()
+            throw ProviderFileReadError.tooLarge(path: executablePath, maximumBytes: maximumBytes)
+        }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else { return nil }
-        return copilotCredentialNonEmpty(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines))
+        return data
     }
 }
 
