@@ -157,6 +157,68 @@ struct ProviderMetricLayout: Codable, Equatable, Sendable {
     }
 }
 
+struct PanelMetricPins: Codable, Equatable, Sendable {
+    static let maximumPerProvider = 2
+
+    private var values: [String: [MetricPreferenceKey]]
+
+    init(values: [String: [MetricPreferenceKey]] = [:]) {
+        self.values = Self.normalized(values)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        values = Self.normalized(
+            try container.decode([String: [MetricPreferenceKey]].self)
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(values)
+    }
+
+    func pins(for providerID: String) -> [MetricPreferenceKey] {
+        values[providerID] ?? []
+    }
+
+    @discardableResult
+    mutating func pin(_ key: MetricPreferenceKey, for providerID: String) -> Bool {
+        var providerPins = pins(for: providerID)
+        guard !providerPins.contains(key),
+              providerPins.count < Self.maximumPerProvider
+        else {
+            return false
+        }
+        providerPins.append(key)
+        values[providerID] = providerPins
+        return true
+    }
+
+    mutating func unpin(_ key: MetricPreferenceKey, for providerID: String) {
+        guard var providerPins = values[providerID] else { return }
+        providerPins.removeAll { $0 == key }
+        if providerPins.isEmpty {
+            values.removeValue(forKey: providerID)
+        } else {
+            values[providerID] = providerPins
+        }
+    }
+
+    private static func normalized(
+        _ values: [String: [MetricPreferenceKey]]
+    ) -> [String: [MetricPreferenceKey]] {
+        values.reduce(into: [:]) { result, element in
+            var seen: Set<MetricPreferenceKey> = []
+            let pins = element.value.filter { seen.insert($0).inserted }
+                .prefix(Self.maximumPerProvider)
+            if !pins.isEmpty {
+                result[element.key] = Array(pins)
+            }
+        }
+    }
+}
+
 /// Versioned XDG JSON settings for the GNOME shell (Linux parity matrix:
 /// UserDefaults/settings -> versioned XDG JSON). Secrets never enter this
 /// file; credentials stay in the Secret Service.
@@ -179,6 +241,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var density: DensitySetting = .regular
     var timeFormat: TimeFormatSetting = .auto
     var metricLayouts: [String: ProviderMetricLayout] = [:]
+    var panelMetricPins = PanelMetricPins()
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -194,7 +257,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
         case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
-        case density, timeFormat, metricLayouts
+        case density, timeFormat, metricLayouts, panelMetricPins
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -229,6 +292,10 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             [String: ProviderMetricLayout].self,
             forKey: .metricLayouts
         ) ?? [:]
+        panelMetricPins = try values.decodeIfPresent(
+            PanelMetricPins.self,
+            forKey: .panelMetricPins
+        ) ?? .init()
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []
