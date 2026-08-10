@@ -186,7 +186,7 @@ The server only listens on the loopback interface (`127.0.0.1`), so it is not re
 
 ## Connection lifecycle
 
-The server accepts at most 16 concurrent clients. Each client has a one-second absolute lifetime from acceptance, covering request-head input, snapshot collection, response serialization, and socket writes. Incomplete requests, stalled snapshot work, and backpressured writes are cancelled or closed at that deadline and release their slot. Stopping the server also shuts down every accepted client, cancels pending snapshot work, and waits for its handler to finish.
+The server accepts at most 16 concurrent clients. Each client has a 15-second absolute lifetime from acceptance, covering request-head input, snapshot collection, response serialization, and socket writes. Incomplete requests, stalled snapshot work, and backpressured writes are cancelled or closed at that deadline and release their slot. Stopping the server also shuts down every accepted client, cancels pending snapshot work, and waits for its handler to finish.
 
 ## Caching behavior
 

@@ -380,6 +380,8 @@ private func waitForPeerClosure(_ clients: [LoopbackClient], timeoutMilliseconds
                 openDescriptors.remove(descriptor.fd)
             } else if count > 0 {
                 throw SocketTestError.peerDidNotClose
+            } else if errno == ECONNRESET {
+                openDescriptors.remove(descriptor.fd)
             } else if errno != EAGAIN && errno != EWOULDBLOCK {
                 throw SocketTestError.operation("recv", errno)
             }
