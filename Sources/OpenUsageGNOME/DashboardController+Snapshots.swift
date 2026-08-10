@@ -157,8 +157,16 @@ extension DashboardController {
         applySnapshots()
         recordAnalyticsIfNeeded()
         if let desktopIntegration {
+            let notificationToggles = UsageNotificationToggles(
+                almostOut: settings.notifyAlmostOut,
+                cuttingItClose: settings.notifyCuttingItClose,
+                willRunOut: settings.notifyWillRunOut
+            )
             Task.detached {
-                await desktopIntegration.postRefresh(refreshed)
+                await desktopIntegration.postRefresh(
+                    refreshed,
+                    toggles: notificationToggles
+                )
             }
         }
     }

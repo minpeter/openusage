@@ -70,6 +70,18 @@ extension SettingsView {
             ]
             self.onTimeFormatChanged(format)
         })
+        connections.append(almostOutRow.onNotify(.active) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            self.emitNotificationToggles()
+        })
+        connections.append(cuttingItCloseRow.onNotify(.active) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            self.emitNotificationToggles()
+        })
+        connections.append(willRunOutRow.onNotify(.active) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            self.emitNotificationToggles()
+        })
         connections.append(periodicRow.onNotify(.active) { [weak self] in
             guard let self, !self.applyingSettings else { return }
             self.intervalRow.sensitive = self.periodicRow.active
@@ -96,5 +108,13 @@ extension SettingsView {
             guard let self, !self.applyingSettings else { return }
             self.onLocalAPIChanged(self.apiRow.active, Int(self.apiPortRow.value))
         })
+    }
+
+    private func emitNotificationToggles() {
+        onNotificationTogglesChanged(.init(
+            almostOut: almostOutRow.active,
+            cuttingItClose: cuttingItCloseRow.active,
+            willRunOut: willRunOutRow.active
+        ))
     }
 }

@@ -280,6 +280,9 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var timeFormat: TimeFormatSetting = .auto
     var metricLayouts: [String: ProviderMetricLayout] = [:]
     var panelMetricPins = PanelMetricPins()
+    var notifyAlmostOut = true
+    var notifyCuttingItClose = true
+    var notifyWillRunOut = true
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -296,6 +299,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
         case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
         case density, timeFormat, metricLayouts, panelMetricPins
+        case notifyAlmostOut, notifyCuttingItClose, notifyWillRunOut
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -334,6 +338,12 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             PanelMetricPins.self,
             forKey: .panelMetricPins
         ) ?? .init()
+        notifyAlmostOut = try values.decodeIfPresent(Bool.self, forKey: .notifyAlmostOut) ?? true
+        notifyCuttingItClose = try values.decodeIfPresent(
+            Bool.self,
+            forKey: .notifyCuttingItClose
+        ) ?? true
+        notifyWillRunOut = try values.decodeIfPresent(Bool.self, forKey: .notifyWillRunOut) ?? true
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []

@@ -53,6 +53,13 @@ extension DashboardController {
             self.settings.timeFormat = format
             self.saveAndApplyDisplaySettings()
         }
+        settingsView.onNotificationTogglesChanged = { [weak self] toggles in
+            guard let self else { return }
+            self.settings.notifyAlmostOut = toggles.almostOut
+            self.settings.notifyCuttingItClose = toggles.cuttingItClose
+            self.settings.notifyWillRunOut = toggles.willRunOut
+            self.settingsStore.save(self.settings)
+        }
         settingsView.onRefreshScheduleChanged = { [weak self] enabled, minutes in
             guard let self else { return }
             self.settings.periodicRefreshEnabled = enabled

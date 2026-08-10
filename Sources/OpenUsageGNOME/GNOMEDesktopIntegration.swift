@@ -5,6 +5,7 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
     private let shortcuts: XDGGlobalShortcutsService
     private let tray: StatusNotifierItemService
     private let notifications: FreedesktopNotificationService
+    private let thresholdNotifications = UsageThresholdNotificationCoordinator()
 
     init(presentWindow: @escaping @Sendable () async -> Void) throws {
         let adapter = try GIODesktopDBusAdapter()
@@ -48,16 +49,37 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
         }
     }
 
-    func postRefresh(_ snapshots: [ProviderUsageSnapshot]) async {
+    func postRefresh(
+        _ snapshots: [ProviderUsageSnapshot],
+        toggles: UsageNotificationToggles
+    ) async {
         let failures = snapshots.count { $0.errorMessage != nil }
-        guard failures > 0 else { return }
-        let body = "\(failures) of \(snapshots.count) provider accounts need attention."
-        do {
-            _ = try await notifications.post(
-                LinuxNotification(title: "Provider Issues", body: body, urgency: 1)
-            )
-        } catch {
-            NSLog("OpenUsage: notification unavailable: \(error.localizedDescription)")
+        if failures > 0 {
+            let body = "\(failures) of \(snapshots.count) provider accounts need attention."
+            do {
+                _ = try await notifications.post(
+                    LinuxNotification(title: "Provider Issues", body: body, urgency: 1)
+                )
+            } catch {
+                NSLog("OpenUsage: notification unavailable: \(error.localizedDescription)")
+            }
+        }
+
+        let events = await thresholdNotifications.events(
+            snapshots: snapshots.filter { $0.errorMessage == nil },
+            toggles: toggles
+        )
+        for event in events {
+            do {
+                _ = try await notifications.post(LinuxNotification(
+                    title: event.milestone.title,
+                    body: "\(event.subtitle)\n\(event.milestone.body)",
+                    urgency: event.milestone == .willRunOut ? 2 : 1
+                ))
+                await thresholdNotifications.markDelivered(event)
+            } catch {
+                NSLog("OpenUsage: threshold notification unavailable: \(error.localizedDescription)")
+            }
         }
     }
 }

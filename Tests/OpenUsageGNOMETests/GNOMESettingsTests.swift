@@ -17,6 +17,9 @@ struct GNOMESettingsTests {
         #expect(settings.alwaysShowPacing == false)
         #expect(settings.density == .regular)
         #expect(settings.timeFormat == .auto)
+        #expect(settings.notifyAlmostOut)
+        #expect(settings.notifyCuttingItClose)
+        #expect(settings.notifyWillRunOut)
     }
 
     @Test("Display preferences survive a JSON round trip")
@@ -28,6 +31,9 @@ struct GNOMESettingsTests {
         settings.alwaysShowPacing = true
         settings.density = .compact
         settings.timeFormat = .twentyFourHour
+        settings.notifyAlmostOut = false
+        settings.notifyCuttingItClose = false
+        settings.notifyWillRunOut = false
 
         let decoded = try JSONDecoder().decode(
             GNOMESettings.self,
@@ -40,5 +46,8 @@ struct GNOMESettingsTests {
         #expect(decoded.alwaysShowPacing)
         #expect(decoded.density == .compact)
         #expect(decoded.timeFormat == .twentyFourHour)
+        #expect(!decoded.notifyAlmostOut)
+        #expect(!decoded.notifyCuttingItClose)
+        #expect(!decoded.notifyWillRunOut)
     }
 }

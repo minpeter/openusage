@@ -19,6 +19,7 @@ final class SettingsView {
     var onAlwaysShowPacingChanged: (Bool) -> Void = { _ in }
     var onDensityChanged: (DensitySetting) -> Void = { _ in }
     var onTimeFormatChanged: (TimeFormatSetting) -> Void = { _ in }
+    var onNotificationTogglesChanged: (UsageNotificationToggles) -> Void = { _ in }
     var onRefreshScheduleChanged: (Bool, Int) -> Void = { _, _ in }
     var onProviderOrderChanged: ([String]) -> Void = { _ in }
     var onProviderVisibilityChanged: (String, Bool) -> Void = { _, _ in }
@@ -44,6 +45,9 @@ final class SettingsView {
     let alwaysShowPacingRow: SwitchRow
     let densityRow: ComboRow
     let timeFormatRow: ComboRow
+    let almostOutRow: SwitchRow
+    let cuttingItCloseRow: SwitchRow
+    let willRunOutRow: SwitchRow
     let periodicRow: SwitchRow
     let intervalRow: SpinRow
     let launchRow = SwitchRow(title: "Launch at Login")
@@ -125,6 +129,26 @@ final class SettingsView {
         displayGroup.add(densityRow)
         displayGroup.add(timeFormatRow)
 
+        almostOutRow = SwitchRow(
+            title: UsageNotificationMilestone.almostOut.title,
+            subtitle: UsageNotificationMilestone.almostOut.body
+        )
+        cuttingItCloseRow = SwitchRow(
+            title: UsageNotificationMilestone.cuttingItClose.title,
+            subtitle: UsageNotificationMilestone.cuttingItClose.body
+        )
+        willRunOutRow = SwitchRow(
+            title: UsageNotificationMilestone.willRunOut.title,
+            subtitle: UsageNotificationMilestone.willRunOut.body
+        )
+        let notificationGroup = PreferencesGroup(
+            title: "Usage Notifications",
+            description: "Alert once per reset window when quota risk worsens."
+        )
+        notificationGroup.add(almostOutRow)
+        notificationGroup.add(cuttingItCloseRow)
+        notificationGroup.add(willRunOutRow)
+
         // Refresh group
         periodicRow = SwitchRow(
             title: "Refresh Automatically",
@@ -204,6 +228,7 @@ final class SettingsView {
         content.append(appearanceGroup)
         content.append(panelIndicatorGroup)
         content.append(displayGroup)
+        content.append(notificationGroup)
         content.append(refreshGroup)
         content.append(startupGroup)
         content.append(orderGroup)
@@ -240,6 +265,9 @@ final class SettingsView {
         alwaysShowPacingRow.active = settings.alwaysShowPacing
         densityRow.selected = DensitySetting.allCases.firstIndex(of: settings.density) ?? 0
         timeFormatRow.selected = TimeFormatSetting.allCases.firstIndex(of: settings.timeFormat) ?? 0
+        almostOutRow.active = settings.notifyAlmostOut
+        cuttingItCloseRow.active = settings.notifyCuttingItClose
+        willRunOutRow.active = settings.notifyWillRunOut
         periodicRow.active = settings.periodicRefreshEnabled
         intervalRow.value = Double(settings.refreshIntervalMinutes)
         intervalRow.sensitive = settings.periodicRefreshEnabled
