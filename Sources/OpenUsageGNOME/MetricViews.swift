@@ -2,6 +2,52 @@ import Adwaita
 import Foundation
 import OpenUsageLinuxCore
 
+struct GNOMEModelBreakdown: Equatable, Sendable {
+    struct Item: Equatable, Sendable {
+        let label: String
+        let value: Double
+        let unit: UsageValue.Unit
+        let share: Double
+        let wholePercent: Int
+    }
+
+    let items: [Item]
+    let total: Double
+
+    init(values: [UsageValue]) {
+        let valid = values.enumerated().filter {
+            $0.element.value.isFinite && $0.element.value > 0
+        }
+        guard let unit = valid.first?.element.unit else {
+            items = []
+            total = 0
+            return
+        }
+        let matching = valid.filter { $0.element.unit == unit }
+        let totalValue = matching.reduce(0) { $0 + $1.element.value }
+        total = totalValue
+        items = matching.sorted {
+            if $0.element.value == $1.element.value {
+                return $0.offset < $1.offset
+            }
+            return $0.element.value > $1.element.value
+        }.map {
+            let share = $0.element.value / totalValue
+            return Item(
+                label: $0.element.label,
+                value: $0.element.value,
+                unit: $0.element.unit,
+                share: share,
+                wholePercent: Int((share * 100).rounded())
+            )
+        }
+    }
+
+    var accessibilityDescription: String {
+        items.map { "\($0.label) \($0.wholePercent)%" }.joined(separator: ", ")
+    }
+}
+
 /// Renders every UsageMetric shape the core can produce (progress, value,
 /// values, badge, chart, text) as native GNOME rows. All renderers are pure
 /// functions of the metric so views can rebuild a metric cluster in one call.
@@ -123,6 +169,10 @@ enum MetricViews {
         if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
+        let breakdown = GNOMEModelBreakdown(values: metric.values ?? [])
+        if breakdown.items.count > 1 {
+            box.append(modelBreakdownButton(metric: metric, breakdown: breakdown))
+        }
         return box
     }
 
@@ -201,6 +251,50 @@ enum MetricViews {
         caption.addCSSClass(.caption)
         caption.addCSSClass(.dimLabel)
         return caption
+    }
+
+    private static func modelBreakdownButton(
+        metric: UsageMetric,
+        breakdown: GNOMEModelBreakdown
+    ) -> Widget {
+        let content = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        content.setMargins(GNOMEStyle.sectionSpacing)
+        let heading = Label("Model Breakdown")
+        heading.xalign = 0
+        heading.addCSSClass(.heading)
+        content.append(heading)
+
+        for item in breakdown.items {
+            let row = Box(
+                orientation: GTK_ORIENTATION_HORIZONTAL,
+                spacing: GNOMEStyle.controlSpacing
+            )
+            let name = Label(item.label)
+            name.xalign = 0
+            name.hexpand = true
+            row.append(name)
+            let value = Label("\(item.wholePercent)%")
+            value.addCSSClass(.numeric)
+            row.append(value)
+            content.append(row)
+
+            let bar = ProgressBar()
+            bar.fraction = item.share
+            bar.setAccessibleLabel("\(item.label) share")
+            bar.setAccessibleDescription("\(item.wholePercent)% of \(metric.label)")
+            content.append(bar)
+        }
+
+        let popover = Popover()
+        popover.child = content
+        let button = MenuButton(label: "Model Details")
+        button.setPopover(popover)
+        button.setAccessibleLabel("Show \(metric.label) model breakdown")
+        button.setAccessibleDescription(breakdown.accessibilityDescription)
+        return button
     }
 
     private static func primaryValue(

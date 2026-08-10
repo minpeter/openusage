@@ -98,6 +98,14 @@ enum DemoFixtures {
                     ]
                 ),
                 UsageMetric(
+                    kind: .values, label: "Model Spend", used: 10,
+                    values: [
+                        UsageValue(label: "Opus", value: 6, unit: .dollars),
+                        UsageValue(label: "Sonnet", value: 3, unit: .dollars),
+                        UsageValue(label: "Haiku", value: 1, unit: .dollars),
+                    ]
+                ),
+                UsageMetric(
                     kind: .chart, label: "Usage Trend",
                     used: 24_912_000,
                     points: chartPoints(now: now, seed: 3)
