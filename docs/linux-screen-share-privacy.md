@@ -44,4 +44,3 @@ sources rather than notifying unrelated clients.
   security claims.
 - If GNOME or the XDG portal later ships a public global capture-state signal or
   capture-exclusion protocol, the disabled row is the integration point.
-
