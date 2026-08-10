@@ -113,6 +113,12 @@ extension SettingsView {
             self.proxyURLRow.sensitive = self.proxyEnabledRow.active
             self.proxyBypassRow.sensitive = self.proxyEnabledRow.active
         })
+        connections.append(logLevelRow.onNotify(.selected) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            let levels = LinuxLogLevel.allCases
+            let index = min(max(self.logLevelRow.selected, 0), levels.count - 1)
+            self.onLogLevelChanged(levels[index])
+        })
     }
 
     private func emitNotificationToggles() {

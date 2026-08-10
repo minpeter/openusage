@@ -38,14 +38,15 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 | Menu-bar popover | StatusNotifierItem plus application window | Tray activation presents the existing window |
 | Global shortcut | XDG GlobalShortcuts portal | Configured shortcut presents the window |
 | Launch at login | systemd user unit and XDG autostart fallback | Survives logout/login and remains user-controlled |
-| Keychain | Freedesktop Secret Service | Secrets never enter settings or snapshot files |
-| UserDefaults/settings | Versioned XDG JSON settings | Ordering, visibility, appearance, refresh, and panel display settings persist |
+| Keychain | Freedesktop Secret Service | API keys never enter settings, logs, or snapshot files |
+| UserDefaults/settings | Versioned XDG JSON settings | Ordering, visibility, appearance, refresh, proxy, logging, and panel display settings persist |
 | Local API | Loopback HTTP server with the same JSON contract | Existing API consumers parse equivalent data |
 | CLI | Linux executable sharing the same core | Happy, error, JSON, and help behavior match |
 | Notifications | Freedesktop notification portal | Threshold and provider errors are actionable |
 | Sparkle | Flatpak or package-manager updates | No application-managed privileged updater |
 | iCloud sync | Export/import plus optional user-selected sync directory | Settings and snapshots round-trip without Apple services |
 | Share sheet | Export file and default application opener | User can share equivalent machine-readable data |
+| Hide during screen share | Disabled with a documented GNOME Wayland limitation | No false privacy claim; public compositor APIs are re-evaluated when available |
 
 ## GNOME Experience
 

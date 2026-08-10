@@ -41,6 +41,8 @@ final class SettingsView {
     var onAPIKeySave: (ManagedAPIKeyProvider, String) -> Void = { _, _ in }
     var onAPIKeyClear: (ManagedAPIKeyProvider) -> Void = { _ in }
     var onProxySave: (Bool, String, String) -> Void = { _, _, _ in }
+    var onLogLevelChanged: (LinuxLogLevel) -> Void = { _ in }
+    var onOpenLog: () -> Void = {}
 
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let appearanceRow: ComboRow
@@ -75,6 +77,7 @@ final class SettingsView {
     let proxyEnabledRow = SwitchRow(title: "Use Proxy")
     let proxyURLRow = PasswordEntryRow(title: "Proxy URL")
     let proxyBypassRow = EntryRow(title: "Bypass Hosts")
+    let logLevelRow = ComboRow()
     let orderGroup = PreferencesGroup(
         title: "Provider Order",
         description: "Controls the order of providers in every view."
@@ -306,6 +309,43 @@ final class SettingsView {
         proxyGroup.add(proxyBypassRow)
         proxyGroup.add(proxySaveRow)
 
+        logLevelRow.title = "Log Level"
+        logLevelRow.setModel(StringList(LinuxLogLevel.allCases.map(\.label)))
+        logLevelRow.selected = LinuxLogLevel.allCases.firstIndex(
+            of: settings.logLevel
+        ) ?? 0
+        let advancedGroup = PreferencesGroup(
+            title: "Advanced",
+            description: "File logging applies immediately. Debug is opt-in."
+        )
+        advancedGroup.add(logLevelRow)
+        let logFileRow = ActionRow(
+            title: "Log File",
+            subtitle: GNOMEAppLog.file.path
+        )
+        logFileRow.subtitleSelectable = true
+        logFileRow.addSuffix(Button(label: "Open", onClicked: { [weak self] in
+            self?.onOpenLog()
+        }))
+        advancedGroup.add(logFileRow)
+
+        let updateDelivery = LinuxUpdateDelivery(
+            environment: ProcessInfo.processInfo.environment
+        )
+        let updateGroup = PreferencesGroup(title: "Updates")
+        updateGroup.add(ActionRow(
+            title: "Managed Updates",
+            subtitle: updateDelivery.userMessage
+        ))
+
+        let screenSharePrivacyRow = SwitchRow(
+            title: "Hide From Screen Share",
+            subtitle: "Unavailable on GNOME Wayland: no API exposes global capture state or capture exclusion."
+        )
+        screenSharePrivacyRow.active = false
+        screenSharePrivacyRow.sensitive = false
+        privacyGroup.add(screenSharePrivacyRow)
+
         // About group
         let aboutGroup = PreferencesGroup(title: "About")
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
@@ -323,6 +363,8 @@ final class SettingsView {
         content.append(privacyGroup)
         content.append(apiKeyGroup)
         content.append(proxyGroup)
+        content.append(advancedGroup)
+        content.append(updateGroup)
         content.append(aboutGroup)
 
         let clamp = Clamp()
@@ -369,6 +411,9 @@ final class SettingsView {
         proxyBypassRow.text = settings.proxyBypassHosts.joined(separator: ", ")
         proxyURLRow.sensitive = settings.proxyEnabled
         proxyBypassRow.sensitive = settings.proxyEnabled
+        logLevelRow.selected = LinuxLogLevel.allCases.firstIndex(
+            of: settings.logLevel
+        ) ?? 0
         order = settings.providerOrder
         hiddenProviderIDs = Set(settings.hiddenProviderIDs ?? [])
         rebuildOrderRows()

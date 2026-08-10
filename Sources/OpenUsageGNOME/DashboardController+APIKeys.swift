@@ -75,7 +75,7 @@ extension DashboardController {
         error: String?
     ) {
         guard let error else {
-            NSLog("OpenUsage: stored \(provider.providerID) API key in Secret Service")
+            GNOMEAppLog.info("Stored \(provider.providerID) API key in Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Stored")
             toastOverlay.addToast(Toast(
@@ -83,7 +83,7 @@ extension DashboardController {
             ))
             return
         }
-        NSLog("OpenUsage: could not store \(provider.providerID) API key: \(error)")
+        GNOMEAppLog.warning("Could not store \(provider.providerID) API key: \(error)")
         toastOverlay.addToast(Toast(
             title: "Could not save \(provider.displayName) API key: \(error)"
         ))
@@ -94,7 +94,7 @@ extension DashboardController {
         error: String?
     ) {
         guard let error else {
-            NSLog("OpenUsage: cleared \(provider.providerID) API key from Secret Service")
+            GNOMEAppLog.info("Cleared \(provider.providerID) API key from Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Not Stored")
             toastOverlay.addToast(Toast(
@@ -102,7 +102,7 @@ extension DashboardController {
             ))
             return
         }
-        NSLog("OpenUsage: could not clear \(provider.providerID) API key: \(error)")
+        GNOMEAppLog.warning("Could not clear \(provider.providerID) API key: \(error)")
         toastOverlay.addToast(Toast(
             title: "Could not clear \(provider.displayName) API key: \(error)"
         ))

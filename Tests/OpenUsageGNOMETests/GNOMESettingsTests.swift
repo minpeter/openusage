@@ -85,4 +85,21 @@ struct GNOMESettingsTests {
         #expect(!restarted.proxyEnabled)
         #expect(try restarted.proxyConfiguration() == nil)
     }
+
+    @Test("Log level survives restart with Info as the migration default")
+    func logLevelRoundTrip() throws {
+        let migrated = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: Data(#"{"version":1}"#.utf8)
+        )
+        #expect(migrated.logLevel == .info)
+
+        var settings = migrated
+        settings.logLevel = .debug
+        let restarted = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        #expect(restarted.logLevel == .debug)
+    }
 }

@@ -160,6 +160,17 @@ extension DashboardController {
                 bypassText: bypass
             )
         }
+        settingsView.onLogLevelChanged = { [weak self] level in
+            guard let self else { return }
+            self.settings.logLevel = level
+            self.settingsStore.save(self.settings)
+            GNOMEAppLog.configure(level: level)
+            GNOMEAppLog.info("Log level changed to \(level.rawValue)")
+        }
+        settingsView.onOpenLog = {
+            GNOMEAppLog.info("Opening file log")
+            UriLauncher(uri: GNOMEAppLog.file.absoluteString).launch()
+        }
         refreshAPIKeyStatuses()
     }
 

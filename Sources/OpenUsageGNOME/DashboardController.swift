@@ -162,7 +162,9 @@ final class DashboardController {
                     callback.retainDesktopIntegration(integration)
                 }
             } catch {
-                NSLog("OpenUsage: desktop integration unavailable: \(error.localizedDescription)")
+                GNOMEAppLog.warning(
+                    "Desktop integration unavailable: \(error.localizedDescription)"
+                )
             }
         }
     }

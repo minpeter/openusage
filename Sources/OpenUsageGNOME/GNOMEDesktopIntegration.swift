@@ -24,12 +24,12 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
         do {
             try await shortcuts.start()
         } catch {
-            NSLog("OpenUsage: global shortcut unavailable: \(error.localizedDescription)")
+            GNOMEAppLog.warning("Global shortcut unavailable: \(error.localizedDescription)")
         }
         do {
             try await tray.start()
         } catch {
-            NSLog("OpenUsage: tray unavailable: \(error.localizedDescription)")
+            GNOMEAppLog.warning("Tray unavailable: \(error.localizedDescription)")
         }
     }
 
@@ -45,7 +45,7 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
         do {
             try await tray.update(configuration: configuration, revision: revision)
         } catch {
-            NSLog("OpenUsage: tray update unavailable: \(error.localizedDescription)")
+            GNOMEAppLog.warning("Tray update unavailable: \(error.localizedDescription)")
         }
     }
 
@@ -61,7 +61,7 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
                     LinuxNotification(title: "Provider Issues", body: body, urgency: 1)
                 )
             } catch {
-                NSLog("OpenUsage: notification unavailable: \(error.localizedDescription)")
+                GNOMEAppLog.warning("Notification unavailable: \(error.localizedDescription)")
             }
         }
 
@@ -78,7 +78,9 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
                 ))
                 await thresholdNotifications.markDelivered(event)
             } catch {
-                NSLog("OpenUsage: threshold notification unavailable: \(error.localizedDescription)")
+                GNOMEAppLog.warning(
+                    "Threshold notification unavailable: \(error.localizedDescription)"
+                )
             }
         }
     }

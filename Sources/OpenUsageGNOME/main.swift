@@ -3,7 +3,10 @@ import Foundation
 
 @MainActor
 private func runOpenUsage() {
-    if let proxy = try? GNOMESettingsStore().load().proxyConfiguration() {
+    let settings = GNOMESettingsStore().load()
+    GNOMEAppLog.configure(level: settings.logLevel)
+    GNOMEAppLog.info("GNOME application starting")
+    if let proxy = try? settings.proxyConfiguration() {
         proxy.applyToProcessEnvironment()
     }
     let application = Application(id: "io.github.minpeter.OpenUsage")

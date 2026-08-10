@@ -288,6 +288,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var proxyEnabled = false
     var proxyURL: String?
     var proxyBypassHosts: [String] = []
+    var logLevel: LinuxLogLevel = .info
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -307,6 +308,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         case notifyAlmostOut, notifyCuttingItClose, notifyWillRunOut
         case syncDirectoryPath
         case proxyEnabled, proxyURL, proxyBypassHosts
+        case logLevel
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -359,6 +361,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         proxyEnabled = try values.decodeIfPresent(Bool.self, forKey: .proxyEnabled) ?? false
         proxyURL = try values.decodeIfPresent(String.self, forKey: .proxyURL)
         proxyBypassHosts = try values.decodeIfPresent([String].self, forKey: .proxyBypassHosts) ?? []
+        logLevel = try values.decodeIfPresent(LinuxLogLevel.self, forKey: .logLevel) ?? .info
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []
@@ -460,7 +463,9 @@ struct GNOMESettingsStore: Sendable {
         do {
             return try storage.loadMigratingLegacy(GNOMESettings.self) ?? GNOMESettings()
         } catch {
-            NSLog("OpenUsage: GNOME settings were not loaded or migrated: \(error.localizedDescription)")
+            GNOMEAppLog.warning(
+                "GNOME settings were not loaded or migrated: \(error.localizedDescription)"
+            )
             return GNOMESettings()
         }
     }
@@ -469,7 +474,9 @@ struct GNOMESettingsStore: Sendable {
         do {
             try savePreservingLegacyOwnership(settings)
         } catch {
-            NSLog("OpenUsage: failed to save GNOME settings: \(error.localizedDescription)")
+            GNOMEAppLog.error(
+                "Failed to save GNOME settings: \(error.localizedDescription)"
+            )
         }
     }
 

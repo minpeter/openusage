@@ -120,6 +120,14 @@ extension DashboardController {
                 bypassText: environment["OPENUSAGE_PROXY_BYPASS"] ?? ""
             )
         }
+        let setLogLevelAction = SimpleAction(name: "set-log-level") { [weak self] in
+            guard let raw = ProcessInfo.processInfo.environment["OPENUSAGE_LOG_LEVEL"],
+                  let level = LinuxLogLevel(rawValue: raw)
+            else {
+                return
+            }
+            self?.settingsView.onLogLevelChanged(level)
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
@@ -133,6 +141,7 @@ extension DashboardController {
             storeAPIKeyAction,
             clearAPIKeyAction,
             saveProxyAction,
+            setLogLevelAction,
         ]
         for action in retainedActions {
             application.addAction(action)
