@@ -12,7 +12,7 @@ public struct AntigravityCloudCodeClient: AntigravityUsageFetching {
         "https://cloudcode-pa.googleapis.com",
     ]
     private static let clientID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-    private static let clientSecret = "GOCSPX-K58FWR486LdLJmLB8sXC4z6qDAf"
+    private static let clientSecret = "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"
 
     private let transport: any HTTPTransport
     private let maximumResponseBytes: Int
@@ -54,7 +54,7 @@ public struct AntigravityCloudCodeClient: AntigravityUsageFetching {
         throw AntigravityLinuxError.unavailable
     }
 
-    public func refreshAccessToken(refreshToken: String) async throws -> String {
+    public func refreshAccessToken(refreshToken: String) async throws -> AntigravityTokenRefresh {
         let form = [
             "client_id=\(Self.form(Self.clientID))",
             "client_secret=\(Self.form(Self.clientSecret))",
@@ -78,7 +78,8 @@ public struct AntigravityCloudCodeClient: AntigravityUsageFetching {
                   let token = (object["access_token"] as? String)?.antigravityTrimmedNonEmpty else {
                 throw AntigravityLinuxError.unavailable
             }
-            return token
+            let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue ?? 3_600
+            return AntigravityTokenRefresh(accessToken: token, expiresIn: expiresIn)
         case 408, 429, 500...599:
             throw AntigravityLinuxError.unavailable
         case 400..<500:
@@ -90,11 +91,16 @@ public struct AntigravityCloudCodeClient: AntigravityUsageFetching {
 
     private enum EndpointResult { case success(Data), authFailure, other(reachable: Bool) }
 
-    private func post(_ address: String, token: String, userAgent: String) async throws -> EndpointResult {
+    private func post(
+        _ address: String,
+        token: String,
+        userAgent: String,
+        body: Data = Data("{}".utf8)
+    ) async throws -> EndpointResult {
         guard let url = URL(string: address) else { return .other(reachable: false) }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.httpMethod = "POST"
-        request.httpBody = Data("{}".utf8)
+        request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -109,7 +115,13 @@ public struct AntigravityCloudCodeClient: AntigravityUsageFetching {
     }
 
     private func loadPlan(base: String, token: String) async -> String? {
-        guard let result = try? await post(base + "/v1internal:loadCodeAssist", token: token, userAgent: "agy"),
+        let body = Data(#"{"metadata":{"ideType":"ANTIGRAVITY"}}"#.utf8)
+        guard let result = try? await post(
+            base + "/v1internal:loadCodeAssist",
+            token: token,
+            userAgent: "antigravity",
+            body: body
+        ),
               case .success(let data) = result else { return nil }
         return AntigravityLinuxUsageMapper.plan(from: data)
     }

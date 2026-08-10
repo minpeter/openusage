@@ -14,6 +14,11 @@ let package = Package(
         .package(url: "https://github.com/makoni/swift-adwaita.git", from: "1.0.0")
     ],
     targets: [
+        .systemLibrary(
+            name: "CSecretService",
+            pkgConfig: "gio-2.0",
+            providers: [.apt(["libglib2.0-dev"])]
+        ),
         .target(
             name: "OpenUsagePricingResources",
             path: "Sources/OpenUsage/Resources",
@@ -30,7 +35,7 @@ let package = Package(
         ),
         .target(
             name: "OpenUsageLinuxCore",
-            dependencies: ["OpenUsagePricingResources"],
+            dependencies: ["CSecretService", "OpenUsagePricingResources"],
             path: "Sources/OpenUsageLinuxCore",
             swiftSettings: [
                 .swiftLanguageMode(.v6)

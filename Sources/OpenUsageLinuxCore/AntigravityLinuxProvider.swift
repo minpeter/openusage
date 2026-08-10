@@ -5,17 +5,20 @@ import FoundationNetworking
 
 public struct AntigravityLinuxPaths: Equatable, Sendable {
     public let credentialCandidates: [URL]
+    public let refreshedTokenCache: URL
 
     public init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         let home = URL(fileURLWithPath: environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path)
         let data = URL(fileURLWithPath: environment["XDG_DATA_HOME"] ?? home.appendingPathComponent(".local/share").path)
         let config = URL(fileURLWithPath: environment["XDG_CONFIG_HOME"] ?? home.appendingPathComponent(".config").path)
+        let cache = URL(fileURLWithPath: environment["XDG_CACHE_HOME"] ?? home.appendingPathComponent(".cache").path)
         var candidates: [URL] = []
         if let override = environment["ANTIGRAVITY_CREDENTIALS_PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines),
            !override.isEmpty {
             candidates.append(URL(fileURLWithPath: Self.expandHome(override, home: home)))
         }
         candidates += [
+            home.appendingPathComponent(".gemini/antigravity-cli/antigravity-oauth-token"),
             data.appendingPathComponent("agy/auth.json"),
             config.appendingPathComponent("agy/auth.json"),
             home.appendingPathComponent(".local/share/agy/auth.json"),
@@ -23,6 +26,9 @@ public struct AntigravityLinuxPaths: Equatable, Sendable {
         ]
         var seen = Set<String>()
         credentialCandidates = candidates.filter { seen.insert($0.standardizedFileURL.path).inserted }
+        refreshedTokenCache = cache
+            .appendingPathComponent("openusage", isDirectory: true)
+            .appendingPathComponent("antigravity-token.json")
     }
 
     private static func expandHome(_ path: String, home: URL) -> String {
@@ -70,11 +76,11 @@ public struct AntigravityUsagePayload: Sendable {
 
 public protocol AntigravityUsageFetching: Sendable {
     func fetch(accessToken: String) async throws -> AntigravityUsagePayload
-    func refreshAccessToken(refreshToken: String) async throws -> String
+    func refreshAccessToken(refreshToken: String) async throws -> AntigravityTokenRefresh
 }
 
 public extension AntigravityUsageFetching {
-    func refreshAccessToken(refreshToken: String) async throws -> String {
+    func refreshAccessToken(refreshToken: String) async throws -> AntigravityTokenRefresh {
         throw AntigravityLinuxError.authExpired
     }
 }
@@ -91,38 +97,61 @@ public struct AntigravityLinuxProvider: Sendable {
     private let paths: AntigravityLinuxPaths
     private let files: any ProviderFileReading
     private let client: any AntigravityUsageFetching
+    private let secretService: (any FreedesktopSecretService)?
+    private let tokenCache: any AntigravityRefreshedTokenCaching
     private let now: @Sendable () -> Date
 
     public init(
         paths: AntigravityLinuxPaths = AntigravityLinuxPaths(),
         files: any ProviderFileReading = BoundedProviderFileReader(),
         client: any AntigravityUsageFetching = AntigravityCloudCodeClient(),
+        secretService: (any FreedesktopSecretService)? = nil,
+        tokenCache: (any AntigravityRefreshedTokenCaching)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
-        self.paths = paths; self.files = files; self.client = client; self.now = now
+        self.paths = paths
+        self.files = files
+        self.client = client
+        self.secretService = secretService
+        self.tokenCache = tokenCache ?? AntigravityRefreshedTokenCache(path: paths.refreshedTokenCache)
+        self.now = now
     }
 
     public func hasLocalCredentials() -> Bool {
-        paths.credentialCandidates.contains { (try? files.readIfPresent($0)) != nil }
+        loadSecretServiceData() != nil
+            || paths.credentialCandidates.contains { (try? files.readIfPresent($0)) != nil }
     }
 
     public func refresh() async throws -> ProviderUsageSnapshot {
         let credential = try loadCredential()
-        var token: String
+        var tokens: [String] = []
         if let accessToken = credential.accessToken,
            credential.expiry.map({ $0.timeIntervalSince(now()) > 60 }) != false {
-            token = accessToken
-        } else {
-            guard let refresh = credential.refreshToken else { throw AntigravityLinuxError.authExpired }
-            token = try await client.refreshAccessToken(refreshToken: refresh)
+            tokens.append(accessToken)
         }
-        let payload: AntigravityUsagePayload
-        do {
-            payload = try await client.fetch(accessToken: token)
-        } catch AntigravityLinuxError.authExpired {
-            guard let refresh = credential.refreshToken else { throw AntigravityLinuxError.authExpired }
-            payload = try await client.fetch(accessToken: client.refreshAccessToken(refreshToken: refresh))
+        if let refresh = credential.refreshToken,
+           let cached = await tokenCache.load(sourceRefreshToken: refresh, now: now()),
+           !tokens.contains(cached) {
+            tokens.append(cached)
         }
+
+        var payload: AntigravityUsagePayload?
+        for token in tokens {
+            do {
+                payload = try await client.fetch(accessToken: token)
+                break
+            } catch AntigravityLinuxError.authExpired {
+                continue
+            }
+        }
+        if payload == nil {
+            guard let refresh = credential.refreshToken else { throw AntigravityLinuxError.authExpired }
+            await tokenCache.discard()
+            let refreshed = try await client.refreshAccessToken(refreshToken: refresh)
+            await tokenCache.store(refreshed, sourceRefreshToken: refresh, now: now())
+            payload = try await client.fetch(accessToken: refreshed.accessToken)
+        }
+        guard let payload else { throw AntigravityLinuxError.unavailable }
         guard let metrics = AntigravityLinuxUsageMapper.metrics(from: payload.summary) else {
             throw AntigravityLinuxError.unavailable
         }
@@ -135,6 +164,12 @@ public struct AntigravityLinuxProvider: Sendable {
     }
 
     private func loadCredential() throws -> Credential {
+        if let data = loadSecretServiceData() {
+            guard let credential = Credential(data: data) else {
+                throw AntigravityLinuxError.invalidCredentialData
+            }
+            return credential
+        }
         for path in paths.credentialCandidates {
             let data: Data?
             do { data = try files.readIfPresent(path) }
@@ -144,6 +179,20 @@ public struct AntigravityLinuxProvider: Sendable {
             return credential
         }
         throw AntigravityLinuxError.notSignedIn
+    }
+
+    private func loadSecretServiceData() -> Data? {
+        guard let secretService else { return nil }
+        let candidates = [
+            SecretServiceAttributes(["service": "gemini", "username": "antigravity"]),
+            SecretServiceAttributes(["service": "gemini", "account": "antigravity"]),
+        ]
+        for attributes in candidates {
+            if let data = try? secretService.lookup(attributes: attributes) {
+                return data
+            }
+        }
+        return nil
     }
 
     private struct Credential {

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import OpenUsageLinuxCore
 
@@ -18,6 +21,7 @@ struct AntigravityOpenCodeParityTests {
 
         #expect(AntigravityLinuxPaths(environment: environment).credentialCandidates.map(\.path) == [
             "/secrets/antigravity.json",
+            "/home/tester/.gemini/antigravity-cli/antigravity-oauth-token",
             "/xdg/data/agy/auth.json",
             "/xdg/config/agy/auth.json",
             "/home/tester/.local/share/agy/auth.json",
@@ -81,6 +85,131 @@ struct AntigravityOpenCodeParityTests {
             "antigravity.geminiPro", "antigravity.geminiWeekly",
             "antigravity.claude", "antigravity.claudeWeekly",
         ])
+    }
+
+    @Test("Antigravity plan request uses the native AGY discovery contract")
+    func antigravityPlanRequestContract() async throws {
+        let transport = AntigravityRecordingTransport(results: [
+            HTTPResult(data: Data(#"{"groups":[]}"#.utf8), statusCode: 200),
+            HTTPResult(data: Data(#"{"paidTier":{"id":"g1-pro-tier","name":"Google AI Pro"}}"#.utf8), statusCode: 200),
+        ])
+        let payload = try await AntigravityCloudCodeClient(transport: transport).fetch(accessToken: "token")
+        let requests = await transport.requests
+
+        #expect(payload.plan == "Pro")
+        #expect(requests.count == 2)
+        #expect(requests[1].url?.absoluteString ==
+            "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist")
+        #expect(requests[1].value(forHTTPHeaderField: "User-Agent") == "antigravity")
+        #expect(requests[1].httpBody == Data(#"{"metadata":{"ideType":"ANTIGRAVITY"}}"#.utf8))
+    }
+
+    @Test("Antigravity OAuth refresh uses the current AGY client secret")
+    func antigravityOAuthRefreshContract() async throws {
+        let transport = AntigravityRecordingTransport(results: [
+            HTTPResult(data: Data(#"{"access_token":"fresh","expires_in":3599}"#.utf8), statusCode: 200),
+        ])
+        let token = try await AntigravityCloudCodeClient(transport: transport)
+            .refreshAccessToken(refreshToken: "refresh")
+        let request = try #require(await transport.requests.first)
+        let body = try #require(request.httpBody.flatMap { String(data: $0, encoding: .utf8) })
+
+        #expect(token == AntigravityTokenRefresh(accessToken: "fresh", expiresIn: 3_599))
+        #expect(body.contains("client_secret=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"))
+    }
+
+    @Test("Antigravity uses a cached refreshed token before another OAuth refresh")
+    func antigravityUsesCachedRefreshedToken() async throws {
+        let now = self.now
+        let cache = MemoryAntigravityTokenCache(token: "cached")
+        let client = RefreshingAntigravityClient()
+        let provider = AntigravityLinuxProvider(
+            paths: Self.expiredCredentialPaths,
+            files: MemoryProviderFiles(["/auth.json": Self.expiredCredential]),
+            client: client,
+            tokenCache: cache,
+            now: { now }
+        )
+
+        _ = try await provider.refresh()
+
+        let fetchedTokens = await client.fetchedTokens
+        let refreshTokens = await client.refreshTokens
+        #expect(fetchedTokens == ["cached"])
+        #expect(refreshTokens.isEmpty)
+    }
+
+    @Test("Antigravity tries cached token after an unparseable-expiry access token fails")
+    func antigravityFallsBackToCacheBeforeOAuthRefresh() async throws {
+        let now = self.now
+        let cache = MemoryAntigravityTokenCache(token: "cached")
+        let client = RefreshingAntigravityClient(rejectedTokens: ["expired"])
+        let credential = Data(
+            #"{"token":{"access_token":"expired","refresh_token":"1//refresh","expiry":"2026-08-10T07:56:45.427891188+09:00"}}"#.utf8
+        )
+        let provider = AntigravityLinuxProvider(
+            paths: Self.expiredCredentialPaths,
+            files: MemoryProviderFiles(["/auth.json": credential]),
+            client: client,
+            tokenCache: cache,
+            now: { now }
+        )
+
+        _ = try await provider.refresh()
+
+        let fetchedTokens = await client.fetchedTokens
+        let refreshTokens = await client.refreshTokens
+        #expect(fetchedTokens == ["expired", "cached"])
+        #expect(refreshTokens.isEmpty)
+    }
+
+    @Test("Antigravity caches a newly refreshed token for later cycles")
+    func antigravityCachesRefreshedToken() async throws {
+        let now = self.now
+        let cache = MemoryAntigravityTokenCache()
+        let client = RefreshingAntigravityClient()
+        let provider = AntigravityLinuxProvider(
+            paths: Self.expiredCredentialPaths,
+            files: MemoryProviderFiles(["/auth.json": Self.expiredCredential]),
+            client: client,
+            tokenCache: cache,
+            now: { now }
+        )
+
+        _ = try await provider.refresh()
+
+        let fetchedTokens = await client.fetchedTokens
+        let refreshTokens = await client.refreshTokens
+        let storedToken = await cache.storedToken
+        let storedRefreshToken = await cache.storedRefreshToken
+        #expect(fetchedTokens == ["fresh"])
+        #expect(refreshTokens == ["1//refresh"])
+        #expect(storedToken == "fresh")
+        #expect(storedRefreshToken == "1//refresh")
+    }
+
+    @Test("Refreshed token cache is credential-bound and private")
+    func antigravityRefreshedTokenCacheStorage() async throws {
+        let now = self.now
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("antigravity-token.json")
+        let cache = AntigravityRefreshedTokenCache(path: path)
+
+        await cache.store(
+            AntigravityTokenRefresh(accessToken: "cached", expiresIn: 3_600),
+            sourceRefreshToken: "refresh-a",
+            now: now
+        )
+
+        let cached = await cache.load(sourceRefreshToken: "refresh-a", now: now)
+        #expect(cached == "cached")
+        let permissions = try #require(
+            FileManager.default.attributesOfItem(atPath: path.path)[.posixPermissions] as? NSNumber
+        )
+        #expect(permissions.intValue == 0o600)
+        let mismatched = await cache.load(sourceRefreshToken: "refresh-b", now: now)
+        #expect(mismatched == nil)
     }
 
     @Test("Antigravity malformed credential and missing credential remain typed")
@@ -209,6 +338,14 @@ struct AntigravityOpenCodeParityTests {
             .replacingOccurrences(of: "=", with: "")
         return "e30.\(payload).signature"
     }
+
+    private static let expiredCredentialPaths = AntigravityLinuxPaths(environment: [
+        "HOME": "/home/tester",
+        "ANTIGRAVITY_CREDENTIALS_PATH": "/auth.json",
+    ])
+    private static let expiredCredential = Data(
+        #"{"token":{"access_token":"expired","refresh_token":"1//refresh","expiry":"2020-01-01T00:00:00Z"}}"#.utf8
+    )
 }
 
 private struct MemoryProviderFiles: ProviderFileReading {
@@ -223,6 +360,76 @@ private struct AntigravityFixtureClient: AntigravityUsageFetching {
     init(summary: Data, plan: String? = nil) { self.summary = summary; self.plan = plan }
     func fetch(accessToken: String) async throws -> AntigravityUsagePayload {
         AntigravityUsagePayload(summary: summary, plan: plan)
+    }
+}
+
+private actor RefreshingAntigravityClient: AntigravityUsageFetching {
+    private let rejectedTokens: Set<String>
+    private(set) var fetchedTokens: [String] = []
+    private(set) var refreshTokens: [String] = []
+
+    init(rejectedTokens: Set<String> = []) {
+        self.rejectedTokens = rejectedTokens
+    }
+
+    func fetch(accessToken: String) async throws -> AntigravityUsagePayload {
+        fetchedTokens.append(accessToken)
+        if rejectedTokens.contains(accessToken) {
+            throw AntigravityLinuxError.authExpired
+        }
+        let summary = """
+        {"groups":[{"buckets":[
+          {"bucketId":"gemini-5h","remainingFraction":0.75,"resetTime":"2026-07-12T16:00:00Z"}
+        ]}]}
+        """
+        return AntigravityUsagePayload(summary: Data(summary.utf8), plan: "Google AI Pro")
+    }
+
+    func refreshAccessToken(refreshToken: String) async throws -> AntigravityTokenRefresh {
+        refreshTokens.append(refreshToken)
+        return AntigravityTokenRefresh(accessToken: "fresh", expiresIn: 3_599)
+    }
+}
+
+private actor MemoryAntigravityTokenCache: AntigravityRefreshedTokenCaching {
+    private var token: String?
+    private(set) var storedToken: String?
+    private(set) var storedRefreshToken: String?
+
+    init(token: String? = nil) {
+        self.token = token
+    }
+
+    func load(sourceRefreshToken: String, now: Date) -> String? {
+        token
+    }
+
+    func store(
+        _ refreshed: AntigravityTokenRefresh,
+        sourceRefreshToken: String,
+        now: Date
+    ) {
+        token = refreshed.accessToken
+        storedToken = refreshed.accessToken
+        storedRefreshToken = sourceRefreshToken
+    }
+
+    func discard() {
+        token = nil
+    }
+}
+
+private actor AntigravityRecordingTransport: HTTPTransport {
+    private(set) var requests: [URLRequest] = []
+    private var results: [HTTPResult]
+
+    init(results: [HTTPResult]) {
+        self.results = results
+    }
+
+    func execute(_ request: URLRequest) async throws -> HTTPResult {
+        requests.append(request)
+        return results.removeFirst()
     }
 }
 

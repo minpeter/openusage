@@ -1,0 +1,5 @@
+module CSecretService [system] {
+    header "include/CSecretService.h"
+    link "gio-2.0"
+    export *
+}

@@ -20,6 +20,7 @@ finish-args:
   - --filesystem=~/.codex:ro
   - --filesystem=~/.grok:ro
   - --filesystem=~/.cursor:ro
+  - --filesystem=~/.gemini/antigravity-cli:ro
   - --filesystem=xdg-config/claude:ro
   - --filesystem=xdg-config/codex:ro
   - --filesystem=xdg-config/Cursor:ro

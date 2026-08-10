@@ -79,7 +79,9 @@ public actor LinuxUsageRepository: ProviderSnapshotSource {
         )
         let antigravity = AntigravityLinuxProvider(
             paths: AntigravityLinuxPaths(environment: environment),
-            client: AntigravityCloudCodeClient(transport: transport), now: now
+            client: AntigravityCloudCodeClient(transport: transport),
+            secretService: GIOSecretService(),
+            now: now
         )
         let devin = DevinLinuxProvider(
             credentials: DevinLinuxCredentialStore(environment: environment),

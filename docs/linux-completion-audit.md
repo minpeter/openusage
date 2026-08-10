@@ -12,7 +12,7 @@ exists and the observable verification succeeds against the current release buil
 | Codex parity and reset credits | Codex Linux provider files | Fixture tests, token rotation, claim and reset-credit tests | Fixture and registry tests passed |
 | Cursor parity | Cursor Linux files | Credential, live meter and fallback fixture tests | Fixture and registry tests passed |
 | Copilot parity | Copilot Linux files | Editor/GH/Secret Service precedence and billing tests | Fixture and registry tests passed |
-| Antigravity parity | Antigravity Linux files | Summary, legacy, OAuth and identity tests | Fixture and registry tests passed |
+| Antigravity parity | Antigravity Linux files, direct GIO Secret Service and Flatpak permission | Summary, OAuth, identity, current `agy` keyring and file-fallback tests | Fixtures plus real keyring-only server refresh passed |
 | OpenCode parity | OpenCode Linux files | Multi-database spend/quota/history tests | Fixture and registry tests passed |
 | OpenRouter parity | OpenRouter Linux files | API key, endpoint and metric fixture tests | Fixture and registry tests passed |
 | Grok parity | Grok Linux files | Auth, live quota and local-spend fixture tests | Fixture and registry tests passed |
