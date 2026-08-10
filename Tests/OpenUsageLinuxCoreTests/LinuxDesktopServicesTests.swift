@@ -141,15 +141,186 @@ struct LinuxDesktopServicesTests {
         let dbus = FakeDesktopDBus(replies: [[]])
         let presented = AsyncEvent()
         let service = StatusNotifierItemService(dbus: dbus) { await presented.send() }
+        let configuration = StatusNotifierItemConfiguration(
+            label: "Grok · 36%",
+            labelGuide: "GitHub Copilot · 100%"
+        )
 
-        try await service.start()
+        try await service.start(configuration: configuration)
         async let observed: Void = presented.wait()
         await dbus.invokeExported(member: "Activate", arguments: [.int32(0), .int32(0)])
         await observed
         await service.stop()
 
         #expect(await dbus.events.prefix(2) == ["export", "RegisterStatusNotifierItem"])
+        let registration = try #require(await dbus.calls.first)
+        #expect(registration.arguments == [.string("io.github.minpeter.OpenUsage")])
+        #expect(await dbus.exportedProperty("Menu") == .objectPath("/StatusNotifierItem"))
+        #expect(await dbus.exportedProperty("XAyatanaLabel") == .string("Grok · 36%"))
+        #expect(await dbus.exportedProperty("XAyatanaLabelGuide") == .string("GitHub Copilot · 100%"))
         #expect(await dbus.lease.cancelCount == 1)
+    }
+
+    @Test("StatusNotifierItem updates usage properties without re-registering")
+    func trayUpdatesUsageSummary() async throws {
+        let dbus = FakeDesktopDBus(replies: [[]])
+        let service = StatusNotifierItemService(dbus: dbus) {}
+        let updated = StatusNotifierItemConfiguration(
+            title: "Claude · 82%",
+            label: "Claude · 82%",
+            tooltip: "Session · 82% used"
+        )
+
+        try await service.start()
+        try await service.update(configuration: updated)
+        try await service.update(configuration: updated)
+
+        #expect(await dbus.events == [
+            "export", "RegisterStatusNotifierItem",
+        ])
+        #expect(await dbus.lease.cancelCount == 0)
+        #expect(await dbus.lease.propertyUpdates == [
+            RecordedPropertyUpdate(
+                interface: "org.kde.StatusNotifierItem",
+                changed: [
+                    "Title": .string("Claude · 82%"),
+                    "ToolTip": .structure([
+                        .string("io.github.minpeter.OpenUsage"), .array([]),
+                        .string("Claude · 82%"), .string("Session · 82% used"),
+                    ]),
+                    "XAyatanaLabel": .string("Claude · 82%"),
+                ]
+            ),
+        ])
+        #expect(await dbus.lease.signalEmissions == [
+            RecordedSignalEmission(
+                signal: DBusSignal(
+                    path: "/StatusNotifierItem",
+                    interface: "org.kde.StatusNotifierItem",
+                    member: "XAyatanaNewLabel",
+                    arguments: [.string("Claude · 82%"), .string("GitHub Copilot · 100%")]
+                ),
+                signature: "(ss)"
+            ),
+        ])
+
+        await service.stop()
+        #expect(await dbus.lease.cancelCount == 1)
+    }
+
+    @Test("StatusNotifierItem clears stale usage label while preserving icon fallback")
+    func trayClearsUsageLabel() async throws {
+        let dbus = FakeDesktopDBus(replies: [[]])
+        let service = StatusNotifierItemService(dbus: dbus) {}
+
+        try await service.start(configuration: StatusNotifierItemConfiguration(
+            title: "Grok · 36%",
+            label: "Grok · 36%",
+            tooltip: "Weekly limit · 36% used"
+        ))
+        try await service.update(configuration: StatusNotifierItemConfiguration(
+            label: "",
+            tooltip: "No active usage quotas"
+        ))
+
+        #expect(await dbus.events == ["export", "RegisterStatusNotifierItem"])
+        #expect(await dbus.exportedProperty("IconName") == .string("io.github.minpeter.OpenUsage"))
+        #expect(await dbus.lease.propertyUpdates == [
+            RecordedPropertyUpdate(
+                interface: "org.kde.StatusNotifierItem",
+                changed: [
+                    "Title": .string("OpenUsage"),
+                    "ToolTip": .structure([
+                        .string("io.github.minpeter.OpenUsage"), .array([]),
+                        .string("OpenUsage"), .string("No active usage quotas"),
+                    ]),
+                    "XAyatanaLabel": .string(""),
+                ]
+            ),
+        ])
+        #expect(await dbus.lease.signalEmissions.last == RecordedSignalEmission(
+            signal: DBusSignal(
+                path: "/StatusNotifierItem",
+                interface: "org.kde.StatusNotifierItem",
+                member: "XAyatanaNewLabel",
+                arguments: [.string(""), .string("GitHub Copilot · 100%")]
+            ),
+            signature: "(ss)"
+        ))
+    }
+
+    @Test("Switching to icon-only updates the live item without re-registering")
+    func trayDisplayModeUpdatesInPlace() async throws {
+        let dbus = FakeDesktopDBus(replies: [[]])
+        let service = StatusNotifierItemService(dbus: dbus) {}
+        let snapshots = [
+            ProviderUsageSnapshot(
+                providerID: "claude",
+                instanceID: "claude",
+                displayName: "Claude",
+                accountLabel: nil,
+                plan: nil,
+                metrics: [UsageMetric(
+                    kind: .progress,
+                    label: "Session",
+                    used: 82,
+                    limit: 100
+                )],
+                links: [],
+                refreshedAt: Date(timeIntervalSince1970: 0)
+            ),
+        ]
+
+        try await service.start(configuration: .usage(
+            snapshots: snapshots,
+            displayMode: .mostUrgent
+        ))
+        try await service.update(configuration: .usage(
+            snapshots: snapshots,
+            displayMode: .iconOnly
+        ))
+
+        #expect(await dbus.events == ["export", "RegisterStatusNotifierItem"])
+        #expect(await dbus.lease.propertyUpdates == [
+            RecordedPropertyUpdate(
+                interface: "org.kde.StatusNotifierItem",
+                changed: [
+                    "Title": .string("OpenUsage"),
+                    "ToolTip": .structure([
+                        .string("io.github.minpeter.OpenUsage"), .array([]),
+                        .string("OpenUsage"), .string("Claude · Session · 82% used"),
+                    ]),
+                    "XAyatanaLabel": .string(""),
+                ]
+            ),
+        ])
+        #expect(await dbus.lease.signalEmissions.last?.signal.arguments == [
+            .string(""), .string("GitHub Copilot · 100%"),
+        ])
+    }
+
+    @Test("An older tray revision cannot overwrite a newer display selection")
+    func trayIgnoresStaleRevision() async throws {
+        let dbus = FakeDesktopDBus(replies: [[]])
+        let service = StatusNotifierItemService(dbus: dbus) {}
+        let visible = StatusNotifierItemConfiguration(
+            title: "Claude · 82%",
+            label: "Claude · 82%",
+            tooltip: "Session · 82% used"
+        )
+        let iconOnly = StatusNotifierItemConfiguration(
+            label: "",
+            tooltip: "Claude · Session · 82% used"
+        )
+
+        try await service.start(configuration: visible)
+        try await service.update(configuration: iconOnly, revision: 2)
+        try await service.update(configuration: visible, revision: 1)
+
+        #expect(await dbus.events == ["export", "RegisterStatusNotifierItem"])
+        #expect(await dbus.lease.propertyUpdates.count == 1)
+        #expect(await dbus.lease.propertyUpdates.first?.changed["XAyatanaLabel"] == .string(""))
+        #expect(await dbus.lease.signalEmissions.count == 1)
     }
 }
 
@@ -255,9 +426,34 @@ private actor FakeDesktopDBus: LinuxDesktopDBusAdapter {
     func invokeExported(member: String, arguments: [DBusValue]) async {
         _ = await exported?.handleMethod(member, arguments)
     }
+
+    func exportedProperty(_ name: String) -> DBusValue? {
+        exported?.properties[name]
+    }
 }
 
 private actor FakeExportLease: DBusExportLease {
     private(set) var cancelCount = 0
+    private(set) var propertyUpdates: [RecordedPropertyUpdate] = []
+    private(set) var signalEmissions: [RecordedSignalEmission] = []
+
+    func updateProperties(interface: String, changed: [String: DBusValue]) {
+        propertyUpdates.append(.init(interface: interface, changed: changed))
+    }
+
+    func emit(_ signal: DBusSignal, signature: String) {
+        signalEmissions.append(.init(signal: signal, signature: signature))
+    }
+
     func cancel() { cancelCount += 1 }
+}
+
+private struct RecordedPropertyUpdate: Equatable {
+    let interface: String
+    let changed: [String: DBusValue]
+}
+
+private struct RecordedSignalEmission: Equatable {
+    let signal: DBusSignal
+    let signature: String
 }

@@ -15,6 +15,9 @@ final class DashboardController {
     let headerSwitcher = ViewSwitcher()
     let switcherBar = ViewSwitcherBar()
     let refreshButton = Button(icon: .viewRefresh)
+    let toolbarSummaryButton = Button()
+    let toolbarSummaryProviderLabel = Label("Usage")
+    let toolbarSummaryValueLabel = Label("—")
     let toastOverlay = ToastOverlay()
 
     let overview = OverviewView()
@@ -29,6 +32,7 @@ final class DashboardController {
     var settings: GNOMESettings
     var localAPIServer: LoopbackHTTPServer?
     var desktopIntegration: GNOMEDesktopIntegration?
+    var trayUpdateRevision: UInt64 = 0
     var analyticsRecorded = false
     var snapshots: [ProviderUsageSnapshot] = []
     var lastGoodByInstance: [String: ProviderUsageSnapshot] = [:]

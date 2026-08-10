@@ -16,6 +16,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
 
     var version = Self.currentVersion
     var appearance: Appearance = .system
+    var trayUsageDisplayMode = TrayUsageDisplayMode.defaultValue
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -29,7 +30,8 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     static let maximumInterval = 60
 
     private enum CodingKeys: String, CodingKey {
-        case version, appearance, periodicRefreshEnabled, refreshIntervalMinutes, providerOrder
+        case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
+        case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
 
@@ -43,6 +45,10 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         }
         version = Self.currentVersion
         appearance = try values.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
+        trayUsageDisplayMode = try values.decodeIfPresent(
+            TrayUsageDisplayMode.self,
+            forKey: .trayUsageDisplayMode
+        ) ?? .defaultValue
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []

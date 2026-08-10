@@ -39,7 +39,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 | Global shortcut | XDG GlobalShortcuts portal | Configured shortcut presents the window |
 | Launch at login | systemd user unit and XDG autostart fallback | Survives logout/login and remains user-controlled |
 | Keychain | Freedesktop Secret Service | Secrets never enter settings or snapshot files |
-| UserDefaults/settings | Versioned XDG JSON settings | Ordering, visibility, appearance, and refresh settings persist |
+| UserDefaults/settings | Versioned XDG JSON settings | Ordering, visibility, appearance, refresh, and panel display settings persist |
 | Local API | Loopback HTTP server with the same JSON contract | Existing API consumers parse equivalent data |
 | CLI | Linux executable sharing the same core | Happy, error, JSON, and help behavior match |
 | Notifications | Freedesktop notification portal | Threshold and provider errors are actionable |
@@ -56,6 +56,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Header bars contain only window-level actions; row actions live in rows or detail pages.
 - Destructive, warning, success, and error states use semantic styling plus text and icons.
 - Keyboard focus, accessible labels/descriptions, system font scaling, dark mode, and high contrast work.
+- The panel indicator defaults to the most urgent healthy quota; Settings can switch it to icon-only.
 - Animations respect reduced-motion preferences and never gate data availability.
 
 ## Efficiency Budgets

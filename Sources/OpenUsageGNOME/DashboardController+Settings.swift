@@ -17,6 +17,12 @@ extension DashboardController {
             self.settingsStore.save(self.settings)
             self.applyAppearance(appearance)
         }
+        settingsView.onTrayUsageDisplayModeChanged = { [weak self] mode in
+            guard let self else { return }
+            self.settings.trayUsageDisplayMode = mode
+            self.settingsStore.save(self.settings)
+            self.updateTrayUsage(self.visibleOrdered(self.snapshots))
+        }
         settingsView.onRefreshScheduleChanged = { [weak self] enabled, minutes in
             guard let self else { return }
             self.settings.periodicRefreshEnabled = enabled

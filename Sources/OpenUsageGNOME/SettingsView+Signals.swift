@@ -15,6 +15,16 @@ extension SettingsView {
             ]
             self.onAppearanceChanged(appearance)
         })
+        connections.append(trayUsageDisplayRow.onNotify(.selected) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            let mode = TrayUsageDisplayMode.allCases[
+                min(
+                    max(trayUsageDisplayRow.selected, 0),
+                    TrayUsageDisplayMode.allCases.count - 1
+                )
+            ]
+            self.onTrayUsageDisplayModeChanged(mode)
+        })
         connections.append(periodicRow.onNotify(.active) { [weak self] in
             guard let self, !self.applyingSettings else { return }
             self.intervalRow.sensitive = self.periodicRow.active

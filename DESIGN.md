@@ -43,6 +43,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Providers: boxed provider/account rows with disclosure into complete metric details.
 - History: bounded daily charts and a provider/account legend.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
+- Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
 
 ## 5. Interaction
 

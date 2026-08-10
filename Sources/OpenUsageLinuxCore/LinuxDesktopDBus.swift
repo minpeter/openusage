@@ -73,6 +73,8 @@ public struct DBusSignal: Equatable, Sendable {
 }
 
 public protocol DBusExportLease: Sendable {
+    func updateProperties(interface: String, changed: [String: DBusValue]) async throws
+    func emit(_ signal: DBusSignal, signature: String) async throws
     func cancel() async
 }
 

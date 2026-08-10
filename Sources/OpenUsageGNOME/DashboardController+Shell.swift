@@ -12,6 +12,22 @@ extension DashboardController {
         let header = HeaderBar()
         header.titleWidget = headerSwitcher
 
+        let summaryBox = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: GNOMEStyle.controlSpacing
+        )
+        toolbarSummaryProviderLabel.addCSSClass(.caption)
+        toolbarSummaryValueLabel.addCSSClass(.numeric)
+        toolbarSummaryValueLabel.addCSSClass(.heading)
+        summaryBox.append(toolbarSummaryProviderLabel)
+        summaryBox.append(toolbarSummaryValueLabel)
+        toolbarSummaryButton.child = summaryBox
+        toolbarSummaryButton.addCSSClass(.raised)
+        toolbarSummaryButton.addCSSClass(.pill)
+        toolbarSummaryButton.tooltipText = "Open Overview"
+        toolbarSummaryButton.setAccessibleLabel("Usage summary")
+        header.packStart(toolbarSummaryButton)
+
         refreshButton.addCSSClass(.flat)
         refreshButton.setAccessibleLabel("Refresh usage")
         header.packEnd(refreshButton)
@@ -41,6 +57,9 @@ extension DashboardController {
 
         connections.append(refreshButton.onClicked { [weak self] in
             self?.refresh()
+        })
+        connections.append(toolbarSummaryButton.onClicked { [weak self] in
+            self?.stack.visibleChildName = "overview"
         })
     }
 
@@ -88,6 +107,7 @@ extension DashboardController {
         let narrow = Breakpoint.maxWidth(GNOMEStyle.narrowBreakpointWidth, unit: .px)
         narrow.addSetter(switcherBar, property: .custom("reveal"), value: true)
         narrow.addSetter(headerSwitcher, property: .visible, value: false)
+        narrow.addSetter(toolbarSummaryButton, property: .visible, value: false)
         narrow.addSetter(overview.spendGroup, property: .custom("title"), value: "")
         for page in [overview.root, providersView.root, historyView.root, settingsView.root] {
             narrow.addSetter(page, property: .custom("margin-bottom"), value: 56)

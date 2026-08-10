@@ -12,6 +12,7 @@ final class SettingsView {
     let root: ScrolledWindow
 
     var onAppearanceChanged: (GNOMESettings.Appearance) -> Void = { _ in }
+    var onTrayUsageDisplayModeChanged: (TrayUsageDisplayMode) -> Void = { _ in }
     var onRefreshScheduleChanged: (Bool, Int) -> Void = { _, _ in }
     var onProviderOrderChanged: ([String]) -> Void = { _ in }
     var onProviderVisibilityChanged: (String, Bool) -> Void = { _, _ in }
@@ -22,6 +23,7 @@ final class SettingsView {
 
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let appearanceRow: ComboRow
+    let trayUsageDisplayRow: ComboRow
     let periodicRow: SwitchRow
     let intervalRow: SpinRow
     let launchRow = SwitchRow(title: "Launch at Login")
@@ -61,6 +63,15 @@ final class SettingsView {
                 + "scaling always come from the system."
         )
         appearanceGroup.add(appearanceRow)
+
+        trayUsageDisplayRow = ComboRow(title: "Show Usage As")
+        trayUsageDisplayRow.setModel(StringList(["Most Urgent Usage", "Icon Only"]))
+        let panelIndicatorGroup = PreferencesGroup(
+            title: "Panel Indicator",
+            description: "Choose whether the GNOME top panel shows the most urgent quota "
+                + "next to the OpenUsage icon."
+        )
+        panelIndicatorGroup.add(trayUsageDisplayRow)
 
         // Refresh group
         periodicRow = SwitchRow(
@@ -139,6 +150,7 @@ final class SettingsView {
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
 
         content.append(appearanceGroup)
+        content.append(panelIndicatorGroup)
         content.append(refreshGroup)
         content.append(startupGroup)
         content.append(orderGroup)
@@ -161,6 +173,9 @@ final class SettingsView {
     func apply(settings: GNOMESettings) {
         applyingSettings = true
         appearanceRow.selected = GNOMESettings.Appearance.allCases.firstIndex(of: settings.appearance) ?? 0
+        trayUsageDisplayRow.selected = TrayUsageDisplayMode.allCases.firstIndex(
+            of: settings.trayUsageDisplayMode
+        ) ?? 0
         periodicRow.active = settings.periodicRefreshEnabled
         intervalRow.value = Double(settings.refreshIntervalMinutes)
         intervalRow.sensitive = settings.periodicRefreshEnabled

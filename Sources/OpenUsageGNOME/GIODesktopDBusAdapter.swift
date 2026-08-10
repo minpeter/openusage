@@ -99,6 +99,12 @@ final class GIODesktopDBusAdapter: LinuxDesktopDBusAdapter, @unchecked Sendable 
             if let error { g_error_free(error) }
             throw LinuxDesktopDBusError.unavailable("export \(object.path)")
         }
-        return GIOExportLease(connection: connection, registration: registration, node: node)
+        return GIOExportLease(
+            connection: connection,
+            path: object.path,
+            box: box,
+            registration: registration,
+            node: node
+        )
     }
 }

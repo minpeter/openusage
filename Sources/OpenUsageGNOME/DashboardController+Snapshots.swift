@@ -15,7 +15,9 @@ extension DashboardController {
 
         isRefreshing = true
         refreshButton.sensitive = false
-        overview.update(snapshots: visibleOrdered(snapshots), isRefreshing: true)
+        let visible = visibleOrdered(snapshots)
+        overview.update(snapshots: visible, isRefreshing: true)
+        updateToolbarSummary(snapshots: visible, isRefreshing: true)
 
         let repository = repository
         let callback = DashboardCallback(self)
@@ -93,6 +95,8 @@ extension DashboardController {
         overview.update(snapshots: visible, isRefreshing: isRefreshing)
         providersView.update(snapshots: visible, isRefreshing: isRefreshing)
         historyView.update(snapshots: visible)
+        updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)
+        updateTrayUsage(visible)
 
         var seen: Set<String> = []
         let providers = ordered.compactMap { snapshot -> (id: String, name: String)? in
@@ -100,6 +104,20 @@ extension DashboardController {
             return (snapshot.providerID, snapshot.displayName)
         }
         settingsView.updateProviders(providers)
+    }
+
+    func updateTrayUsage(_ snapshots: [ProviderUsageSnapshot]) {
+        guard let desktopIntegration else { return }
+        trayUpdateRevision += 1
+        let revision = trayUpdateRevision
+        let displayMode = settings.trayUsageDisplayMode
+        Task {
+            await desktopIntegration.updateUsage(
+                snapshots,
+                displayMode: displayMode,
+                revision: revision
+            )
+        }
     }
 
     func applyCached(_ cached: [ProviderUsageSnapshot]) {
@@ -186,6 +204,8 @@ final class DashboardCallback: @unchecked Sendable {
 
     @MainActor
     func retainDesktopIntegration(_ integration: GNOMEDesktopIntegration) {
-        controller?.desktopIntegration = integration
+        guard let controller else { return }
+        controller.desktopIntegration = integration
+        controller.updateTrayUsage(controller.visibleOrdered(controller.snapshots))
     }
 }

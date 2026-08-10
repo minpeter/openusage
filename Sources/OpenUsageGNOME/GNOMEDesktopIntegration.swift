@@ -37,6 +37,22 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
         await tray.stop()
     }
 
+    func updateUsage(
+        _ snapshots: [ProviderUsageSnapshot],
+        displayMode: TrayUsageDisplayMode,
+        revision: UInt64
+    ) async {
+        let configuration = StatusNotifierItemConfiguration.usage(
+            snapshots: snapshots,
+            displayMode: displayMode
+        )
+        do {
+            try await tray.update(configuration: configuration, revision: revision)
+        } catch {
+            NSLog("OpenUsage: tray update unavailable: \(error.localizedDescription)")
+        }
+    }
+
     func postRefresh(_ snapshots: [ProviderUsageSnapshot]) async {
         let failures = snapshots.count { $0.errorMessage != nil }
         guard failures > 0 else { return }
