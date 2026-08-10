@@ -50,4 +50,17 @@ struct GNOMESettingsTests {
         #expect(!decoded.notifyCuttingItClose)
         #expect(!decoded.notifyWillRunOut)
     }
+
+    @Test("Sync directory survives restart and blank input restores the default")
+    func syncDirectoryRoundTrip() throws {
+        var settings = GNOMESettings()
+        settings.setSyncDirectory("  /home/tester/Usage Sync  ")
+
+        let persisted = try JSONEncoder().encode(settings)
+        var restarted = try JSONDecoder().decode(GNOMESettings.self, from: persisted)
+
+        #expect(restarted.syncDirectoryPath == "/home/tester/Usage Sync")
+        restarted.setSyncDirectory(" \n ")
+        #expect(restarted.syncDirectoryPath == nil)
+    }
 }

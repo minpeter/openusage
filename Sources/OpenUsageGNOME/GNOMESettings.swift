@@ -284,6 +284,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var notifyAlmostOut = true
     var notifyCuttingItClose = true
     var notifyWillRunOut = true
+    var syncDirectoryPath: String?
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -301,6 +302,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
         case density, timeFormat, metricLayouts, panelMetricPins, providerRenames
         case notifyAlmostOut, notifyCuttingItClose, notifyWillRunOut
+        case syncDirectoryPath
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -349,6 +351,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             forKey: .notifyCuttingItClose
         ) ?? true
         notifyWillRunOut = try values.decodeIfPresent(Bool.self, forKey: .notifyWillRunOut) ?? true
+        syncDirectoryPath = try values.decodeIfPresent(String.self, forKey: .syncDirectoryPath)
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []
@@ -370,6 +373,11 @@ struct GNOMESettings: Codable, Equatable, Sendable {
 
     func displayName(providerID: String, fallback: String) -> String {
         providerRenames[providerID] ?? fallback
+    }
+
+    mutating func setSyncDirectory(_ path: String?) {
+        let normalized = path?.trimmingCharacters(in: .whitespacesAndNewlines)
+        syncDirectoryPath = normalized?.isEmpty == false ? normalized : nil
     }
 }
 

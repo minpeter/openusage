@@ -53,6 +53,75 @@ struct ExportServiceTests {
             try UsageExportService().decodeJSON(oversized)
         }
     }
+
+    @Test("Configured sync directory round trips exported JSON into the snapshot cache")
+    func configuredSyncDirectoryRoundTripsJSON() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let paths = LinuxPaths(environment: [
+            "HOME": root.path,
+            "XDG_CONFIG_HOME": root.appendingPathComponent("config").path,
+            "XDG_CACHE_HOME": root.appendingPathComponent("cache").path,
+        ])
+        let directory = root.appendingPathComponent("shared usage", isDirectory: true)
+        let service = UsageDataSyncService(
+            cache: SnapshotCache(paths: paths),
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+
+        let exported = try service.export(
+            snapshots,
+            format: .json,
+            to: directory
+        )
+        let imported = try service.importSnapshots(from: exported)
+
+        #expect(exported.deletingLastPathComponent() == directory)
+        #expect(exported.lastPathComponent == "openusage-1700000000.json")
+        #expect(imported == snapshots)
+        #expect(try SnapshotCache(paths: paths).load() == snapshots)
+    }
+
+    @Test("Malformed import preserves the previous snapshot cache byte for byte")
+    func malformedImportPreservesSnapshotCache() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let paths = LinuxPaths(environment: [
+            "HOME": root.path,
+            "XDG_CONFIG_HOME": root.appendingPathComponent("config").path,
+            "XDG_CACHE_HOME": root.appendingPathComponent("cache").path,
+        ])
+        let cache = SnapshotCache(paths: paths)
+        try cache.save(snapshots)
+        let original = try Data(contentsOf: paths.snapshotCache)
+        let malformed = root.appendingPathComponent("malformed.json")
+        try Data(#"{"providerID":"truncated""#.utf8).write(to: malformed)
+
+        #expect(throws: (any Error).self) {
+            try UsageDataSyncService(cache: cache).importSnapshots(from: malformed)
+        }
+        #expect(try Data(contentsOf: paths.snapshotCache) == original)
+        #expect(try cache.load() == snapshots)
+    }
+
+    @Test("Repeated exports never overwrite an existing sync file")
+    func repeatedExportsDoNotOverwrite() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = UsageDataSyncService(
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+
+        let first = try service.export(snapshots, format: .json, to: root)
+        let second = try service.export(snapshots, format: .json, to: root)
+
+        #expect(first.lastPathComponent == "openusage-1700000000.json")
+        #expect(second.lastPathComponent == "openusage-1700000000-2.json")
+        #expect(try Data(contentsOf: first) == Data(contentsOf: second))
+    }
 }
 
 private extension JSONDecoder {

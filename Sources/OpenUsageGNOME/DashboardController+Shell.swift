@@ -87,12 +87,28 @@ extension DashboardController {
         let spendTokensAction = SimpleAction(name: "spend-tokens") { [weak self] in
             self?.overview.selectTotalSpendMetric(.tokens)
         }
+        let chooseSyncDirectoryAction = SimpleAction(name: "choose-sync-directory") { [weak self] in
+            self?.chooseSyncDirectory()
+        }
+        let importUsageAction = SimpleAction(name: "import-usage") { [weak self] in
+            self?.chooseUsageImport()
+        }
+        let exportJSONAction = SimpleAction(name: "export-json") { [weak self] in
+            self?.exportSnapshots(format: .json)
+        }
+        let exportCSVAction = SimpleAction(name: "export-csv") { [weak self] in
+            self?.exportSnapshots(format: .csv)
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
             shareAction,
             spendRateAction,
             spendTokensAction,
+            chooseSyncDirectoryAction,
+            importUsageAction,
+            exportJSONAction,
+            exportCSVAction,
         ]
         for action in retainedActions {
             application.addAction(action)

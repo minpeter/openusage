@@ -34,6 +34,9 @@ final class SettingsView {
     var onLaunchAtLoginChanged: (Bool) -> Void = { _ in }
     var onAnalyticsChanged: (Bool) -> Void = { _ in }
     var onLocalAPIChanged: (Bool, Int) -> Void = { _, _ in }
+    var onSyncDirectoryRequested: () -> Void = {}
+    var onSyncDirectoryReset: () -> Void = {}
+    var onImportRequested: () -> Void = {}
     var onExportRequested: (UsageExportFormat) -> Void = { _ in }
 
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
@@ -60,6 +63,8 @@ final class SettingsView {
         subtitle: "Serve usage data on the IPv4 loopback interface only."
     )
     let apiPortRow = SpinRow(title: "Port", min: 1_024, max: 65_535, step: 1)
+    let syncDirectoryRow: ActionRow
+    let defaultSyncPath: String
     let orderGroup = PreferencesGroup(
         title: "Provider Order",
         description: "Controls the order of providers in every view."
@@ -79,11 +84,21 @@ final class SettingsView {
     var customizationSettings = GNOMESettings()
     var applyingSettings = false
 
-    init(settings: GNOMESettings, cachePath: String, version: String) {
+    init(
+        settings: GNOMESettings,
+        cachePath: String,
+        defaultSyncPath: String,
+        version: String
+    ) {
         root = ScrolledWindow()
+        self.defaultSyncPath = defaultSyncPath
         root.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
         root.kineticScrolling = true
         content.setMargins(GNOMEStyle.outerMargin)
+        syncDirectoryRow = ActionRow(
+            title: "Sync Directory",
+            subtitle: settings.syncDirectoryPath ?? defaultSyncPath
+        )
 
         // Appearance group
         appearanceRow = ComboRow(title: "Style")
@@ -204,6 +219,26 @@ final class SettingsView {
         )
         privacyGroup.add(secretsRow)
         privacyGroup.add(analyticsRow)
+        let syncDirectoryActions = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: GNOMEStyle.controlSpacing
+        )
+        syncDirectoryActions.append(Button(label: "Choose…", onClicked: { [weak self] in
+            self?.onSyncDirectoryRequested()
+        }))
+        syncDirectoryActions.append(Button(label: "Default", onClicked: { [weak self] in
+            self?.onSyncDirectoryReset()
+        }))
+        syncDirectoryRow.addSuffix(syncDirectoryActions)
+        privacyGroup.add(syncDirectoryRow)
+        let importRow = ActionRow(
+            title: "Import Usage",
+            subtitle: "Load a JSON usage export into the local snapshot cache."
+        )
+        importRow.addSuffix(Button(label: "Import…", onClicked: { [weak self] in
+            self?.onImportRequested()
+        }))
+        privacyGroup.add(importRow)
         let exportRow = ActionRow(
             title: "Export Usage",
             subtitle: "Save the current snapshots without credentials."
@@ -276,6 +311,7 @@ final class SettingsView {
         apiRow.active = settings.localAPIEnabled ?? false
         apiPortRow.value = Double(settings.localAPIPort ?? LoopbackHTTPServer.defaultPort)
         apiPortRow.sensitive = apiRow.active
+        syncDirectoryRow.subtitle = settings.syncDirectoryPath ?? defaultSyncPath
         order = settings.providerOrder
         hiddenProviderIDs = Set(settings.hiddenProviderIDs ?? [])
         rebuildOrderRows()

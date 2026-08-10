@@ -84,6 +84,7 @@ final class DashboardController {
         settingsView = SettingsView(
             settings: settings,
             cachePath: LinuxPaths().snapshotCache.path,
+            defaultSyncPath: Self.defaultUsageDirectory().path,
             version: Self.appVersion
         )
 

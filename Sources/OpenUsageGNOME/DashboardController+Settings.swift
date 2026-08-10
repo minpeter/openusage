@@ -135,6 +135,15 @@ extension DashboardController {
             self.settingsStore.save(self.settings)
             self.configureLocalAPI(enabled: enabled, port: port)
         }
+        settingsView.onSyncDirectoryRequested = { [weak self] in
+            self?.chooseSyncDirectory()
+        }
+        settingsView.onSyncDirectoryReset = { [weak self] in
+            self?.setSyncDirectory(nil)
+        }
+        settingsView.onImportRequested = { [weak self] in
+            self?.chooseUsageImport()
+        }
         settingsView.onExportRequested = { [weak self] format in
             self?.exportSnapshots(format: format)
         }
@@ -257,30 +266,11 @@ extension DashboardController {
 
     func exportSnapshots(format: UsageExportFormat) {
         do {
-            let environment = ProcessInfo.processInfo.environment
-            let home = environment["HOME"].map {
-                URL(fileURLWithPath: $0, isDirectory: true)
-            } ?? FileManager.default.homeDirectoryForCurrentUser
-            let directory = environment["XDG_DOWNLOAD_DIR"].map {
-                URL(
-                    fileURLWithPath: $0.replacingOccurrences(
-                        of: "$HOME",
-                        with: home.path
-                    ),
-                    isDirectory: true
-                )
-            } ?? home.appendingPathComponent("Downloads", isDirectory: true)
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
+            let file = try UsageDataSyncService().export(
+                snapshots,
+                format: format,
+                to: usageDataDirectory
             )
-            let suffix = format == .json ? "json" : "csv"
-            let stamp = Int(Date().timeIntervalSince1970)
-            let file = directory.appendingPathComponent(
-                "openusage-\(stamp).\(suffix)"
-            )
-            let data = try UsageExportService().encode(snapshots, format: format)
-            try data.write(to: file, options: .atomic)
             UriLauncher(uri: file.absoluteString).launch()
             toastOverlay.addToast(Toast(title: "Exported \(file.lastPathComponent)"))
         } catch {
@@ -288,6 +278,85 @@ extension DashboardController {
                 title: "Could not export usage: \(error.localizedDescription)"
             ))
         }
+    }
+
+    func chooseSyncDirectory() {
+        if let qaPath = ProcessInfo.processInfo.environment["OPENUSAGE_SYNC_DIRECTORY"] {
+            setSyncDirectory(qaPath)
+            return
+        }
+        let dialog = FileDialog()
+        dialog.title = "Choose Usage Sync Directory"
+        dialog.acceptLabel = "Choose"
+        dialog.selectFolder(parent: window) { [weak self] path in
+            guard let path else { return }
+            self?.setSyncDirectory(path)
+        }
+    }
+
+    func setSyncDirectory(_ path: String?) {
+        settings.setSyncDirectory(path)
+        settingsStore.save(settings)
+        settingsView.syncDirectoryRow.subtitle = usageDataDirectory.path
+        toastOverlay.addToast(Toast(
+            title: settings.syncDirectoryPath == nil
+                ? "Using the Downloads directory"
+                : "Sync directory updated"
+        ))
+    }
+
+    func chooseUsageImport() {
+        if let qaPath = ProcessInfo.processInfo.environment["OPENUSAGE_IMPORT_PATH"] {
+            importSnapshots(from: URL(fileURLWithPath: qaPath))
+            return
+        }
+        let dialog = FileDialog()
+        dialog.title = "Import Usage"
+        dialog.acceptLabel = "Import"
+        dialog.setFilters([FileFilter(name: "OpenUsage JSON", suffixes: ["json"])])
+        dialog.open(parent: window) { [weak self] path in
+            guard let path else { return }
+            self?.importSnapshots(from: URL(fileURLWithPath: path))
+        }
+    }
+
+    func importSnapshots(from file: URL) {
+        do {
+            snapshots = mergedWithLastGood(
+                try UsageDataSyncService().importSnapshots(from: file)
+            )
+            applySnapshots()
+            toastOverlay.addToast(Toast(title: "Imported \(file.lastPathComponent)"))
+        } catch {
+            toastOverlay.addToast(Toast(
+                title: "Could not import usage: \(error.localizedDescription)"
+            ))
+        }
+    }
+
+    var usageDataDirectory: URL {
+        guard let path = settings.syncDirectoryPath else {
+            return Self.defaultUsageDirectory()
+        }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    static func defaultUsageDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        let home = environment["HOME"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        } ?? FileManager.default.homeDirectoryForCurrentUser
+        guard let configured = environment["XDG_DOWNLOAD_DIR"] else {
+            return home.appendingPathComponent("Downloads", isDirectory: true)
+        }
+        return URL(
+            fileURLWithPath: configured.replacingOccurrences(
+                of: "$HOME",
+                with: home.path
+            ),
+            isDirectory: true
+        )
     }
 
     func exportShareCard(_ card: BrandedShareCard) {
