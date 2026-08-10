@@ -155,7 +155,7 @@ struct LinuxDesktopServicesTests {
         #expect(await dbus.events.prefix(2) == ["export", "RegisterStatusNotifierItem"])
         let registration = try #require(await dbus.calls.first)
         #expect(registration.arguments == [.string("io.github.minpeter.OpenUsage")])
-        #expect(await dbus.exportedProperty("Menu") == .objectPath("/StatusNotifierItem"))
+        #expect(await dbus.exportedProperty("Menu") == .objectPath("/NO_DBUSMENU"))
         #expect(await dbus.exportedProperty("XAyatanaLabel") == .string("Grok · 36%"))
         #expect(await dbus.exportedProperty("XAyatanaLabelGuide") == .string("GitHub Copilot · 100%"))
         #expect(await dbus.lease.cancelCount == 1)
@@ -322,6 +322,58 @@ struct LinuxDesktopServicesTests {
         #expect(await dbus.lease.propertyUpdates.first?.changed["XAyatanaLabel"] == .string(""))
         #expect(await dbus.lease.signalEmissions.count == 1)
     }
+
+    @Test("Concurrent tray updates commit in revision order")
+    func traySerializesConcurrentRevisions() async throws {
+        let dbus = FakeDesktopDBus(replies: [[]])
+        let service = StatusNotifierItemService(dbus: dbus) {}
+        let initial = StatusNotifierItemConfiguration(
+            title: "Initial · 10%",
+            label: "Initial · 10%",
+            tooltip: "Session · 10% used"
+        )
+        let older = StatusNotifierItemConfiguration(
+            title: "Older · 40%",
+            label: "Older · 40%",
+            tooltip: "Session · 40% used"
+        )
+        let newer = StatusNotifierItemConfiguration(
+            title: "Newer · 80%",
+            label: "Newer · 80%",
+            tooltip: "Session · 80% used"
+        )
+
+        try await service.start(configuration: initial)
+        await dbus.lease.blockNextPropertyUpdate()
+
+        let olderUpdate = Task {
+            try await service.update(configuration: older, revision: 1)
+        }
+        await dbus.lease.waitUntilPropertyUpdateStarts()
+
+        let newerUpdate = Task {
+            try await service.update(configuration: newer, revision: 2)
+        }
+        await service.waitUntilMutationQueueHasWaiter()
+
+        await dbus.lease.releasePropertyUpdate()
+        try await olderUpdate.value
+        try await newerUpdate.value
+        try await service.update(configuration: newer, revision: 3)
+
+        #expect(await dbus.lease.propertyUpdates.compactMap {
+            $0.changed["XAyatanaLabel"]
+        } == [
+            .string("Older · 40%"),
+            .string("Newer · 80%"),
+        ])
+        #expect(await dbus.lease.signalEmissions.map {
+            $0.signal.arguments.first
+        } == [
+            .string("Older · 40%"),
+            .string("Newer · 80%"),
+        ])
+    }
 }
 
 private final class DesktopCommandRecorder: CommandRunning, @unchecked Sendable {
@@ -436,8 +488,28 @@ private actor FakeExportLease: DBusExportLease {
     private(set) var cancelCount = 0
     private(set) var propertyUpdates: [RecordedPropertyUpdate] = []
     private(set) var signalEmissions: [RecordedSignalEmission] = []
+    private var shouldBlockNextPropertyUpdate = false
+    private let propertyUpdateStarted = AsyncEvent()
+    private let propertyUpdateRelease = AsyncEvent()
 
-    func updateProperties(interface: String, changed: [String: DBusValue]) {
+    func blockNextPropertyUpdate() {
+        shouldBlockNextPropertyUpdate = true
+    }
+
+    func waitUntilPropertyUpdateStarts() async {
+        await propertyUpdateStarted.wait()
+    }
+
+    func releasePropertyUpdate() async {
+        await propertyUpdateRelease.send()
+    }
+
+    func updateProperties(interface: String, changed: [String: DBusValue]) async {
+        if shouldBlockNextPropertyUpdate {
+            shouldBlockNextPropertyUpdate = false
+            await propertyUpdateStarted.send()
+            await propertyUpdateRelease.wait()
+        }
         propertyUpdates.append(.init(interface: interface, changed: changed))
     }
 

@@ -39,6 +39,7 @@ public actor StatusNotifierItemService {
     private var exportLease: (any DBusExportLease)?
     private var configuration: StatusNotifierItemConfiguration?
     private var latestUpdateRevision: UInt64?
+    private let mutationGate = StatusNotifierItemMutationGate()
 
     public init(dbus: any LinuxDesktopDBusAdapter, presentWindow: @escaping @Sendable () async -> Void) {
         self.dbus = dbus
@@ -46,6 +47,17 @@ public actor StatusNotifierItemService {
     }
 
     public func start(configuration: StatusNotifierItemConfiguration = .init()) async throws {
+        await mutationGate.acquire()
+        do {
+            try await startWithMutationPermit(configuration: configuration)
+        } catch {
+            await mutationGate.release()
+            throw error
+        }
+        await mutationGate.release()
+    }
+
+    private func startWithMutationPermit(configuration: StatusNotifierItemConfiguration) async throws {
         guard exportLease == nil else { return }
         let presentWindow = presentWindow
         let object = DBusExportedObject(
@@ -80,31 +92,46 @@ public actor StatusNotifierItemService {
     }
 
     public func update(configuration: StatusNotifierItemConfiguration) async throws {
-        try await apply(configuration: configuration)
+        await mutationGate.acquire()
+        do {
+            try await apply(configuration: configuration)
+        } catch {
+            await mutationGate.release()
+            throw error
+        }
+        await mutationGate.release()
     }
 
     public func update(
         configuration: StatusNotifierItemConfiguration,
         revision: UInt64
     ) async throws {
+        await mutationGate.acquire()
         if let latestUpdateRevision, revision < latestUpdateRevision {
+            await mutationGate.release()
             return
         }
         latestUpdateRevision = revision
-        try await apply(configuration: configuration)
+        do {
+            try await apply(configuration: configuration)
+        } catch {
+            await mutationGate.release()
+            throw error
+        }
+        await mutationGate.release()
     }
 
     private func apply(configuration: StatusNotifierItemConfiguration) async throws {
         guard self.configuration != configuration else { return }
         guard let current = self.configuration, let lease = exportLease else {
-            try await start(configuration: configuration)
+            try await startWithMutationPermit(configuration: configuration)
             return
         }
         if current.serviceName != configuration.serviceName {
             exportLease = nil
             self.configuration = nil
             await lease.cancel()
-            try await start(configuration: configuration)
+            try await startWithMutationPermit(configuration: configuration)
             return
         }
 
@@ -125,11 +152,17 @@ public actor StatusNotifierItemService {
     }
 
     public func stop() async {
+        await mutationGate.acquire()
         let lease = exportLease
         exportLease = nil
         configuration = nil
         latestUpdateRevision = nil
         await lease?.cancel()
+        await mutationGate.release()
+    }
+
+    func waitUntilMutationQueueHasWaiter() async {
+        await mutationGate.waitUntilQueued(count: 1)
     }
 
     public static let introspectionXML = """
@@ -153,7 +186,7 @@ public actor StatusNotifierItemService {
             "Title": .string(configuration.title),
             "Status": .string("Active"),
             "IconName": .string(configuration.iconName),
-            "Menu": .objectPath(Self.objectPath),
+            "Menu": .objectPath("/NO_DBUSMENU"),
             "ToolTip": .structure([
                 .string(configuration.iconName), .array([]),
                 .string(configuration.title), .string(configuration.tooltip),
@@ -169,5 +202,49 @@ public actor StatusNotifierItemService {
     ) -> [String: DBusValue] {
         let currentProperties = properties(for: current)
         return properties(for: updated).filter { currentProperties[$0.key] != $0.value }
+    }
+}
+
+private actor StatusNotifierItemMutationGate {
+    private var isHeld = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var queueObservers: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func acquire() async {
+        guard isHeld else {
+            isHeld = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+            resumeSatisfiedObservers()
+        }
+    }
+
+    func release() {
+        guard !waiters.isEmpty else {
+            isHeld = false
+            return
+        }
+        waiters.removeFirst().resume()
+    }
+
+    func waitUntilQueued(count: Int) async {
+        guard waiters.count < count else { return }
+        await withCheckedContinuation { continuation in
+            queueObservers.append((count, continuation))
+        }
+    }
+
+    private func resumeSatisfiedObservers() {
+        var pending: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        for observer in queueObservers {
+            if waiters.count >= observer.count {
+                observer.continuation.resume()
+            } else {
+                pending.append(observer)
+            }
+        }
+        queueObservers = pending
     }
 }

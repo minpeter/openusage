@@ -33,15 +33,47 @@ struct UsageToolbarSummaryTests {
         #expect(summary?.severity == .critical)
     }
 
-    @Test("Snapshots without a healthy progress quota have no summary")
-    func excludesErrorsAndNonProgressMetrics() {
-        let value = UsageMetric(kind: .value, label: "Balance", used: 12)
+    @Test("Warning begins at eighty percent")
+    func warningThresholdMatchesMacOS() {
+        let below = UsageToolbarSummary.mostUrgent(in: [
+            snapshot(providerID: "below", name: "Below", metric: quota("Weekly", used: 79)),
+        ])
+        let warning = UsageToolbarSummary.mostUrgent(in: [
+            snapshot(providerID: "warning", name: "Warning", metric: quota("Weekly", used: 80)),
+        ])
+
+        #expect(below?.severity == .normal)
+        #expect(warning?.severity == .warning)
+    }
+
+    @Test("Account identity disambiguates accessible summaries")
+    func includesAccountIdentity() {
         let summary = UsageToolbarSummary.mostUrgent(in: [
-            snapshot(providerID: "value", name: "Value", metric: value),
             ProviderUsageSnapshot(
-                providerID: "stale",
-                instanceID: "stale",
-                displayName: "Stale",
+                providerID: "claude",
+                instanceID: "claude-work",
+                displayName: "Claude",
+                accountLabel: "Work",
+                plan: nil,
+                metrics: [quota("Session", used: 82)],
+                links: [],
+                refreshedAt: Date(timeIntervalSince1970: 0)
+            ),
+        ])
+
+        #expect(summary?.accessibilityDescription == "Claude, Work, Session, 82% used")
+    }
+
+    @Test("Stale last-good progress remains visible and announced")
+    func retainsStaleLastGoodProgress() {
+        let value = UsageMetric(kind: .value, label: "Balance", used: 12)
+        let snapshots = [
+            snapshot(providerID: "value", name: "Value", metric: value),
+            snapshot(providerID: "healthy", name: "Healthy", metric: quota("Weekly", used: 70)),
+            ProviderUsageSnapshot(
+                providerID: "claude",
+                instanceID: "claude-work",
+                displayName: "Claude",
                 accountLabel: nil,
                 plan: nil,
                 metrics: [quota("Session", used: 95)],
@@ -49,9 +81,18 @@ struct UsageToolbarSummaryTests {
                 refreshedAt: Date(timeIntervalSince1970: 0),
                 errorMessage: "Refresh failed"
             ),
-        ])
+        ]
+        let summary = UsageToolbarSummary.mostUrgent(in: snapshots)
 
-        #expect(summary == nil)
+        #expect(summary?.providerID == "claude")
+        #expect(summary?.percentUsed == 95)
+        #expect(summary?.severity == .critical)
+        #expect(summary?.isStale == true)
+        #expect(summary?.accessibilityDescription == "Claude, Session, 95% used, stale: Refresh failed")
+        #expect(StatusNotifierItemConfiguration.usage(
+            snapshots: snapshots,
+            displayMode: .mostUrgent
+        ).tooltip == "Claude · Session · 95% used · Stale — Refresh failed")
     }
 
     @Test("Most urgent is the persisted tray display default")
@@ -75,7 +116,7 @@ struct UsageToolbarSummaryTests {
         )
         #expect(visible.title == "Claude · 82%")
         #expect(visible.label == "Claude · 82%")
-        #expect(visible.tooltip == "Session · 82% used")
+        #expect(visible.tooltip == "Claude · Session · 82% used")
 
         let iconOnly = StatusNotifierItemConfiguration.usage(
             snapshots: snapshots,

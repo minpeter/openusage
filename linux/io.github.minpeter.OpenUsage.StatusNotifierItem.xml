@@ -4,11 +4,15 @@
   <interface name="org.kde.StatusNotifierItem">
     <method name="Activate"><arg name="x" type="i" direction="in"/><arg name="y" type="i" direction="in"/></method>
     <method name="SecondaryActivate"><arg name="x" type="i" direction="in"/><arg name="y" type="i" direction="in"/></method>
+    <signal name="XAyatanaNewLabel"><arg name="label" type="s"/><arg name="guide" type="s"/></signal>
     <property name="Category" type="s" access="read"/>
     <property name="Id" type="s" access="read"/>
     <property name="Title" type="s" access="read"/>
     <property name="Status" type="s" access="read"/>
     <property name="IconName" type="s" access="read"/>
     <property name="ToolTip" type="(sa(iiay)ss)" access="read"/>
+    <property name="Menu" type="o" access="read"/>
+    <property name="XAyatanaLabel" type="s" access="read"/>
+    <property name="XAyatanaLabelGuide" type="s" access="read"/>
   </interface>
 </node>

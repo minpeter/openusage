@@ -111,7 +111,7 @@ extension DashboardController {
         trayUpdateRevision += 1
         let revision = trayUpdateRevision
         let displayMode = settings.trayUsageDisplayMode
-        Task {
+        Task.detached {
             await desktopIntegration.updateUsage(
                 snapshots,
                 displayMode: displayMode,
