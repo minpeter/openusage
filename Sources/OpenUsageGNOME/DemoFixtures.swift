@@ -140,6 +140,20 @@ enum DemoFixtures {
                     values: [UsageValue(label: "credits", value: 37, unit: .credits)],
                     expiriesAt: [now.addingTimeInterval(1_209_600)]
                 ),
+                UsageMetric(
+                    kind: .values, label: "Model Spend", used: 4,
+                    values: [
+                        UsageValue(label: "o3", value: 3, unit: .dollars),
+                        UsageValue(label: "o4-mini", value: 1, unit: .dollars),
+                    ]
+                ),
+                UsageMetric(
+                    kind: .values, label: "Model Tokens", used: 2_000_000,
+                    values: [
+                        UsageValue(label: "o3", value: 1_500_000, unit: .tokens),
+                        UsageValue(label: "o4-mini", value: 500_000, unit: .tokens),
+                    ]
+                ),
                 UsageMetric(kind: .badge, label: "Status", used: 0, text: "Operational"),
                 UsageMetric(
                     kind: .chart, label: "Usage Trend",

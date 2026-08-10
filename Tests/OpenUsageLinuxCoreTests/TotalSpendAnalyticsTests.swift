@@ -93,6 +93,62 @@ struct TotalSpendAnalyticsTests {
         #expect(projection.slices.isEmpty)
     }
 
+    @Test("Snapshot extraction keeps the largest same-dimension total")
+    func snapshotExtraction() {
+        let snapshot = ProviderUsageSnapshot(
+            providerID: "claude",
+            instanceID: "claude-work",
+            displayName: "Claude Studio",
+            accountLabel: "Work",
+            plan: nil,
+            metrics: [
+                UsageMetric(
+                    kind: .values,
+                    label: "Today",
+                    used: 4.21,
+                    values: [
+                        UsageValue(label: "Total", value: 4.21, unit: .dollars),
+                        UsageValue(label: "Tokens", value: 1_000_000, unit: .tokens),
+                    ]
+                ),
+                UsageMetric(
+                    kind: .values,
+                    label: "Model Spend",
+                    used: 10,
+                    values: [
+                        UsageValue(label: "Opus", value: 6, unit: .dollars),
+                        UsageValue(label: "Sonnet", value: 3, unit: .dollars),
+                        UsageValue(label: "Haiku", value: 1, unit: .dollars),
+                    ]
+                ),
+                UsageMetric(
+                    kind: .values,
+                    label: "Model Tokens",
+                    used: 6_000_000,
+                    values: [
+                        UsageValue(label: "Opus", value: 1_000_000, unit: .tokens),
+                        UsageValue(label: "Sonnet", value: 2_000_000, unit: .tokens),
+                        UsageValue(label: "Haiku", value: 3_000_000, unit: .tokens),
+                    ]
+                ),
+            ],
+            links: [],
+            refreshedAt: now
+        )
+
+        let records = TotalSpendAnalytics.records(from: [snapshot])
+
+        #expect(records == [
+            ProviderSpendRecord(
+                providerID: "claude",
+                providerName: "Claude Studio",
+                cost: 10,
+                tokens: 6_000_000,
+                date: now
+            ),
+        ])
+    }
+
     private func record(
         providerID: String,
         providerName: String,

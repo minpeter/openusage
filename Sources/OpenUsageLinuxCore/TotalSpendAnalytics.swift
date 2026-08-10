@@ -92,6 +92,27 @@ public struct TotalSpendProjection: Equatable, Sendable {
 }
 
 public enum TotalSpendAnalytics {
+    public static func records(
+        from snapshots: [ProviderUsageSnapshot]
+    ) -> [ProviderSpendRecord] {
+        snapshots.compactMap { snapshot in
+            let cost = snapshot.metrics.compactMap {
+                dimensionTotal(metric: $0, unit: .dollars)
+            }.max() ?? 0
+            let tokens = snapshot.metrics.compactMap {
+                dimensionTotal(metric: $0, unit: .tokens)
+            }.max() ?? 0
+            guard cost > 0 || tokens > 0 else { return nil }
+            return ProviderSpendRecord(
+                providerID: snapshot.providerID,
+                providerName: snapshot.displayName,
+                cost: cost,
+                tokens: tokens,
+                date: snapshot.refreshedAt
+            )
+        }
+    }
+
     public static func project(
         records: [ProviderSpendRecord],
         metric: TotalSpendMetric,
@@ -181,6 +202,22 @@ public enum TotalSpendAnalytics {
         case .thirtyDays: now.addingTimeInterval(-30 * 24 * 60 * 60)
         case .all: nil
         }
+    }
+
+    private static func dimensionTotal(
+        metric: UsageMetric,
+        unit: UsageValue.Unit
+    ) -> Double? {
+        let total = (metric.values ?? []).reduce(0) { partial, value in
+            guard value.unit == unit,
+                  value.value.isFinite,
+                  value.value > 0
+            else {
+                return partial
+            }
+            return partial + value.value
+        }
+        return total > 0 ? total : nil
     }
 }
 

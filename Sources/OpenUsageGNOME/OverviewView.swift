@@ -19,6 +19,7 @@ final class OverviewView {
     )
     let spinnerBox = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let spendGroup = PreferencesGroup(title: "Spend")
+    private let totalSpendView = TotalSpendView()
     private let spendButtons = [
         ToggleButton(label: "Today"),
         ToggleButton(label: "Yesterday"),
@@ -99,6 +100,7 @@ final class OverviewView {
         currentSpend = spend
         spendGroup.visible = !spend.isEmpty
         renderSpend()
+        totalSpendView.update(snapshots: snapshots)
 
         let urgent = urgentQuotas(snapshots, metricLayouts: metricLayouts)
         urgentGroup.visible = !urgent.isEmpty
@@ -107,6 +109,7 @@ final class OverviewView {
         replaceRows(in: healthGroup, rows: snapshots.map(healthRow(_:)))
 
         content.append(spendGroup)
+        content.append(totalSpendView.root)
         content.append(urgentGroup)
         content.append(healthGroup)
     }
