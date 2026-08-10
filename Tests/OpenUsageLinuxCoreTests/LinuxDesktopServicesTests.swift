@@ -1,9 +1,47 @@
 import Foundation
+#if os(Linux)
+import Glibc
+#endif
 import Testing
 @testable import OpenUsageLinuxCore
 
 @Suite("Linux desktop services")
 struct LinuxDesktopServicesTests {
+    #if os(Linux)
+    @Test("Timed-out commands force-terminate children that ignore SIGTERM")
+    func timedOutCommandForceTerminatesStubbornChild() throws {
+        let pidFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("openusage-stubborn-\(UUID().uuidString).pid")
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let invocation = CommandInvocation(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: [
+                "-c",
+                "trap '' TERM; printf '%s' $$ > '\(pidFile.path)'; exec sleep 30",
+            ],
+            timeout: 0.5
+        )
+
+        do {
+            _ = try BoundedCommandRunner().run(invocation)
+            Issue.record("Expected stubborn child command to time out")
+        } catch LinuxDesktopCommandError.timedOut {
+        } catch {
+            Issue.record("Expected timeout, got \(error)")
+        }
+
+        let pid = try #require(
+            Int32(String(contentsOf: pidFile, encoding: .utf8))
+        )
+        let probe = Glibc.kill(pid, 0)
+        if probe == 0 {
+            _ = Glibc.kill(pid, SIGKILL)
+        }
+        #expect(probe == -1)
+        #expect(errno == ESRCH)
+    }
+    #endif
+
     @Test("Periodic refresh uses only the repository-wide single-flight entry point")
     func periodicRefreshUsesRepositoryBoundary() async {
         let clock = ManualRefreshClock()

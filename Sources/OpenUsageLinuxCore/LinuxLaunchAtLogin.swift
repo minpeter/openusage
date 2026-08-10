@@ -1,4 +1,5 @@
 import Foundation
+import Glibc
 
 public struct CommandInvocation: Equatable, Sendable {
     public let executableURL: URL
@@ -78,7 +79,11 @@ public struct BoundedCommandRunner: CommandRunning {
         }
         guard terminated.wait(timeout: .now() + invocation.timeout) == .success else {
             process.terminate()
-            _ = terminated.wait(timeout: .now() + 1)
+            if terminated.wait(timeout: .now() + 1) != .success {
+                _ = Glibc.kill(process.processIdentifier, SIGKILL)
+                _ = terminated.wait(timeout: .now() + 1)
+            }
+            _ = drains.wait(timeout: .now() + 1)
             throw LinuxDesktopCommandError.timedOut
         }
         _ = drains.wait(timeout: .now() + 1)
