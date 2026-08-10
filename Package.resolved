@@ -1,5 +1,5 @@
 {
-  "originHash" : "12902f6b852ffdc5882382e41acddcbc432d72c536db46c9693c6d50209bfab5",
+  "originHash" : "3f2b5267cbea9e06e813ae20b994ab4956484c192f5f2783dac32b3d4fbf1884",
   "pins" : [
     {
       "identity" : "keyboardshortcuts",
@@ -26,15 +26,6 @@
       "state" : {
         "revision" : "b6496a74a087257ef5e6da1c5b29a447a60f5bd7",
         "version" : "2.9.4"
-      }
-    },
-    {
-      "identity" : "swift-adwaita",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/makoni/swift-adwaita.git",
-      "state" : {
-        "revision" : "d66e7f86e4ce6cbbe503b81f08b89fe8b9ad8b42",
-        "version" : "1.1.0"
       }
     }
   ],
