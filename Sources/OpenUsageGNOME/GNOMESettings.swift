@@ -2,6 +2,68 @@ import Adwaita
 import Foundation
 import OpenUsageLinuxCore
 
+enum MenuBarStyle: String, Codable, CaseIterable, Sendable {
+    case text
+    case bars
+
+    var label: String {
+        switch self {
+        case .text: "Text"
+        case .bars: "Bars"
+        }
+    }
+}
+
+enum WidgetDisplayMode: String, Codable, CaseIterable, Sendable {
+    case used
+    case remaining
+
+    var label: String {
+        switch self {
+        case .used: "Used"
+        case .remaining: "Left"
+        }
+    }
+}
+
+enum ResetDisplayMode: String, Codable, CaseIterable, Sendable {
+    case relative
+    case absolute
+
+    var label: String {
+        switch self {
+        case .relative: "Countdown"
+        case .absolute: "Exact Time"
+        }
+    }
+}
+
+enum DensitySetting: String, Codable, CaseIterable, Sendable {
+    case regular
+    case compact
+
+    var label: String {
+        switch self {
+        case .regular: "Default"
+        case .compact: "Compact"
+        }
+    }
+}
+
+enum TimeFormatSetting: String, Codable, CaseIterable, Sendable {
+    case auto
+    case twelveHour = "12h"
+    case twentyFourHour = "24h"
+
+    var label: String {
+        switch self {
+        case .auto: "Auto"
+        case .twelveHour: "12-hour"
+        case .twentyFourHour: "24-hour"
+        }
+    }
+}
+
 /// Versioned XDG JSON settings for the GNOME shell (Linux parity matrix:
 /// UserDefaults/settings -> versioned XDG JSON). Secrets never enter this
 /// file; credentials stay in the Secret Service.
@@ -17,6 +79,12 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var version = Self.currentVersion
     var appearance: Appearance = .system
     var trayUsageDisplayMode = TrayUsageDisplayMode.defaultValue
+    var menuBarStyle: MenuBarStyle = .text
+    var widgetDisplayMode: WidgetDisplayMode = .used
+    var resetDisplayMode: ResetDisplayMode = .relative
+    var alwaysShowPacing = false
+    var density: DensitySetting = .regular
+    var timeFormat: TimeFormatSetting = .auto
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -31,6 +99,8 @@ struct GNOMESettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
+        case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
+        case density, timeFormat
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -49,6 +119,18 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             TrayUsageDisplayMode.self,
             forKey: .trayUsageDisplayMode
         ) ?? .defaultValue
+        menuBarStyle = try values.decodeIfPresent(MenuBarStyle.self, forKey: .menuBarStyle) ?? .text
+        widgetDisplayMode = try values.decodeIfPresent(
+            WidgetDisplayMode.self,
+            forKey: .widgetDisplayMode
+        ) ?? .used
+        resetDisplayMode = try values.decodeIfPresent(
+            ResetDisplayMode.self,
+            forKey: .resetDisplayMode
+        ) ?? .relative
+        alwaysShowPacing = try values.decodeIfPresent(Bool.self, forKey: .alwaysShowPacing) ?? false
+        density = try values.decodeIfPresent(DensitySetting.self, forKey: .density) ?? .regular
+        timeFormat = try values.decodeIfPresent(TimeFormatSetting.self, forKey: .timeFormat) ?? .auto
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []

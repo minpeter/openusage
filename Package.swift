@@ -85,6 +85,12 @@ let package = Package(
             dependencies: ["OpenUsageLinuxCore"],
             path: "Tests/OpenUsageLinuxAPITests",
             swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "OpenUsageGNOMETests",
+            dependencies: ["OpenUsageGNOME"],
+            path: "Tests/OpenUsageGNOMETests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
 )
