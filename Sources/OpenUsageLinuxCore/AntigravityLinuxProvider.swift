@@ -165,22 +165,36 @@ public struct AntigravityLinuxProvider: Sendable {
 
     private func loadCredential() throws -> Credential {
         let secretData: Data?
+        var credentialStoreError: (any Error)?
         do { secretData = try loadSecretServiceData() }
-        catch { throw AntigravityLinuxError.credentialStoreUnreadable }
+        catch {
+            secretData = nil
+            credentialStoreError = error
+        }
         if let data = secretData {
             guard let credential = Credential(data: data) else {
                 throw AntigravityLinuxError.invalidCredentialData
             }
             return credential
         }
+
+        var malformedFileFound = false
         for path in paths.credentialCandidates {
             let data: Data?
             do { data = try files.readIfPresent(path) }
-            catch { throw AntigravityLinuxError.credentialStoreUnreadable }
+            catch {
+                credentialStoreError = credentialStoreError ?? error
+                continue
+            }
             guard let data else { continue }
-            guard let credential = Credential(data: data) else { throw AntigravityLinuxError.invalidCredentialData }
+            guard let credential = Credential(data: data) else {
+                malformedFileFound = true
+                continue
+            }
             return credential
         }
+        if malformedFileFound { throw AntigravityLinuxError.invalidCredentialData }
+        if credentialStoreError != nil { throw AntigravityLinuxError.credentialStoreUnreadable }
         throw AntigravityLinuxError.notSignedIn
     }
 

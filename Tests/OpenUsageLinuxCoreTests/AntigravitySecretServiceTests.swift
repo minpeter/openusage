@@ -43,7 +43,24 @@ struct AntigravitySecretServiceTests {
         #expect(service.lookups == [username, account])
     }
 
-    @Test("A locked credential-store failure never becomes not signed in")
+    @Test("A locked credential-store failure falls back to the AGY credential file")
+    func lockedCredentialStoreUsesFileFallback() async throws {
+        let service = AntigravitySecretServiceFixture(error: SecretServiceError.unavailable)
+        let fallbackPath = "/home/tester/.gemini/antigravity-cli/antigravity-oauth-token"
+        let fallback = Data(#"{"token":{"access_token":"ya29.file","expiry":"2099-01-01T00:00:00Z"}}"#.utf8)
+        let provider = AntigravityLinuxProvider(
+            paths: AntigravityLinuxPaths(environment: ["HOME": "/home/tester"]),
+            files: AntigravityFixtureFiles([fallbackPath: fallback]),
+            client: AntigravityKeyringClient(),
+            secretService: service
+        )
+
+        let snapshot = try await provider.refresh()
+
+        #expect(snapshot.metrics.map(\.label) == ["Session"])
+    }
+
+    @Test("A locked credential-store failure remains typed when no fallback file exists")
     func lockedCredentialStoreFailure() async {
         let service = AntigravitySecretServiceFixture(error: SecretServiceError.unavailable)
         let provider = AntigravityLinuxProvider(
@@ -54,6 +71,22 @@ struct AntigravitySecretServiceTests {
         )
 
         await #expect(throws: AntigravityLinuxError.credentialStoreUnreadable) {
+            try await provider.refresh()
+        }
+    }
+
+    @Test("A malformed fallback remains invalid when the credential store is locked")
+    func lockedCredentialStoreWithMalformedFile() async {
+        let service = AntigravitySecretServiceFixture(error: SecretServiceError.unavailable)
+        let fallbackPath = "/home/tester/.gemini/antigravity-cli/antigravity-oauth-token"
+        let provider = AntigravityLinuxProvider(
+            paths: AntigravityLinuxPaths(environment: ["HOME": "/home/tester"]),
+            files: AntigravityFixtureFiles([fallbackPath: Data("{}".utf8)]),
+            client: AntigravityKeyringClient(),
+            secretService: service
+        )
+
+        await #expect(throws: AntigravityLinuxError.invalidCredentialData) {
             try await provider.refresh()
         }
     }
@@ -125,6 +158,18 @@ private final class AntigravitySecretServiceFixture: FreedesktopSecretService, @
 
 private struct AntigravityEmptyFiles: ProviderFileReading {
     func readIfPresent(_ url: URL) throws -> Data? { nil }
+}
+
+private struct AntigravityFixtureFiles: ProviderFileReading {
+    let files: [String: Data]
+
+    init(_ files: [String: Data]) {
+        self.files = files
+    }
+
+    func readIfPresent(_ url: URL) throws -> Data? {
+        files[url.path]
+    }
 }
 
 private struct AntigravityKeyringClient: AntigravityUsageFetching {

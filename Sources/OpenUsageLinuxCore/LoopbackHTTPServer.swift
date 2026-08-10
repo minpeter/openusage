@@ -25,10 +25,11 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     public static let defaultPort = 6736
     public static let maximumRequestHeadBytes = 8_192
     public static let maximumConcurrentConnections = 16
-    static let requestHeadReadDeadlineMilliseconds: Int32 = 1_000
+    static let defaultClientLifetimeMilliseconds: Int32 = 15_000
 
     private let requestedPort: Int
     private let source: any ProviderSnapshotSource
+    private let clientLifetimeMilliseconds: Int32
     private let queue = DispatchQueue(label: "openusage.linux.local-api")
     private let clientQueue = DispatchQueue(
         label: "openusage.linux.local-api.clients",
@@ -38,14 +39,31 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     private let workers = DispatchGroup()
     private var listener: Int32 = -1
     private var activeClients: Set<Int32> = []
+    private var activeResponseWork: [Int32: ResponseWork] = [:]
     private var didStop = false
     public private(set) var port: Int
 
-    public init(port: Int = defaultPort, source: any ProviderSnapshotSource) throws {
+    public convenience init(port: Int = defaultPort, source: any ProviderSnapshotSource) throws {
+        try self.init(
+            port: port,
+            source: source,
+            clientLifetimeMilliseconds: Self.defaultClientLifetimeMilliseconds
+        )
+    }
+
+    init(
+        port: Int,
+        source: any ProviderSnapshotSource,
+        clientLifetimeMilliseconds: Int32
+    ) throws {
         guard (0...65_535).contains(port) else { throw LoopbackHTTPServerError.invalidPort(port) }
+        guard clientLifetimeMilliseconds > 0 else {
+            throw LoopbackHTTPServerError.socketFailure(EINVAL)
+        }
         requestedPort = port
         self.port = port
         self.source = source
+        self.clientLifetimeMilliseconds = clientLifetimeMilliseconds
     }
 
     public func start() throws {
@@ -104,10 +122,12 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         didStop = true
         let descriptor = listener
         listener = -1
+        let responseWork = Array(activeResponseWork.values)
         for client in activeClients {
             _ = shutdown(client, Int32(SHUT_RDWR))
         }
         lock.unlock()
+        responseWork.forEach { $0.cancel() }
         if descriptor >= 0 {
             _ = shutdown(descriptor, Int32(SHUT_RDWR))
             _ = Glibc.close(descriptor)
@@ -131,13 +151,14 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
                 if stopping { return }
                 continue
             }
+            let deadline = Self.deadline(after: clientLifetimeMilliseconds)
             guard reserveConnection(client) else {
-                send(Self.http(LinuxUsageAPI.busyResponse), to: client)
+                Self.sendWithDeadline(Self.http(LinuxUsageAPI.busyResponse), to: client, deadline: deadline)
                 _ = Glibc.close(client)
                 continue
             }
             clientQueue.async {
-                self.handle(client)
+                self.handle(client, deadline: deadline)
                 self.finishConnection(client)
             }
         }
@@ -155,30 +176,48 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     private func finishConnection(_ client: Int32) {
         lock.lock()
         _ = Glibc.close(client)
+        activeResponseWork.removeValue(forKey: client)
         let wasActive = activeClients.remove(client) != nil
         lock.unlock()
         if wasActive { workers.leave() }
     }
 
-    private func handle(_ client: Int32) {
-        guard let request = Self.readRequest(client) else { return }
-        let completed = DispatchSemaphore(value: 0)
-        Task {
+    private func handle(_ client: Int32, deadline: UInt64) {
+        guard let request = Self.readRequest(client, deadline: deadline) else { return }
+        guard Self.isLoopbackAuthority(request.host) else {
+            Self.sendWithDeadline(Self.http(Self.forbidden("invalid_host")), to: client, deadline: deadline)
+            return
+        }
+        guard request.origin.map(Self.isLoopbackOrigin) != false else {
+            Self.sendWithDeadline(Self.http(Self.forbidden("forbidden_origin")), to: client, deadline: deadline)
+            return
+        }
+
+        let work = ResponseWork()
+        lock.lock()
+        guard !didStop else {
+            lock.unlock()
+            return
+        }
+        activeResponseWork[client] = work
+        lock.unlock()
+        let source = self.source
+        work.start {
             let snapshots = await source.snapshots(force: false)
             let known = await source.knownProviderIDs()
             let state = LinuxUsageAPIState(knownProviderIDs: known, snapshots: snapshots)
-            let response = LinuxUsageAPI.respond(method: request.method, path: request.path, state: state)
-            send(Self.http(response), to: client)
-            completed.signal()
+            return LinuxUsageAPI.respond(method: request.method, path: request.path, state: state)
         }
-        completed.wait()
+        guard work.wait(until: deadline), let response = work.response else {
+            work.cancel()
+            return
+        }
+        Self.sendWithDeadline(Self.http(response), to: client, deadline: deadline)
     }
 
-    private static func readRequest(_ descriptor: Int32) -> (method: String, path: String)? {
+    private static func readRequest(_ descriptor: Int32, deadline: UInt64) -> HTTPRequest? {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 1_024)
-        let deadline = DispatchTime.now().uptimeNanoseconds
-            + UInt64(requestHeadReadDeadlineMilliseconds) * 1_000_000
         while data.count < maximumRequestHeadBytes {
             let now = DispatchTime.now().uptimeNanoseconds
             guard now < deadline else { return nil }
@@ -194,7 +233,7 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
             data.append(buffer, count: count)
             if let range = data.range(of: Data("\r\n\r\n".utf8)) {
                 let head = String(data: data[..<range.lowerBound], encoding: .utf8) ?? ""
-                return parseRequestLine(head)
+                return parseRequest(head)
             }
         }
         return nil
@@ -209,10 +248,69 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         )
     }
 
+    private static func parseRequest(_ head: String) -> HTTPRequest? {
+        let lines = head.components(separatedBy: "\r\n")
+        guard let line = lines.first else { return nil }
+        let parts = line.split(separator: " ")
+        guard parts.count == 3 else { return nil }
+        var headers: [String: [String]] = [:]
+        for line in lines.dropFirst() {
+            guard let separator = line.firstIndex(of: ":") else { return nil }
+            let name = line[..<separator].lowercased()
+            let value = line[line.index(after: separator)...].trimmingCharacters(in: .whitespaces)
+            headers[name, default: []].append(value)
+        }
+        guard headers["host"]?.count == 1, (headers["origin"]?.count ?? 0) <= 1 else { return nil }
+        return HTTPRequest(
+            method: String(parts[0]),
+            path: String(parts[1]),
+            host: headers["host"]![0],
+            origin: headers["origin"]?.first
+        )
+    }
+
+    private static func isLoopbackAuthority(_ authority: String) -> Bool {
+        let value = authority.lowercased()
+        if value.hasPrefix("[") {
+            guard let closing = value.firstIndex(of: "]") else { return false }
+            let host = String(value[value.index(after: value.startIndex)..<closing])
+            return host == "::1" && validPortSuffix(String(value[value.index(after: closing)...]))
+        }
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count <= 2, parts.first == "127.0.0.1" || parts.first == "localhost" else { return false }
+        return parts.count == 1 || validPort(String(parts[1]))
+    }
+
+    private static func isLoopbackOrigin(_ origin: String) -> Bool {
+        guard let components = URLComponents(string: origin),
+              components.scheme == "http" || components.scheme == "https",
+              let host = components.host?.lowercased(),
+              host == "127.0.0.1" || host == "localhost" || host == "::1",
+              components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil,
+              components.path.isEmpty
+        else { return false }
+        return true
+    }
+
+    private static func validPortSuffix(_ suffix: String) -> Bool {
+        suffix.isEmpty || (suffix.first == ":" && validPort(String(suffix.dropFirst())))
+    }
+
+    private static func validPort(_ port: String) -> Bool {
+        guard !port.isEmpty, port.allSatisfy(\.isNumber), let value = Int(port) else { return false }
+        return (0...65_535).contains(value)
+    }
+
+    private static func forbidden(_ code: String) -> LinuxUsageAPIResponse {
+        LinuxUsageAPIResponse(status: 403, body: Data(#"{"error":"\#(code)"}"#.utf8))
+    }
+
     private static func http(_ response: LinuxUsageAPIResponse) -> Data {
         let reason: String = switch response.status {
         case 200: "OK"
         case 204: "No Content"
+        case 403: "Forbidden"
         case 404: "Not Found"
         case 405: "Method Not Allowed"
         case 503: "Service Unavailable"
@@ -226,15 +324,79 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         return Data(head.utf8) + body
     }
 
-    private func send(_ data: Data, to descriptor: Int32) {
+    static func sendWithDeadline(_ data: Data, to descriptor: Int32, deadline: UInt64) {
         data.withUnsafeBytes { bytes in
             guard let base = bytes.baseAddress else { return }
             var sent = 0
             while sent < data.count {
-                let count = Glibc.send(descriptor, base.advanced(by: sent), data.count - sent, Int32(MSG_NOSIGNAL))
-                if count <= 0 { return }
+                let now = DispatchTime.now().uptimeNanoseconds
+                guard now < deadline else { return }
+                let remaining = deadline - now
+                let timeout = Int32(min((remaining + 999_999) / 1_000_000, UInt64(Int32.max)))
+                var pollDescriptor = pollfd(fd: descriptor, events: Int16(POLLOUT | POLLHUP), revents: 0)
+                let ready = Glibc.poll(&pollDescriptor, 1, timeout)
+                if ready < 0, errno == EINTR { continue }
+                guard ready > 0, pollDescriptor.revents & Int16(POLLOUT) != 0 else { return }
+                let count = Glibc.send(
+                    descriptor,
+                    base.advanced(by: sent),
+                    data.count - sent,
+                    Int32(MSG_NOSIGNAL | MSG_DONTWAIT)
+                )
+                if count < 0, errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK { continue }
+                guard count > 0 else { return }
                 sent += count
             }
+        }
+    }
+
+    private static func deadline(after milliseconds: Int32) -> UInt64 {
+        DispatchTime.now().uptimeNanoseconds + UInt64(milliseconds) * 1_000_000
+    }
+}
+
+private struct HTTPRequest: Sendable {
+    let method: String
+    let path: String
+    let host: String
+    let origin: String?
+}
+
+private final class ResponseWork: @unchecked Sendable {
+    private let lock = NSLock()
+    private let completed = DispatchSemaphore(value: 0)
+    private var task: Task<Void, Never>?
+    private var isCancelled = false
+    private var storedResponse: LinuxUsageAPIResponse?
+
+    var response: LinuxUsageAPIResponse? {
+        lock.withLock { isCancelled ? nil : storedResponse }
+    }
+
+    func start(_ operation: @escaping @Sendable () async -> LinuxUsageAPIResponse) {
+        let task = Task {
+            let response = await operation()
+            lock.withLock { storedResponse = response }
+            completed.signal()
+        }
+        lock.withLock {
+            self.task = task
+            if isCancelled { task.cancel() }
+        }
+    }
+
+    func wait(until deadline: UInt64) -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now < deadline else { return false }
+        return completed.wait(timeout: .now() + .nanoseconds(Int(deadline - now))) == .success
+    }
+
+    func cancel() {
+        lock.withLock {
+            guard !isCancelled else { return }
+            isCancelled = true
+            task?.cancel()
+            completed.signal()
         }
     }
 }

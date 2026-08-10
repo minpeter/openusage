@@ -97,22 +97,26 @@ struct GNOMESettingsStore: Sendable {
     }
 
     private func savePreservingLegacyOwnership(_ settings: GNOMESettings) throws {
-        guard !FileManager.default.fileExists(atPath: storage.fileURL.path),
-              FileManager.default.fileExists(atPath: legacyFileURL.path)
-        else {
+        if FileManager.default.fileExists(atPath: storage.fileURL.path) {
             try storage.save(settings)
             return
         }
 
-        let legacyData = try Data(contentsOf: legacyFileURL, options: [.mappedIfSafe])
+        let destinationStorage = VersionedJSONSettingsStorage(fileURL: storage.fileURL)
+        guard let legacyData = try BoundedProviderFileReader(
+            maximumBytes: VersionedJSONSettingsStorage.maximumDocumentBytes
+        ).readIfPresent(legacyFileURL) else {
+            try destinationStorage.save(settings)
+            return
+        }
         do {
             _ = try GNOMESettingsDecoder.decode(legacyData)
-            try storage.save(settings)
+            try destinationStorage.save(settings)
         } catch {
             // A schemaVersion discriminator identifies a core-owned document even when that core
             // version is newer than this binary. Its bytes remain untouched at the legacy path.
             if GNOMESettingsDecoder.isCoreDocument(legacyData) {
-                try VersionedJSONSettingsStorage(fileURL: storage.fileURL).save(settings)
+                try destinationStorage.save(settings)
             } else {
                 throw error
             }

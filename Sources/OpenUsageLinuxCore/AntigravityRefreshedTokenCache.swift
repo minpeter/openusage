@@ -1,5 +1,6 @@
 import CSecretService
 import Foundation
+import Glibc
 
 public struct AntigravityTokenRefresh: Equatable, Sendable {
     public let accessToken: String
@@ -44,11 +45,10 @@ public actor AntigravityRefreshedTokenCache: AntigravityRefreshedTokenCaching {
             discard()
             return nil
         }
-        guard PrivateAtomicFileWriter.isPrivateFile(path, fileManager: fileManager),
-              let attributes = try? fileManager.attributesOfItem(atPath: path.path),
-              let size = attributes[.size] as? NSNumber,
-              size.intValue <= Self.maximumBytes,
-              let data = try? Data(contentsOf: path),
+        let reader = BoundedProviderFileReader(maximumBytes: Self.maximumBytes)
+        guard let data = try? reader.readIfPresent(path, validating: { metadata in
+            metadata.st_mode & mode_t(0o777) == mode_t(0o600) && metadata.st_uid == getuid()
+        }),
               let cached = try? JSONDecoder().decode(CachedToken.self, from: data),
               cached.credentialFingerprint == fingerprint,
               cached.expiresAt.timeIntervalSince(now) > Self.refreshBuffer,

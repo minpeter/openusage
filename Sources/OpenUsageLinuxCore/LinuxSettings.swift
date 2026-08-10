@@ -220,31 +220,41 @@ public struct VersionedJSONSettingsStorage: Sendable {
     }
 
     public func loadMigratingLegacy<Document: Codable>(_ type: Document.Type) throws -> Document? {
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            return try decode(type, from: fileURL)
+        if let document = try decodeIfPresent(type, from: fileURL) {
+            return document
         }
-        guard let legacyFileURL, FileManager.default.fileExists(atPath: legacyFileURL.path) else {
+        guard let legacyFileURL,
+              let document = try decodeIfPresent(type, from: legacyFileURL)
+        else {
             return nil
         }
-
-        let document = try decode(type, from: legacyFileURL)
         try write(document)
         return document
     }
 
     public func save<Document: Codable>(_ document: Document) throws {
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            _ = try decode(Document.self, from: fileURL)
-        } else if let legacyFileURL, FileManager.default.fileExists(atPath: legacyFileURL.path) {
-            _ = try decode(Document.self, from: legacyFileURL)
+        if try decodeIfPresent(Document.self, from: fileURL) == nil,
+           let legacyFileURL
+        {
+            _ = try decodeIfPresent(Document.self, from: legacyFileURL)
         }
         try write(document)
     }
 
-    private func decode<Document: Decodable>(_ type: Document.Type, from url: URL) throws -> Document {
-        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-        guard data.count <= Self.maximumDocumentBytes else { throw LinuxSettingsError.documentTooLarge }
-        return try JSONDecoder().decode(type, from: data)
+    private func decodeIfPresent<Document: Decodable>(
+        _ type: Document.Type,
+        from url: URL
+    ) throws -> Document? {
+        do {
+            guard let data = try BoundedProviderFileReader(maximumBytes: Self.maximumDocumentBytes)
+                .readIfPresent(url)
+            else {
+                return nil
+            }
+            return try JSONDecoder().decode(type, from: data)
+        } catch ProviderFileReadError.tooLarge {
+            throw LinuxSettingsError.documentTooLarge
+        }
     }
 
     private func write<Document: Encodable>(_ document: Document) throws {
@@ -276,10 +286,16 @@ public struct XDGSettingsStorage: LinuxSettingsStorage {
     }
 
     public func load() throws -> LinuxSettings? {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
-        let data = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
-        guard data.count <= Self.maximumDocumentBytes else { throw LinuxSettingsError.documentTooLarge }
-        return try LinuxSettings.decode(data)
+        do {
+            guard let data = try BoundedProviderFileReader(maximumBytes: Self.maximumDocumentBytes)
+                .readIfPresent(fileURL)
+            else {
+                return nil
+            }
+            return try LinuxSettings.decode(data)
+        } catch ProviderFileReadError.tooLarge {
+            throw LinuxSettingsError.documentTooLarge
+        }
     }
 
     public func save(_ settings: LinuxSettings) throws {

@@ -1,4 +1,7 @@
 import Foundation
+#if os(Linux)
+import Glibc
+#endif
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -39,6 +42,11 @@ public enum CopilotLinuxError: Error, LocalizedError, Equatable {
             "Copilot usage data is unavailable for this account."
         }
     }
+}
+
+enum CopilotCommandOutputError: Error, Equatable {
+    case tooLarge(path: String, maximumBytes: Int)
+    case timedOut(path: String)
 }
 
 public struct CopilotLinuxCredentialStore: Sendable {
@@ -143,27 +151,94 @@ public struct CopilotLinuxCredentialStore: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    /// Runs a local helper command and returns its stdout, capping the buffered output at
-    /// `maximumBytes`. Oversize output terminates the process and throws instead of draining an
-    /// unbounded stream; a missing executable or non-zero exit yields nil.
-    static func boundedCommandOutput(executablePath: String, arguments: [String], maximumBytes: Int) throws -> Data? {
+    /// Runs a local helper command while bounding both its lifetime and pipe output. Stdout and
+    /// stderr are drained concurrently; output bytes are never included in errors.
+    static func boundedCommandOutput(
+        executablePath: String,
+        arguments: [String],
+        maximumBytes: Int,
+        timeout: TimeInterval = 5
+    ) throws -> Data? {
         guard FileManager.default.isExecutableFile(atPath: executablePath) else { return nil }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
+        let stdout = Pipe(), stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        let terminated = DispatchSemaphore(value: 0)
+        let drains = DispatchGroup()
+        let state = CopilotCommandOutputState()
+        process.terminationHandler = { _ in terminated.signal() }
         try process.run()
-        let data = try output.fileHandleForReading.read(upToCount: maximumBytes + 1) ?? Data()
-        if data.count > maximumBytes {
-            process.terminate()
-            process.waitUntilExit()
-            throw ProviderFileReadError.tooLarge(path: executablePath, maximumBytes: maximumBytes)
+
+        for (pipe, capturesOutput) in [(stdout, true), (stderr, false)] {
+            drains.enter()
+            DispatchQueue.global().async {
+                defer { drains.leave() }
+                let reader = pipe.fileHandleForReading
+                while let chunk = try? reader.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                    guard state.accept(
+                        chunk,
+                        capturesOutput: capturesOutput,
+                        maximumBytes: maximumBytes,
+                        path: executablePath
+                    ) else {
+                        if process.isRunning { process.terminate() }
+                        return
+                    }
+                }
+            }
         }
-        process.waitUntilExit()
+
+        let deadline = DispatchTime.now() + timeout
+        guard terminated.wait(timeout: deadline) == .success,
+              drains.wait(timeout: deadline) == .success else {
+            let error = state.error ?? .timedOut(path: executablePath)
+            terminate(process)
+            try? stdout.fileHandleForReading.close()
+            try? stderr.fileHandleForReading.close()
+            throw error
+        }
+        if let error = state.error { throw error }
         guard process.terminationStatus == 0 else { return nil }
-        return data
+        return state.output
+    }
+
+    private static func terminate(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        #if os(Linux)
+        _ = Glibc.kill(process.processIdentifier, SIGKILL)
+        #endif
+    }
+}
+
+private final class CopilotCommandOutputState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stdout = Data()
+    private var stderrCount = 0
+    private var boundedError: CopilotCommandOutputError?
+
+    var output: Data { lock.withLock { stdout } }
+    var error: CopilotCommandOutputError? { lock.withLock { boundedError } }
+
+    func accept(_ data: Data, capturesOutput: Bool, maximumBytes: Int, path: String) -> Bool {
+        lock.withLock {
+            guard boundedError == nil else { return false }
+            let currentCount = capturesOutput ? stdout.count : stderrCount
+            guard data.count <= maximumBytes - currentCount else {
+                boundedError = .tooLarge(path: path, maximumBytes: maximumBytes)
+                return false
+            }
+            if capturesOutput {
+                stdout.append(data)
+            } else {
+                stderrCount += data.count
+            }
+            return true
+        }
     }
 }
 

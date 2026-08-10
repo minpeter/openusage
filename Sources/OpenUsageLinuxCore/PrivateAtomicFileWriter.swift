@@ -2,10 +2,24 @@ import Foundation
 import Glibc
 
 enum PrivateAtomicFileWriter {
+    struct Syscalls {
+        let close: (Int32) -> Int32
+        let fsync: (Int32) -> Int32
+
+        init(
+            close: @escaping (Int32) -> Int32 = { Glibc.close($0) },
+            fsync: @escaping (Int32) -> Int32 = { Glibc.fsync($0) }
+        ) {
+            self.close = close
+            self.fsync = fsync
+        }
+    }
+
     static func write(
         _ data: Data,
         to destination: URL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        syscalls: Syscalls = Syscalls()
     ) throws {
         let directory = destination.deletingLastPathComponent()
         try fileManager.createDirectory(
@@ -24,7 +38,7 @@ enum PrivateAtomicFileWriter {
         var openDescriptor = descriptor
         defer {
             if openDescriptor >= 0 {
-                _ = Glibc.close(openDescriptor)
+                _ = syscalls.close(openDescriptor)
             }
             try? fileManager.removeItem(at: temporary)
         }
@@ -42,15 +56,34 @@ enum PrivateAtomicFileWriter {
                 offset += written
             }
         }
-        guard Glibc.fsync(descriptor) == 0 else { throw posixError(path: temporary.path) }
-        guard Glibc.close(descriptor) == 0 else { throw posixError(path: temporary.path) }
+        guard syscalls.fsync(descriptor) == 0 else { throw posixError(path: temporary.path) }
         openDescriptor = -1
+        guard syscalls.close(descriptor) == 0 else { throw posixError(path: temporary.path) }
         let renameResult = temporary.path.withCString { source in
             destination.path.withCString { target in
                 Glibc.rename(source, target)
             }
         }
         guard renameResult == 0 else { throw posixError(path: destination.path) }
+
+        let directoryDescriptor = directory.path.withCString {
+            Glibc.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        }
+        guard directoryDescriptor >= 0 else { throw posixError(path: directory.path) }
+        var openDirectoryDescriptor = directoryDescriptor
+        defer {
+            if openDirectoryDescriptor >= 0 {
+                _ = syscalls.close(openDirectoryDescriptor)
+            }
+        }
+
+        guard syscalls.fsync(directoryDescriptor) == 0 else {
+            throw posixError(path: directory.path)
+        }
+        openDirectoryDescriptor = -1
+        guard syscalls.close(directoryDescriptor) == 0 else {
+            throw posixError(path: directory.path)
+        }
     }
 
     static func isPrivateFile(

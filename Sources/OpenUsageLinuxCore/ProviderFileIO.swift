@@ -1,4 +1,5 @@
 import Foundation
+import Glibc
 
 public protocol ProviderFileReading: Sendable {
     func readIfPresent(_ url: URL) throws -> Data?
@@ -24,6 +25,7 @@ public struct BoundedProviderFileReader: ProviderFileReading {
     public let maximumBytes: Int
 
     public init(maximumBytes: Int = BoundedProviderFileReader.defaultMaximumBytes) {
+        precondition(maximumBytes >= 0)
         self.maximumBytes = maximumBytes
     }
 
@@ -35,24 +37,52 @@ public struct BoundedProviderFileReader: ProviderFileReading {
     }
 
     public func readIfPresent(_ url: URL) throws -> Data? {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: url.path) else { return nil }
-        do {
-            let attributes = try fileManager.attributesOfItem(atPath: url.path)
-            if let size = attributes[.size] as? NSNumber, size.intValue > maximumBytes {
-                throw ProviderFileReadError.tooLarge(path: url.path, maximumBytes: maximumBytes)
-            }
-            let handle = try FileHandle(forReadingFrom: url)
-            defer { try? handle.close() }
-            let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
-            guard data.count <= maximumBytes else {
-                throw ProviderFileReadError.tooLarge(path: url.path, maximumBytes: maximumBytes)
-            }
-            return data
-        } catch let error as ProviderFileReadError {
-            throw error
-        } catch {
+        try readIfPresent(url, validating: { _ in true })
+    }
+
+    func readIfPresent(
+        _ url: URL,
+        validating descriptorMetadata: (stat) -> Bool
+    ) throws -> Data? {
+        let descriptor = url.path.withCString {
+            Glibc.open($0, O_RDONLY | O_CLOEXEC | O_NONBLOCK)
+        }
+        guard descriptor >= 0 else {
+            if errno == ENOENT { return nil }
             throw ProviderFileReadError.unreadable(path: url.path)
         }
+        defer { _ = Glibc.close(descriptor) }
+
+        var metadata = stat()
+        guard Glibc.fstat(descriptor, &metadata) == 0,
+              metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              descriptorMetadata(metadata)
+        else {
+            throw ProviderFileReadError.unreadable(path: url.path)
+        }
+        if metadata.st_size > off_t(maximumBytes) {
+            throw ProviderFileReadError.tooLarge(path: url.path, maximumBytes: maximumBytes)
+        }
+
+        let readLimit = maximumBytes + 1
+        var data = Data()
+        data.reserveCapacity(min(readLimit, 8 * 1024))
+        var buffer = [UInt8](repeating: 0, count: min(readLimit, 8 * 1024))
+        while data.count < readLimit {
+            let requested = min(buffer.count, readLimit - data.count)
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Glibc.read(descriptor, bytes.baseAddress, requested)
+            }
+            if count < 0, errno == EINTR { continue }
+            guard count >= 0 else {
+                throw ProviderFileReadError.unreadable(path: url.path)
+            }
+            if count == 0 { break }
+            data.append(contentsOf: buffer.prefix(count))
+        }
+        guard data.count <= maximumBytes else {
+            throw ProviderFileReadError.tooLarge(path: url.path, maximumBytes: maximumBytes)
+        }
+        return data
     }
 }

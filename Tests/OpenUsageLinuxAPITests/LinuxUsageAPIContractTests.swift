@@ -119,8 +119,8 @@ struct LinuxUsageAPIContractTests {
         server.waitUntilStopped()
     }
 
-    @Test("Cross-origin browser requests are not granted read access")
-    func crossOriginRequestsAreNotCORSReadable() throws {
+    @Test("Non-loopback authorities and foreign browser origins are rejected")
+    func rejectsUntrustedAuthorities() throws {
         let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
         try server.start()
         defer {
@@ -128,17 +128,70 @@ struct LinuxUsageAPIContractTests {
             server.waitUntilStopped()
         }
 
-        let client = try LoopbackClient(port: server.port)
-        try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:\(server.port)\r\nOrigin: https://attacker.example\r\n\r\n")
-        let response = try client.readToEnd(timeoutMilliseconds: 1_000)
+        let rebound = try LoopbackClient(port: server.port)
+        try rebound.send("GET /v1/usage HTTP/1.1\r\nHost: attacker.example\r\n\r\n")
+        #expect(try rebound.readToEnd(timeoutMilliseconds: 5_000).contains("HTTP/1.1 403 Forbidden"))
 
-        #expect(response.contains("HTTP/1.1 200 OK"))
+        let crossOrigin = try LoopbackClient(port: server.port)
+        try crossOrigin.send("GET /v1/usage HTTP/1.1\r\nHost: localhost:\(server.port)\r\nOrigin: https://attacker.example\r\n\r\n")
+        let response = try crossOrigin.readToEnd(timeoutMilliseconds: 5_000)
+        #expect(response.contains("HTTP/1.1 403 Forbidden"))
         #expect(!response.lowercased().contains("access-control-allow-origin:"))
+
+        let local = try LoopbackClient(port: server.port)
+        try local.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:\(server.port)\r\nOrigin: http://localhost:\(server.port)\r\n\r\n")
+        #expect(try local.readToEnd(timeoutMilliseconds: 5_000).contains("HTTP/1.1 200 OK"))
+    }
+
+    @Test("Stopping cancels stalled snapshot work and drains its worker")
+    func stopCancelsStalledSnapshotWork() throws {
+        let source = StalledSnapshotSource()
+        let server = try LoopbackHTTPServer(port: 0, source: source)
+        try server.start()
+        let client = try LoopbackClient(port: server.port)
+        try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:\(server.port)\r\n\r\n")
+        #expect(source.started.wait(timeout: .now() + 1) == .success)
+
+        server.stop()
+        #expect(source.cancelled.wait(timeout: .now() + 1) == .success)
+        let drained = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            server.waitUntilStopped()
+            drained.signal()
+        }
+        #expect(drained.wait(timeout: .now() + 1) == .success)
+    }
+
+    @Test("Socket writes stop at their absolute deadline")
+    func socketWritesAreBounded() throws {
+        var descriptors: [Int32] = [-1, -1]
+        #expect(Glibc.socketpair(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0, &descriptors) == 0)
+        defer {
+            _ = Glibc.close(descriptors[0])
+            _ = Glibc.close(descriptors[1])
+        }
+        var sendBuffer: Int32 = 1_024
+        #expect(setsockopt(descriptors[0], SOL_SOCKET, SO_SNDBUF, &sendBuffer, socklen_t(MemoryLayout<Int32>.size)) == 0)
+        let completed = DispatchSemaphore(value: 0)
+        let sender = descriptors[0]
+        DispatchQueue.global().async {
+            LoopbackHTTPServer.sendWithDeadline(
+                Data(repeating: 0x61, count: 1_000_000),
+                to: sender,
+                deadline: DispatchTime.now().uptimeNanoseconds + 100_000_000
+            )
+            completed.signal()
+        }
+        #expect(completed.wait(timeout: .now() + 1) == .success)
     }
 
     @Test("Idle clients expire and release every connection slot")
     func idleClientsReleaseConnectionSlots() throws {
-        let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
+        let server = try LoopbackHTTPServer(
+            port: 0,
+            source: APIFixtureSource(),
+            clientLifetimeMilliseconds: 250
+        )
         try server.start()
         defer {
             server.stop()
@@ -334,6 +387,50 @@ private func waitForPeerClosure(_ clients: [LoopbackClient], timeoutMilliseconds
     }
 }
 #endif
+
+private final class StalledSnapshotSource: ProviderSnapshotSource, @unchecked Sendable {
+    let started = DispatchSemaphore(value: 0)
+    let cancelled = DispatchSemaphore(value: 0)
+    private let gate = CancellationGate()
+
+    func knownProviderIDs() async -> Set<String> { [] }
+
+    func snapshots(force: Bool) async -> [ProviderUsageSnapshot] {
+        started.signal()
+        await withTaskCancellationHandler {
+            await gate.wait()
+        } onCancel: {
+            cancelled.signal()
+            gate.cancel()
+        }
+        return []
+    }
+}
+
+private final class CancellationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isCancelled = false
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeImmediately = lock.withLock {
+                if isCancelled { return true }
+                self.continuation = continuation
+                return false
+            }
+            if resumeImmediately { continuation.resume() }
+        }
+    }
+
+    func cancel() {
+        let continuation = lock.withLock {
+            isCancelled = true
+            return self.continuation
+        }
+        continuation?.resume()
+    }
+}
 
 private actor APIFixtureSource: ProviderSnapshotSource {
     func knownProviderIDs() -> Set<String> { ["fixture"] }

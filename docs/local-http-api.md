@@ -176,17 +176,17 @@ In both response shapes, `displayName` is the card's current name — if you ren
 { "error": "provider_not_found" }
 ```
 
-Codes: `provider_not_found`, `not_found`, `method_not_allowed`, `server_busy`.
+Codes: `provider_not_found`, `not_found`, `method_not_allowed`, `server_busy`, `invalid_host`, `forbidden_origin`.
 
 ## Browser origins and privacy
 
-The server does not grant browser cross-origin access: responses omit `Access-Control-Allow-Origin` and the other CORS opt-in headers. `OPTIONS` remains a valid route and returns **204**, but its response does not authorize a browser preflight. A page from another origin therefore cannot read usage snapshots through browser JavaScript.
+The server does not grant browser cross-origin access: responses omit `Access-Control-Allow-Origin` and the other CORS opt-in headers. `OPTIONS` remains a valid route and returns **204**, but its response does not authorize a browser preflight. Requests carrying a non-loopback `Origin` are rejected with **403**, so a page from another origin cannot read usage snapshots through browser JavaScript.
 
-The server only listens on the loopback interface (`127.0.0.1`), so it is not reachable from other machines on your network. Existing native integrations, command-line tools, and local HTTP clients continue to work because they do not rely on browser CORS permission. The API never serves credentials or tokens.
+The server only listens on the loopback interface (`127.0.0.1`), so it is not reachable from other machines on your network. To prevent DNS rebinding, HTTP `Host` must name `127.0.0.1`, `localhost`, or bracketed `::1`, with an optional port; other authorities are rejected with **403**. Existing native integrations, command-line tools, and local HTTP clients continue to work when they use a loopback authority. The API never serves credentials or tokens.
 
 ## Connection lifecycle
 
-The server accepts at most 16 concurrent clients. A client has one second from acceptance to send its complete HTTP request head; incomplete or idle connections are then closed and their slot is released. Stopping the server also shuts down every accepted client and waits for its handler to finish, so stalled clients cannot keep the process or connection slots alive.
+The server accepts at most 16 concurrent clients. Each client has a one-second absolute lifetime from acceptance, covering request-head input, snapshot collection, response serialization, and socket writes. Incomplete requests, stalled snapshot work, and backpressured writes are cancelled or closed at that deadline and release their slot. Stopping the server also shuts down every accepted client, cancels pending snapshot work, and waits for its handler to finish.
 
 ## Caching behavior
 

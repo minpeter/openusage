@@ -111,7 +111,7 @@ struct CredentialReadBoundsTests {
                 executablePath: "/bin/cat", arguments: [big.path], maximumBytes: 1024
             )
             Issue.record("expected oversize command output to throw")
-        } catch let error as ProviderFileReadError {
+        } catch let error as CopilotCommandOutputError {
             #expect(error == .tooLarge(path: "/bin/cat", maximumBytes: 1024))
         }
 
@@ -125,6 +125,50 @@ struct CredentialReadBoundsTests {
         #expect(try CopilotLinuxCredentialStore.boundedCommandOutput(
             executablePath: root.appendingPathComponent("not-a-tool").path, arguments: [], maximumBytes: 1024
         ) == nil)
+    }
+
+    @Test("Copilot secret command drains stderr concurrently")
+    func copilotCommandDrainsStderr() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let helper = try makeExecutable(
+            at: root.appendingPathComponent("large-stderr"),
+            contents: """
+            #!/bin/sh
+            /usr/bin/head -c 262144 /dev/zero >&2
+            printf 'secret-value\\n'
+            """
+        )
+
+        let data = try CopilotLinuxCredentialStore.boundedCommandOutput(
+            executablePath: helper.path,
+            arguments: [],
+            maximumBytes: 512 * 1024,
+            timeout: 1
+        )
+        #expect(data == Data("secret-value\n".utf8))
+    }
+
+    @Test("Copilot secret command has a hard process deadline")
+    func copilotCommandTimesOut() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let helper = try makeExecutable(
+            at: root.appendingPathComponent("never-exits"),
+            contents: """
+            #!/bin/sh
+            while :; do :; done
+            """
+        )
+
+        #expect(throws: CopilotCommandOutputError.timedOut(path: helper.path)) {
+            try CopilotLinuxCredentialStore.boundedCommandOutput(
+                executablePath: helper.path,
+                arguments: [],
+                maximumBytes: 1024,
+                timeout: 0.1
+            )
+        }
     }
 
     private func makeClaudeHome(at url: URL, accountID: String, identityPadding: String, credentialPadding: String) throws {
@@ -148,5 +192,11 @@ struct CredentialReadBoundsTests {
     private func writeText(_ text: String, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(text.utf8).write(to: url)
+    }
+
+    private func makeExecutable(at url: URL, contents: String) throws -> URL {
+        try Data(contents.utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        return url
     }
 }

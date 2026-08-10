@@ -1,4 +1,5 @@
 import Foundation
+import Glibc
 import Testing
 @testable import OpenUsageLinuxCore
 
@@ -39,6 +40,53 @@ struct CredentialFileSecurityTests {
         )
 
         #expect(try permissions(paths.codexAuthCandidates[0]) == 0o600)
+    }
+
+    @Test("A failed close is not retried by deferred cleanup")
+    func failedCloseDoesNotDoubleCloseDescriptor() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("credentials.json")
+        let closeState = CloseFailureState()
+        let syscalls = PrivateAtomicFileWriter.Syscalls { descriptor in
+            closeState.callCount += 1
+            if closeState.callCount == 1 {
+                #expect(Glibc.close(descriptor) == 0)
+                errno = EIO
+                return -1
+            }
+            return 0
+        }
+
+        #expect(throws: NSError.self) {
+            try PrivateAtomicFileWriter.write(Data("secret".utf8), to: path, syscalls: syscalls)
+        }
+
+        #expect(closeState.callCount == 1)
+    }
+
+    @Test("Credential replacement fsyncs its parent directory after rename")
+    func replacementFsyncsParentDirectoryAfterRename() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("credentials.json")
+        let fsyncState = FsyncState(destination: path)
+        let syscalls = PrivateAtomicFileWriter.Syscalls(fsync: { descriptor in
+            var status = stat()
+            #expect(Glibc.fstat(descriptor, &status) == 0)
+            if (status.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) {
+                fsyncState.didFsyncDirectory = true
+                fsyncState.destinationExistedAtDirectoryFsync = FileManager.default.fileExists(
+                    atPath: fsyncState.destination.path
+                )
+            }
+            return Glibc.fsync(descriptor)
+        })
+
+        try PrivateAtomicFileWriter.write(Data("secret".utf8), to: path, syscalls: syscalls)
+
+        #expect(fsyncState.didFsyncDirectory)
+        #expect(fsyncState.destinationExistedAtDirectoryFsync)
     }
 
     @Test("Refreshed token cache rejects unsafe permissions")
@@ -101,6 +149,20 @@ struct CredentialFileSecurityTests {
             )
         }
         #expect(try FileManager.default.attributesOfItem(atPath: path.path)[.size] as? NSNumber == 1_048_577)
+    }
+
+    private final class CloseFailureState {
+        var callCount = 0
+    }
+
+    private final class FsyncState {
+        let destination: URL
+        var didFsyncDirectory = false
+        var destinationExistedAtDirectoryFsync = false
+
+        init(destination: URL) {
+            self.destination = destination
+        }
     }
 
     private func permissions(_ path: URL) throws -> Int {

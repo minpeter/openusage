@@ -147,13 +147,15 @@ public struct LinuxCredentialStore: Sendable {
     }
 
     public func loadCodex() throws -> CodexCredentials {
-        guard let path = paths.codexAuthCandidates.first(where: {
-            FileManager.default.fileExists(atPath: $0.path)
-        }) else {
-            throw LinuxUsageError.credentialsMissing("Codex")
+        var credentialData: Data?
+        for path in paths.codexAuthCandidates {
+            if let data = try readIfPresent(path: path, provider: "Codex") {
+                credentialData = data
+                break
+            }
         }
-        let data = try read(path: path, provider: "Codex")
-        let credentials = try JSONDecoder().decode(CodexCredentials.self, from: data)
+        guard let credentialData else { throw LinuxUsageError.credentialsMissing("Codex") }
+        let credentials = try JSONDecoder().decode(CodexCredentials.self, from: credentialData)
         guard !credentials.accessToken.isEmpty else {
             throw LinuxUsageError.invalidCredentials("Codex")
         }
@@ -162,10 +164,16 @@ public struct LinuxCredentialStore: Sendable {
 
     public func saveCodex(_ credentials: CodexCredentials) throws {
         let fileManager = FileManager.default
-        let path = paths.codexAuthCandidates.first(where: {
-            fileManager.fileExists(atPath: $0.path)
-        }) ?? paths.codexAuthCandidates[0]
-        let existing = try readIfPresent(path: path, provider: "Codex")
+        var path = paths.codexAuthCandidates[0]
+        var existingData: Data?
+        for candidate in paths.codexAuthCandidates {
+            if let data = try readIfPresent(path: candidate, provider: "Codex") {
+                path = candidate
+                existingData = data
+                break
+            }
+        }
+        let existing = existingData
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         var document = existing
         var tokens = document["tokens"] as? [String: Any] ?? [:]
@@ -183,9 +191,6 @@ public struct LinuxCredentialStore: Sendable {
     }
 
     private func read(path: URL, provider: String) throws -> Data {
-        guard FileManager.default.fileExists(atPath: path.path) else {
-            throw LinuxUsageError.credentialsMissing(provider)
-        }
         guard let data = try readIfPresent(path: path, provider: provider) else {
             throw LinuxUsageError.credentialsMissing(provider)
         }
@@ -193,18 +198,10 @@ public struct LinuxCredentialStore: Sendable {
     }
 
     private func readIfPresent(path: URL, provider: String) throws -> Data? {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: path.path) else { return nil }
         do {
-            let attributes = try fileManager.attributesOfItem(atPath: path.path)
-            guard let size = attributes[.size] as? NSNumber,
-                  size.intValue <= Self.maximumDocumentBytes
-            else {
-                throw LinuxUsageError.invalidCredentials(provider)
-            }
-            return try Data(contentsOf: path, options: [.mappedIfSafe])
+            return try BoundedProviderFileReader(maximumBytes: Self.maximumDocumentBytes)
+                .readIfPresent(path)
         } catch {
-            if let usageError = error as? LinuxUsageError { throw usageError }
             throw LinuxUsageError.invalidCredentials(provider)
         }
     }
