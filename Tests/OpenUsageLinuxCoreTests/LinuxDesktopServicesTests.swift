@@ -80,6 +80,62 @@ struct LinuxDesktopServicesTests {
         #expect(runner.commands.allSatisfy { $0.timeout == 5 })
     }
 
+    @Test("Packaged launch at login never writes sandbox-private native entries")
+    func packagedLaunchAvoidsSandboxPrivateEntry() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = URL(fileURLWithPath: "/app/bin/OpenUsageGNOME")
+        let xdg = XDGAutostartBackend(configHome: root, executableURL: executable)
+        let requester = RecordingPortalRequester()
+        let service = LinuxLaunchAtLoginService(
+            portal: FlatpakPortalLaunchBackend(
+                requester: requester,
+                flatpakDetector: { true }
+            ),
+            systemd: SystemdUserLaunchBackend(
+                configHome: root,
+                executableURL: executable,
+                systemctlURL: root.appendingPathComponent("missing-systemctl")
+            ),
+            xdgAutostart: xdg
+        )
+
+        try service.setEnabled(true)
+
+        #expect(!FileManager.default.fileExists(atPath: xdg.desktopFileURL.path))
+        #expect(requester.updates == [true])
+
+        try service.setEnabled(false)
+
+        #expect(requester.updates == [true, false])
+    }
+
+    @Test("Native launch falls back when the portal is unavailable")
+    func nativeLaunchFallback() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = URL(fileURLWithPath: "/opt/OpenUsageGNOME")
+        let xdg = XDGAutostartBackend(configHome: root, executableURL: executable)
+        let requester = RecordingPortalRequester()
+        let service = LinuxLaunchAtLoginService(
+            portal: FlatpakPortalLaunchBackend(
+                requester: requester,
+                flatpakDetector: { false }
+            ),
+            systemd: SystemdUserLaunchBackend(
+                configHome: root,
+                executableURL: executable,
+                systemctlURL: root.appendingPathComponent("missing-systemctl")
+            ),
+            xdgAutostart: xdg
+        )
+
+        try service.setEnabled(true)
+
+        #expect(FileManager.default.fileExists(atPath: xdg.desktopFileURL.path))
+        #expect(requester.updates.isEmpty)
+    }
+
     @Test("StatusNotifierItem exports before registration and activation presents the existing window")
     func trayPresentsWindow() async throws {
         let dbus = FakeDesktopDBus(replies: [[]])
@@ -108,6 +164,17 @@ private final class DesktopCommandRecorder: CommandRunning, @unchecked Sendable 
             recorded.append(invocation)
             return results.removeFirst()
         }
+    }
+}
+
+private final class RecordingPortalRequester: BackgroundPortalRequesting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [Bool] = []
+    var updates: [Bool] { lock.withLock { recorded } }
+
+    func setAutostart(_ enabled: Bool) throws -> Bool {
+        lock.withLock { recorded.append(enabled) }
+        return enabled
     }
 }
 

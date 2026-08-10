@@ -1,0 +1,5 @@
+module CDesktopPortal [system] {
+    header "include/CDesktopPortal.h"
+    link "gio-2.0"
+    export *
+}

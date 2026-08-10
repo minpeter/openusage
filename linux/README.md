@@ -21,6 +21,19 @@ The app reads Claude Code credentials from `~/.claude/.credentials.json` and Cod
 `${XDG_CONFIG_HOME:-~/.config}/codex/auth.json` or `~/.codex/auth.json`. In Flatpak those locations
 are mounted read-only. Application cache and settings remain in Flatpak's private XDG directories.
 
+### Host keyring permission
+
+Antigravity (`agy`) stores its OAuth credential in the host Secret Service. The Flatpak Secret
+portal can retrieve only secrets previously issued to the same sandbox and cannot enumerate AGY's
+entry, so OpenUsage requests `--talk-name=org.freedesktop.secrets` and performs a fixed-attribute
+lookup for `service=gemini` with `username=antigravity` (plus the legacy `account` fallback).
+
+Flatpak D-Bus policy applies to the entire `org.freedesktop.secrets` destination; it cannot limit
+access to those attributes or methods. A compromised OpenUsage process could therefore query other
+unlocked host-keyring items. This is an intentional high-value permission required for automatic
+AGY compatibility. Users who do not want to grant it should remove that `finish-arg`; Antigravity
+usage will then require the read-only `~/.gemini/antigravity-cli` file fallback or remain unavailable.
+
 ## Build the Flatpak
 
 The manifest uses the current GNOME 50 runtime and SDK plus the matching
@@ -66,8 +79,13 @@ flatpak run io.github.minpeter.OpenUsage
 
 ## systemd user service
 
-Flatpak does not export arbitrary systemd units to the host. The bundle carries a validated unit as
-documentation and for extraction, but enabling it is an explicit host-side operation:
+The packaged Settings toggle requests autostart through
+`org.freedesktop.portal.Background.RequestBackground`; the portal creates or removes the
+host-visible autostart entry using the exported Flatpak desktop file. No additional manifest
+permission is required for portal access.
+
+Flatpak does not export arbitrary systemd units to the host. The bundle still carries a validated
+unit for native/manual installs:
 
 ```sh
 mkdir -p ~/.config/systemd/user

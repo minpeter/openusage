@@ -53,6 +53,9 @@ final class DashboardController {
         let paths = LinuxPaths()
         let executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
         launchAtLoginService = LinuxLaunchAtLoginService(
+            portal: FlatpakPortalLaunchBackend(
+                initiallyEnabled: settings.launchAtLogin ?? false
+            ),
             systemd: SystemdUserLaunchBackend(
                 configHome: paths.configDirectory.deletingLastPathComponent(),
                 executableURL: executableURL

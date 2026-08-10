@@ -84,7 +84,7 @@ final class SettingsView {
         launchRow.active = settings.launchAtLogin ?? false
         let startupGroup = PreferencesGroup(
             title: "Startup",
-            description: "Uses a systemd user service with an XDG autostart fallback."
+            description: "Uses the desktop portal in Flatpak, with native systemd and XDG fallbacks."
         )
         startupGroup.add(launchRow)
 

@@ -104,10 +104,16 @@ public protocol LinuxLaunchAtLoginBackend: Sendable {
 }
 
 public struct LinuxLaunchAtLoginService: Sendable {
+    private let portal: (any LinuxLaunchAtLoginBackend)?
     private let systemd: any LinuxLaunchAtLoginBackend
     private let xdgAutostart: any LinuxLaunchAtLoginBackend
 
-    public init(systemd: any LinuxLaunchAtLoginBackend, xdgAutostart: any LinuxLaunchAtLoginBackend) {
+    public init(
+        portal: (any LinuxLaunchAtLoginBackend)? = nil,
+        systemd: any LinuxLaunchAtLoginBackend,
+        xdgAutostart: any LinuxLaunchAtLoginBackend
+    ) {
+        self.portal = portal
         self.systemd = systemd
         self.xdgAutostart = xdgAutostart
     }
@@ -121,7 +127,8 @@ public struct LinuxLaunchAtLoginService: Sendable {
     }
 
     private func selectedBackend() -> any LinuxLaunchAtLoginBackend {
-        systemd.isAvailable() ? systemd : xdgAutostart
+        if let portal, portal.isAvailable() { return portal }
+        return systemd.isAvailable() ? systemd : xdgAutostart
     }
 }
 

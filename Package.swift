@@ -19,6 +19,11 @@ let package = Package(
             pkgConfig: "gio-2.0",
             providers: [.apt(["libglib2.0-dev"])]
         ),
+        .systemLibrary(
+            name: "CDesktopPortal",
+            pkgConfig: "gio-2.0",
+            providers: [.apt(["libglib2.0-dev"])]
+        ),
         .target(
             name: "OpenUsagePricingResources",
             path: "Sources/OpenUsage/Resources",
@@ -35,7 +40,7 @@ let package = Package(
         ),
         .target(
             name: "OpenUsageLinuxCore",
-            dependencies: ["CSecretService", "OpenUsagePricingResources"],
+            dependencies: ["CDesktopPortal", "CSecretService", "OpenUsagePricingResources"],
             path: "Sources/OpenUsageLinuxCore",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
