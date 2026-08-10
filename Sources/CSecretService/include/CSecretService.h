@@ -3,6 +3,8 @@
 
 #include <gio/gio.h>
 
+#define OPENUSAGE_SECRET_MAX_BYTES (512u * 1024u)
+
 typedef struct {
     guint8 *bytes;
     gsize length;
@@ -38,6 +40,26 @@ static inline gboolean openusage_secret_fail(
     return FALSE;
 }
 
+static inline gboolean openusage_secret_result_copy_bytes(
+    const guint8 *bytes,
+    gsize length,
+    OpenUsageSecretResult *result
+) {
+    if (result == NULL) {
+        return FALSE;
+    }
+    if (length > OPENUSAGE_SECRET_MAX_BYTES) {
+        result->error = g_strdup("Secret exceeds the 512 KiB limit");
+        return FALSE;
+    }
+    if (length == 0) {
+        return TRUE;
+    }
+    result->bytes = g_memdup2(bytes, length);
+    result->length = length;
+    return TRUE;
+}
+
 static inline GVariant *openusage_secret_call(
     GDBusConnection *connection,
     const gchar *path,
@@ -71,6 +93,8 @@ static inline gboolean openusage_secret_service_lookup(
     GVariant *search_reply = NULL;
     GVariant *unlocked = NULL;
     GVariant *locked = NULL;
+    GVariant *unlock_reply = NULL;
+    GVariant *unlocked_after_unlock = NULL;
     GVariant *session_reply = NULL;
     GVariant *session_output = NULL;
     GVariant *secrets_reply = NULL;
@@ -112,8 +136,42 @@ static inline gboolean openusage_secret_service_lookup(
     g_variant_get(search_reply, "(@ao@ao)", &unlocked, &locked);
     item_paths = g_variant_get_objv(unlocked, &item_count);
     if (item_count == 0) {
-        success = TRUE;
-        goto cleanup;
+        gsize locked_count = 0;
+        g_free(item_paths);
+        item_paths = g_variant_get_objv(locked, &locked_count);
+        if (locked_count == 0) {
+            success = TRUE;
+            goto cleanup;
+        }
+        g_free(item_paths);
+        item_paths = NULL;
+
+        unlock_reply = openusage_secret_call(
+            connection,
+            "/org/freedesktop/secrets",
+            "org.freedesktop.Secret.Service",
+            "Unlock",
+            g_variant_new("(@ao)", g_variant_ref(locked)),
+            G_VARIANT_TYPE("(aoo)"),
+            &error
+        );
+        if (unlock_reply == NULL) {
+            openusage_secret_fail(result, error, "Secret unlock failed");
+            goto cleanup;
+        }
+        const gchar *prompt_path = NULL;
+        g_variant_get(unlock_reply, "(@ao&o)", &unlocked_after_unlock, &prompt_path);
+        item_paths = g_variant_get_objv(unlocked_after_unlock, &item_count);
+        if (item_count == 0) {
+            openusage_secret_fail(
+                result,
+                NULL,
+                g_strcmp0(prompt_path, "/") == 0
+                    ? "Secret Service did not unlock the matching item"
+                    : "Secret Service requires an unlock prompt"
+            );
+            goto cleanup;
+        }
     }
 
     session_reply = openusage_secret_call(
@@ -169,15 +227,19 @@ static inline gboolean openusage_secret_service_lookup(
             &value,
             &content_type
         );
+        gsize value_length = 0;
         const guint8 *bytes = g_variant_get_fixed_array(
             value,
-            &result->length,
+            &value_length,
             sizeof(guint8)
         );
-        result->bytes = g_memdup2(bytes, result->length);
+        gboolean copied = openusage_secret_result_copy_bytes(bytes, value_length, result);
         g_variant_unref(parameters);
         g_variant_unref(value);
         g_variant_unref(secret);
+        if (!copied) {
+            goto cleanup;
+        }
     }
     success = TRUE;
 
@@ -202,6 +264,8 @@ cleanup:
     g_clear_pointer(&secrets_reply, g_variant_unref);
     g_clear_pointer(&session_output, g_variant_unref);
     g_clear_pointer(&session_reply, g_variant_unref);
+    g_clear_pointer(&unlocked_after_unlock, g_variant_unref);
+    g_clear_pointer(&unlock_reply, g_variant_unref);
     g_clear_pointer(&locked, g_variant_unref);
     g_clear_pointer(&unlocked, g_variant_unref);
     g_clear_pointer(&search_reply, g_variant_unref);

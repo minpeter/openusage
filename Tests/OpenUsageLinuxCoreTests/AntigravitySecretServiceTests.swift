@@ -43,6 +43,41 @@ struct AntigravitySecretServiceTests {
         #expect(service.lookups == [username, account])
     }
 
+    @Test("A locked credential-store failure never becomes not signed in")
+    func lockedCredentialStoreFailure() async {
+        let service = AntigravitySecretServiceFixture(error: SecretServiceError.unavailable)
+        let provider = AntigravityLinuxProvider(
+            paths: AntigravityLinuxPaths(environment: ["HOME": "/home/tester"]),
+            files: AntigravityEmptyFiles(),
+            client: AntigravityKeyringClient(),
+            secretService: service
+        )
+
+        await #expect(throws: AntigravityLinuxError.credentialStoreUnreadable) {
+            try await provider.refresh()
+        }
+    }
+
+    @Test("Direct client rejects an oversized secret")
+    func directClientSizeBoundary() {
+        let maximum = BoundedProviderFileReader.defaultMaximumBytes
+        let service = GIOSecretService { _ in Data(repeating: 0x41, count: maximum + 1) }
+
+        #expect(throws: SecretServiceError.unavailable) {
+            try service.lookup(attributes: .init(["service": "gemini", "username": "antigravity"]))
+        }
+
+        let atLimit = GIOSecretService.nativeCopyOutcomeForTesting(Data(repeating: 0x41, count: maximum))
+        #expect(atLimit.accepted)
+        #expect(atLimit.allocated)
+        #expect(atLimit.length == maximum)
+
+        let oversized = GIOSecretService.nativeCopyOutcomeForTesting(Data(repeating: 0x41, count: maximum + 1))
+        #expect(!oversized.accepted)
+        #expect(!oversized.allocated)
+        #expect(oversized.length == 0)
+    }
+
     @Test("Direct client maps AGY attributes to native lookup keys")
     func directClientAttributes() throws {
         let recorder = AntigravityIdentityKeyRecorder()
@@ -61,17 +96,26 @@ struct AntigravitySecretServiceTests {
 }
 
 private final class AntigravitySecretServiceFixture: FreedesktopSecretService, @unchecked Sendable {
-    private let secret: Data
-    private let matching: SecretServiceAttributes
+    private let secret: Data?
+    private let matching: SecretServiceAttributes?
+    private let error: (any Error)?
     private(set) var lookups: [SecretServiceAttributes] = []
 
     init(secret: Data, matching: SecretServiceAttributes) {
         self.secret = secret
         self.matching = matching
+        self.error = nil
+    }
+
+    init(error: any Error) {
+        self.secret = nil
+        self.matching = nil
+        self.error = error
     }
 
     func lookup(attributes: SecretServiceAttributes) throws -> Data? {
         lookups.append(attributes)
+        if let error { throw error }
         return attributes == matching ? secret : nil
     }
 

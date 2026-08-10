@@ -118,7 +118,7 @@ public struct AntigravityLinuxProvider: Sendable {
     }
 
     public func hasLocalCredentials() -> Bool {
-        loadSecretServiceData() != nil
+        (try? loadSecretServiceData()) != nil
             || paths.credentialCandidates.contains { (try? files.readIfPresent($0)) != nil }
     }
 
@@ -164,7 +164,10 @@ public struct AntigravityLinuxProvider: Sendable {
     }
 
     private func loadCredential() throws -> Credential {
-        if let data = loadSecretServiceData() {
+        let secretData: Data?
+        do { secretData = try loadSecretServiceData() }
+        catch { throw AntigravityLinuxError.credentialStoreUnreadable }
+        if let data = secretData {
             guard let credential = Credential(data: data) else {
                 throw AntigravityLinuxError.invalidCredentialData
             }
@@ -181,14 +184,14 @@ public struct AntigravityLinuxProvider: Sendable {
         throw AntigravityLinuxError.notSignedIn
     }
 
-    private func loadSecretServiceData() -> Data? {
+    private func loadSecretServiceData() throws -> Data? {
         guard let secretService else { return nil }
         let candidates = [
             SecretServiceAttributes(["service": "gemini", "username": "antigravity"]),
             SecretServiceAttributes(["service": "gemini", "account": "antigravity"]),
         ]
         for attributes in candidates {
-            if let data = try? secretService.lookup(attributes: attributes) {
+            if let data = try secretService.lookup(attributes: attributes) {
                 return data
             }
         }

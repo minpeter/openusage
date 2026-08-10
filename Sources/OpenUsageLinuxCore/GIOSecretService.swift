@@ -18,13 +18,18 @@ public struct GIOSecretService: FreedesktopSecretService {
 
     public func lookup(attributes: SecretServiceAttributes) throws -> Data? {
         guard attributes.values["service"] == "gemini" else { return nil }
+        let data: Data?
         if attributes.values["username"] == "antigravity" {
-            return try loader("username")
+            data = try loader("username")
+        } else if attributes.values["account"] == "antigravity" {
+            data = try loader("account")
+        } else {
+            return nil
         }
-        if attributes.values["account"] == "antigravity" {
-            return try loader("account")
+        guard data?.count ?? 0 <= BoundedProviderFileReader.defaultMaximumBytes else {
+            throw SecretServiceError.unavailable
         }
-        return nil
+        return data
     }
 
     public func store(_ secret: Data, label: String, attributes: SecretServiceAttributes) throws {
@@ -33,6 +38,19 @@ public struct GIOSecretService: FreedesktopSecretService {
 
     public func clear(attributes: SecretServiceAttributes) throws {
         throw SecretServiceError.unavailable
+    }
+
+    static func nativeCopyOutcomeForTesting(_ secret: Data) -> (accepted: Bool, allocated: Bool, length: Int) {
+        var result = OpenUsageSecretResult()
+        defer { openusage_secret_result_clear(&result) }
+        let accepted = secret.withUnsafeBytes { buffer in
+            openusage_secret_result_copy_bytes(
+                buffer.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                UInt(buffer.count),
+                &result
+            ) != 0
+        }
+        return (accepted, result.bytes != nil, Int(result.length))
     }
 
     private static func load(identityKey: String) throws -> Data? {
