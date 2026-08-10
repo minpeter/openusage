@@ -111,6 +111,15 @@ extension DashboardController {
             guard let provider = Self.qaAPIKeyProvider else { return }
             self?.clearAPIKey(for: provider)
         }
+        let saveProxyAction = SimpleAction(name: "save-proxy") { [weak self] in
+            let environment = ProcessInfo.processInfo.environment
+            guard let url = environment["OPENUSAGE_PROXY_URL"] else { return }
+            self?.saveProxySettings(
+                enabled: environment["OPENUSAGE_PROXY_ENABLED"] != "0",
+                url: url,
+                bypassText: environment["OPENUSAGE_PROXY_BYPASS"] ?? ""
+            )
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
@@ -123,6 +132,7 @@ extension DashboardController {
             exportCSVAction,
             storeAPIKeyAction,
             clearAPIKeyAction,
+            saveProxyAction,
         ]
         for action in retainedActions {
             application.addAction(action)

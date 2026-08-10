@@ -40,6 +40,7 @@ final class SettingsView {
     var onExportRequested: (UsageExportFormat) -> Void = { _ in }
     var onAPIKeySave: (ManagedAPIKeyProvider, String) -> Void = { _, _ in }
     var onAPIKeyClear: (ManagedAPIKeyProvider) -> Void = { _ in }
+    var onProxySave: (Bool, String, String) -> Void = { _, _, _ in }
 
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let appearanceRow: ComboRow
@@ -71,6 +72,9 @@ final class SettingsView {
     let zaiAPIKeyRow = PasswordEntryRow(title: "Z.ai API Key")
     let openRouterAPIKeyStatus = Label("Checking…")
     let zaiAPIKeyStatus = Label("Checking…")
+    let proxyEnabledRow = SwitchRow(title: "Use Proxy")
+    let proxyURLRow = PasswordEntryRow(title: "Proxy URL")
+    let proxyBypassRow = EntryRow(title: "Bypass Hosts")
     let orderGroup = PreferencesGroup(
         title: "Provider Order",
         description: "Controls the order of providers in every view."
@@ -279,6 +283,29 @@ final class SettingsView {
         apiKeyGroup.add(openRouterAPIKeyRow)
         apiKeyGroup.add(zaiAPIKeyRow)
 
+        let proxyGroup = PreferencesGroup(
+            title: "Proxy",
+            description: "Routes provider HTTP requests after restart. Supports http, https, and socks5."
+        )
+        proxyURLRow.text = settings.proxyURL ?? ""
+        proxyBypassRow.text = settings.proxyBypassHosts.joined(separator: ", ")
+        let proxySaveRow = ActionRow(
+            title: "Apply Proxy Settings",
+            subtitle: "Loopback addresses always bypass the proxy."
+        )
+        proxySaveRow.addSuffix(Button(label: "Save", onClicked: { [weak self] in
+            guard let self else { return }
+            self.onProxySave(
+                self.proxyEnabledRow.active,
+                self.proxyURLRow.text,
+                self.proxyBypassRow.text
+            )
+        }))
+        proxyGroup.add(proxyEnabledRow)
+        proxyGroup.add(proxyURLRow)
+        proxyGroup.add(proxyBypassRow)
+        proxyGroup.add(proxySaveRow)
+
         // About group
         let aboutGroup = PreferencesGroup(title: "About")
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
@@ -295,6 +322,7 @@ final class SettingsView {
         content.append(shortcutsGroup)
         content.append(privacyGroup)
         content.append(apiKeyGroup)
+        content.append(proxyGroup)
         content.append(aboutGroup)
 
         let clamp = Clamp()
@@ -336,6 +364,11 @@ final class SettingsView {
         apiPortRow.value = Double(settings.localAPIPort ?? LoopbackHTTPServer.defaultPort)
         apiPortRow.sensitive = apiRow.active
         syncDirectoryRow.subtitle = settings.syncDirectoryPath ?? defaultSyncPath
+        proxyEnabledRow.active = settings.proxyEnabled
+        proxyURLRow.text = settings.proxyURL ?? ""
+        proxyBypassRow.text = settings.proxyBypassHosts.joined(separator: ", ")
+        proxyURLRow.sensitive = settings.proxyEnabled
+        proxyBypassRow.sensitive = settings.proxyEnabled
         order = settings.providerOrder
         hiddenProviderIDs = Set(settings.hiddenProviderIDs ?? [])
         rebuildOrderRows()

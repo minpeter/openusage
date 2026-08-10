@@ -285,6 +285,9 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var notifyCuttingItClose = true
     var notifyWillRunOut = true
     var syncDirectoryPath: String?
+    var proxyEnabled = false
+    var proxyURL: String?
+    var proxyBypassHosts: [String] = []
     var periodicRefreshEnabled = true
     var refreshIntervalMinutes = 5
     var providerOrder: [String] = []
@@ -303,6 +306,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         case density, timeFormat, metricLayouts, panelMetricPins, providerRenames
         case notifyAlmostOut, notifyCuttingItClose, notifyWillRunOut
         case syncDirectoryPath
+        case proxyEnabled, proxyURL, proxyBypassHosts
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
     }
@@ -352,6 +356,9 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         ) ?? true
         notifyWillRunOut = try values.decodeIfPresent(Bool.self, forKey: .notifyWillRunOut) ?? true
         syncDirectoryPath = try values.decodeIfPresent(String.self, forKey: .syncDirectoryPath)
+        proxyEnabled = try values.decodeIfPresent(Bool.self, forKey: .proxyEnabled) ?? false
+        proxyURL = try values.decodeIfPresent(String.self, forKey: .proxyURL)
+        proxyBypassHosts = try values.decodeIfPresent([String].self, forKey: .proxyBypassHosts) ?? []
         periodicRefreshEnabled = try values.decodeIfPresent(Bool.self, forKey: .periodicRefreshEnabled) ?? true
         refreshIntervalMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshIntervalMinutes) ?? 5
         providerOrder = try values.decodeIfPresent([String].self, forKey: .providerOrder) ?? []
@@ -378,6 +385,49 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     mutating func setSyncDirectory(_ path: String?) {
         let normalized = path?.trimmingCharacters(in: .whitespacesAndNewlines)
         syncDirectoryPath = normalized?.isEmpty == false ? normalized : nil
+    }
+
+    mutating func setProxy(
+        enabled: Bool,
+        url: String,
+        bypassText: String
+    ) throws {
+        guard enabled else {
+            proxyEnabled = false
+            proxyURL = nil
+            proxyBypassHosts = []
+            return
+        }
+        let normalizedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bypass = Self.normalizedProxyBypassHosts(bypassText)
+        _ = try LinuxProxyConfiguration(
+            url: normalizedURL,
+            bypassHosts: bypass
+        )
+        proxyEnabled = true
+        proxyURL = normalizedURL
+        proxyBypassHosts = bypass
+    }
+
+    func proxyConfiguration() throws -> LinuxProxyConfiguration? {
+        guard proxyEnabled, let proxyURL else { return nil }
+        return try LinuxProxyConfiguration(
+            url: proxyURL,
+            bypassHosts: proxyBypassHosts
+        )
+    }
+
+    private static func normalizedProxyBypassHosts(_ text: String) -> [String] {
+        var result: [String] = []
+        var seen = Set<String>()
+        for part in text.split(separator: ",", omittingEmptySubsequences: false) {
+            let host = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !host.isEmpty, seen.insert(host.lowercased()).inserted else {
+                continue
+            }
+            result.append(host)
+        }
+        return result
     }
 }
 

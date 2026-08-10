@@ -153,6 +153,13 @@ extension DashboardController {
         settingsView.onAPIKeyClear = { [weak self] provider in
             self?.clearAPIKey(for: provider)
         }
+        settingsView.onProxySave = { [weak self] enabled, url, bypass in
+            self?.saveProxySettings(
+                enabled: enabled,
+                url: url,
+                bypassText: bypass
+            )
+        }
         refreshAPIKeyStatuses()
     }
 

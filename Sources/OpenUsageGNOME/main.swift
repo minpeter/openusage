@@ -1,7 +1,11 @@
 import Adwaita
+import Foundation
 
 @MainActor
 private func runOpenUsage() {
+    if let proxy = try? GNOMESettingsStore().load().proxyConfiguration() {
+        proxy.applyToProcessEnvironment()
+    }
     let application = Application(id: "io.github.minpeter.OpenUsage")
     var controller: DashboardController?
 

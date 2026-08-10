@@ -108,6 +108,11 @@ extension SettingsView {
             guard let self, !self.applyingSettings else { return }
             self.onLocalAPIChanged(self.apiRow.active, Int(self.apiPortRow.value))
         })
+        connections.append(proxyEnabledRow.onNotify(.active) { [weak self] in
+            guard let self, !self.applyingSettings else { return }
+            self.proxyURLRow.sensitive = self.proxyEnabledRow.active
+            self.proxyBypassRow.sensitive = self.proxyEnabledRow.active
+        })
     }
 
     private func emitNotificationToggles() {

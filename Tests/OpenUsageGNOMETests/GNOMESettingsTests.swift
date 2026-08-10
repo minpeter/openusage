@@ -63,4 +63,26 @@ struct GNOMESettingsTests {
         restarted.setSyncDirectory(" \n ")
         #expect(restarted.syncDirectoryPath == nil)
     }
+
+    @Test("Proxy controls survive restart and blank input disables proxying")
+    func proxySettingsRoundTrip() throws {
+        var settings = GNOMESettings()
+        try settings.setProxy(
+            enabled: true,
+            url: " http://proxy.example.com:8080 ",
+            bypassText: "internal.example.com, localhost"
+        )
+
+        let persisted = try JSONEncoder().encode(settings)
+        var restarted = try JSONDecoder().decode(GNOMESettings.self, from: persisted)
+
+        #expect(restarted.proxyEnabled)
+        #expect(restarted.proxyURL == "http://proxy.example.com:8080")
+        #expect(restarted.proxyBypassHosts == ["internal.example.com", "localhost"])
+        #expect(try restarted.proxyConfiguration()?.host == "proxy.example.com")
+
+        try restarted.setProxy(enabled: false, url: "", bypassText: "")
+        #expect(!restarted.proxyEnabled)
+        #expect(try restarted.proxyConfiguration() == nil)
+    }
 }
