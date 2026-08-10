@@ -16,6 +16,7 @@ final class ProvidersView {
     private var rows: [String: ProviderRow] = [:]
     private var metricPresentationSettings = GNOMEMetricPresentationSettings()
     private var onRefresh: () -> Void = {}
+    private var onRenameProvider: (String, String) -> Void = { _, _ in }
 
     init() {
         root = ScrolledWindow()
@@ -47,6 +48,12 @@ final class ProvidersView {
         button.halign = GTK_ALIGN_CENTER
         button.setAccessibleLabel("Check for provider credentials again")
         emptyPage.child = button
+    }
+
+    func setRenameHandler(
+        _ handler: @escaping @MainActor (String, String) -> Void
+    ) {
+        onRenameProvider = handler
     }
 
     /// Updates the row tree in place. `snapshots` must already be ordered.
@@ -92,6 +99,8 @@ final class ProvidersView {
     private func insertRow(for snapshot: ProviderUsageSnapshot) -> ProviderRow {
         let row = ProviderRow(providerID: snapshot.providerID, displayName: snapshot.displayName) {
             [weak self] in self?.onRefresh()
+        } onRename: { [weak self] name in
+            self?.onRenameProvider(snapshot.providerID, name)
         }
         rows[snapshot.instanceID] = row
         group.add(row.expander)
@@ -110,6 +119,10 @@ private final class ProviderRow {
     private let detail = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let refreshedLabel = Label("")
     private let onRetry: () -> Void
+    private let onRename: (String) -> Void
+    private let renameEntry = EntryRow()
+    private let contextPopover = Popover()
+    private let menuButton = MenuButton(icon: .openMenu)
     private var lastSnapshot: ProviderUsageSnapshot?
     private var lastMetricPresentationSettings: GNOMEMetricPresentationSettings?
     private var lastDensity: DensitySetting?
@@ -117,8 +130,14 @@ private final class ProviderRow {
     private var densityMetrics = DensitySetting.regular.metrics
     private var connections: [SignalConnection] = []
 
-    init(providerID: String, displayName: String, onRetry: @escaping @MainActor () -> Void) {
+    init(
+        providerID: String,
+        displayName: String,
+        onRetry: @escaping @MainActor () -> Void,
+        onRename: @escaping @MainActor (String) -> Void
+    ) {
         self.onRetry = onRetry
+        self.onRename = onRename
         expander = ExpanderRow(title: "")
         expander.addPrefix(ProviderIcon.make(providerID: providerID, displayName: displayName))
 
@@ -131,6 +150,34 @@ private final class ProviderRow {
         suffix.valign = GTK_ALIGN_CENTER
         suffix.append(planPill)
         suffix.append(stateIcon)
+
+        renameEntry.title = "Provider Name"
+        renameEntry.text = displayName
+        let actions = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        actions.setMargins(GNOMEStyle.sectionSpacing)
+        actions.append(renameEntry)
+        let renameButton = Button(label: "Rename Provider", onClicked: { [weak self] in
+            guard let self else { return }
+            self.contextPopover.popdown()
+            self.onRename(self.renameEntry.text)
+        })
+        renameButton.setAccessibleLabel("Save provider name")
+        actions.append(renameButton)
+        let resetButton = Button(label: "Use Default Name", onClicked: { [weak self] in
+            guard let self else { return }
+            self.contextPopover.popdown()
+            self.onRename("")
+        })
+        resetButton.setAccessibleLabel("Restore default provider name")
+        actions.append(resetButton)
+        contextPopover.child = actions
+
+        menuButton.setPopover(contextPopover)
+        menuButton.setAccessibleLabel("Actions for \(displayName)")
+        suffix.append(menuButton)
         expander.addSuffix(suffix)
 
         detail.setMargins(GNOMEStyle.sectionSpacing)
@@ -165,6 +212,8 @@ private final class ProviderRow {
         detail.setMargins(densityMetrics.sectionSpacing)
 
         expander.title = snapshot.displayName
+        renameEntry.text = snapshot.displayName
+        menuButton.setAccessibleLabel("Actions for \(snapshot.displayName)")
         expander.subtitle = snapshot.accountLabel ?? stateSummary(snapshot)
 
         planPill.visible = !(snapshot.plan ?? "").isEmpty

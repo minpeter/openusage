@@ -280,6 +280,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var timeFormat: TimeFormatSetting = .auto
     var metricLayouts: [String: ProviderMetricLayout] = [:]
     var panelMetricPins = PanelMetricPins()
+    var providerRenames: [String: String] = [:]
     var notifyAlmostOut = true
     var notifyCuttingItClose = true
     var notifyWillRunOut = true
@@ -298,7 +299,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case version, appearance, trayUsageDisplayMode, periodicRefreshEnabled
         case menuBarStyle, widgetDisplayMode, resetDisplayMode, alwaysShowPacing
-        case density, timeFormat, metricLayouts, panelMetricPins
+        case density, timeFormat, metricLayouts, panelMetricPins, providerRenames
         case notifyAlmostOut, notifyCuttingItClose, notifyWillRunOut
         case refreshIntervalMinutes, providerOrder
         case hiddenProviderIDs, launchAtLogin, analyticsEnabled, localAPIEnabled, localAPIPort
@@ -338,6 +339,10 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             PanelMetricPins.self,
             forKey: .panelMetricPins
         ) ?? .init()
+        providerRenames = try values.decodeIfPresent(
+            [String: String].self,
+            forKey: .providerRenames
+        ) ?? [:]
         notifyAlmostOut = try values.decodeIfPresent(Bool.self, forKey: .notifyAlmostOut) ?? true
         notifyCuttingItClose = try values.decodeIfPresent(
             Bool.self,
@@ -352,6 +357,19 @@ struct GNOMESettings: Codable, Equatable, Sendable {
         analyticsEnabled = try values.decodeIfPresent(Bool.self, forKey: .analyticsEnabled)
         localAPIEnabled = try values.decodeIfPresent(Bool.self, forKey: .localAPIEnabled)
         localAPIPort = try values.decodeIfPresent(Int.self, forKey: .localAPIPort)
+    }
+
+    mutating func renameProvider(_ providerID: String, to name: String) {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.isEmpty {
+            providerRenames.removeValue(forKey: providerID)
+        } else {
+            providerRenames[providerID] = normalized
+        }
+    }
+
+    func displayName(providerID: String, fallback: String) -> String {
+        providerRenames[providerID] ?? fallback
     }
 }
 

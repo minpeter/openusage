@@ -84,7 +84,7 @@ extension DashboardController {
         ProviderSnapshotPresentation.ordered(
             snapshots,
             providerOrder: settings.providerOrder
-        )
+        ).map { $0.applyingProviderRenames(settings.providerRenames) }
     }
 
     func visibleOrdered(_ snapshots: [ProviderUsageSnapshot]) -> [ProviderUsageSnapshot] {
@@ -92,7 +92,7 @@ extension DashboardController {
             snapshots,
             providerOrder: settings.providerOrder,
             hiddenProviderIDs: settings.hiddenProviderIDs ?? []
-        )
+        ).map { $0.applyingProviderRenames(settings.providerRenames) }
     }
 
     func applySnapshots() {
@@ -162,9 +162,12 @@ extension DashboardController {
                 cuttingItClose: settings.notifyCuttingItClose,
                 willRunOut: settings.notifyWillRunOut
             )
+            let notificationSnapshots = refreshed.map {
+                $0.applyingProviderRenames(settings.providerRenames)
+            }
             Task.detached {
                 await desktopIntegration.postRefresh(
-                    refreshed,
+                    notificationSnapshots,
                     toggles: notificationToggles
                 )
             }

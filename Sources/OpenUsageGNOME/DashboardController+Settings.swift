@@ -8,6 +8,12 @@ extension DashboardController {
     func wireViews() {
         overview.setRefreshHandler { [weak self] in self?.refresh() }
         providersView.setRefreshHandler { [weak self] in self?.refresh() }
+        providersView.setRenameHandler { [weak self] providerID, name in
+            guard let self else { return }
+            self.settings.renameProvider(providerID, to: name)
+            self.settingsStore.save(self.settings)
+            self.applySnapshots()
+        }
     }
 
     func wireSettings() {
