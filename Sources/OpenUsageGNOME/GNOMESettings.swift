@@ -108,6 +108,13 @@ struct MetricPreferenceKey: Codable, Equatable, Hashable, Sendable {
 enum MetricVisibilitySection: String, Codable, Sendable {
     case alwaysVisible
     case onDemand
+
+    var label: String {
+        switch self {
+        case .alwaysVisible: "Always Visible"
+        case .onDemand: "On Demand"
+        }
+    }
 }
 
 struct MetricLayoutEntry: Codable, Equatable, Sendable {

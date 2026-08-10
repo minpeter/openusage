@@ -20,7 +20,8 @@ extension DashboardController {
             snapshots: visible,
             isRefreshing: true,
             metricPresentationSettings: settings.metricPresentationSettings,
-            density: settings.density
+            density: settings.density,
+            metricLayouts: settings.metricLayouts
         )
         updateToolbarSummary(snapshots: visible, isRefreshing: true)
 
@@ -101,13 +102,15 @@ extension DashboardController {
             snapshots: visible,
             isRefreshing: isRefreshing,
             metricPresentationSettings: settings.metricPresentationSettings,
-            density: settings.density
+            density: settings.density,
+            metricLayouts: settings.metricLayouts
         )
         providersView.update(
             snapshots: visible,
             isRefreshing: isRefreshing,
             metricPresentationSettings: settings.metricPresentationSettings,
-            density: settings.density
+            density: settings.density,
+            metricLayouts: settings.metricLayouts
         )
         historyView.update(snapshots: visible)
         updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)
@@ -119,17 +122,22 @@ extension DashboardController {
             return (snapshot.providerID, snapshot.displayName)
         }
         settingsView.updateProviders(providers)
+        settingsView.updateMetricCustomization(visible)
     }
 
     func updateTrayUsage(_ snapshots: [ProviderUsageSnapshot]) {
         guard let desktopIntegration else { return }
         trayUpdateRevision += 1
         let revision = trayUpdateRevision
-        let displayMode = settings.trayUsageDisplayMode
+        let configuration = PanelUsagePresentation.configuration(
+            snapshots: snapshots,
+            pins: settings.panelMetricPins,
+            style: settings.menuBarStyle,
+            displayMode: settings.trayUsageDisplayMode
+        )
         Task.detached {
             await desktopIntegration.updateUsage(
-                snapshots,
-                displayMode: displayMode,
+                configuration,
                 revision: revision
             )
         }

@@ -23,6 +23,36 @@ extension DashboardController {
             self.settingsStore.save(self.settings)
             self.updateTrayUsage(self.visibleOrdered(self.snapshots))
         }
+        settingsView.onMenuBarStyleChanged = { [weak self] style in
+            guard let self else { return }
+            self.settings.menuBarStyle = style
+            self.saveAndApplyDisplaySettings()
+        }
+        settingsView.onWidgetDisplayModeChanged = { [weak self] mode in
+            guard let self else { return }
+            self.settings.widgetDisplayMode = mode
+            self.saveAndApplyDisplaySettings()
+        }
+        settingsView.onResetDisplayModeChanged = { [weak self] mode in
+            guard let self else { return }
+            self.settings.resetDisplayMode = mode
+            self.saveAndApplyDisplaySettings()
+        }
+        settingsView.onAlwaysShowPacingChanged = { [weak self] enabled in
+            guard let self else { return }
+            self.settings.alwaysShowPacing = enabled
+            self.saveAndApplyDisplaySettings()
+        }
+        settingsView.onDensityChanged = { [weak self] density in
+            guard let self else { return }
+            self.settings.density = density
+            self.saveAndApplyDisplaySettings()
+        }
+        settingsView.onTimeFormatChanged = { [weak self] format in
+            guard let self else { return }
+            self.settings.timeFormat = format
+            self.saveAndApplyDisplaySettings()
+        }
         settingsView.onRefreshScheduleChanged = { [weak self] enabled, minutes in
             guard let self else { return }
             self.settings.periodicRefreshEnabled = enabled
@@ -47,6 +77,18 @@ extension DashboardController {
             self.settings.hiddenProviderIDs = hidden.sorted()
             self.settingsStore.save(self.settings)
             self.applySnapshots()
+        }
+        settingsView.onMetricEnabledChanged = { [weak self] providerID, key, enabled in
+            self?.setMetricEnabled(enabled, providerID: providerID, key: key)
+        }
+        settingsView.onMetricSectionChanged = { [weak self] providerID, key, section in
+            self?.setMetricSection(section, providerID: providerID, key: key)
+        }
+        settingsView.onMetricMoved = { [weak self] providerID, key, offset in
+            self?.moveMetric(providerID: providerID, key: key, offset: offset)
+        }
+        settingsView.onPanelPinChanged = { [weak self] providerID, key, enabled in
+            self?.setPanelPin(enabled, providerID: providerID, key: key) ?? false
         }
         settingsView.onLaunchAtLoginChanged = { [weak self] enabled in
             guard let self else { return }
@@ -79,6 +121,95 @@ extension DashboardController {
         }
         settingsView.onExportRequested = { [weak self] format in
             self?.exportSnapshots(format: format)
+        }
+    }
+
+    private func saveAndApplyDisplaySettings() {
+        settingsStore.save(settings)
+        settingsView.apply(settings: settings)
+        applySnapshots()
+    }
+
+    private func setMetricEnabled(
+        _ enabled: Bool,
+        providerID: String,
+        key: MetricPreferenceKey
+    ) {
+        var layout = metricLayout(for: providerID)
+        layout.setEnabled(enabled, for: key)
+        settings.metricLayouts[providerID] = layout
+        if !enabled {
+            settings.panelMetricPins.unpin(key, for: providerID)
+        }
+        saveAndApplyDisplaySettings()
+    }
+
+    private func setMetricSection(
+        _ section: MetricVisibilitySection,
+        providerID: String,
+        key: MetricPreferenceKey
+    ) {
+        var layout = metricLayout(for: providerID)
+        layout.move(key, to: section, at: Int.max)
+        settings.metricLayouts[providerID] = layout
+        saveAndApplyDisplaySettings()
+    }
+
+    private func moveMetric(
+        providerID: String,
+        key: MetricPreferenceKey,
+        offset: Int
+    ) {
+        var layout = metricLayout(for: providerID)
+        guard let entry = layout.entry(for: key) else { return }
+        let knownKeys = Set(metricCustomizationMetrics(for: providerID).map(
+            MetricPreferenceKey.init(metric:)
+        ))
+        let sectionKeys = layout.entries.filter {
+            $0.section == entry.section && knownKeys.contains($0.key)
+        }.map(\.key)
+        guard let current = sectionKeys.firstIndex(of: key) else { return }
+        let destination = current + offset
+        guard sectionKeys.indices.contains(destination) else { return }
+        layout.move(key, to: entry.section, at: destination)
+        settings.metricLayouts[providerID] = layout
+        saveAndApplyDisplaySettings()
+    }
+
+    private func setPanelPin(
+        _ enabled: Bool,
+        providerID: String,
+        key: MetricPreferenceKey
+    ) -> Bool {
+        var pins = settings.panelMetricPins
+        if enabled {
+            guard metricLayout(for: providerID).entry(for: key)?.isEnabled == true else {
+                settingsView.apply(settings: settings)
+                return false
+            }
+            guard pins.pin(key, for: providerID) else {
+                toastOverlay.addToast(Toast(title: "Pin up to two metrics per provider."))
+                settingsView.apply(settings: settings)
+                return false
+            }
+        } else {
+            pins.unpin(key, for: providerID)
+        }
+        settings.panelMetricPins = pins
+        saveAndApplyDisplaySettings()
+        return true
+    }
+
+    private func metricLayout(for providerID: String) -> ProviderMetricLayout {
+        var layout = settings.metricLayouts[providerID] ?? .init()
+        layout.reconcile(with: metricCustomizationMetrics(for: providerID))
+        return layout
+    }
+
+    private func metricCustomizationMetrics(for providerID: String) -> [UsageMetric] {
+        var seen: Set<MetricPreferenceKey> = []
+        return snapshots.filter { $0.providerID == providerID }.flatMap(\.metrics).filter {
+            seen.insert(MetricPreferenceKey(metric: $0)).inserted
         }
     }
 

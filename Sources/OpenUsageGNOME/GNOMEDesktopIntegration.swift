@@ -38,14 +38,9 @@ final class GNOMEDesktopIntegration: @unchecked Sendable {
     }
 
     func updateUsage(
-        _ snapshots: [ProviderUsageSnapshot],
-        displayMode: TrayUsageDisplayMode,
+        _ configuration: StatusNotifierItemConfiguration,
         revision: UInt64
     ) async {
-        let configuration = StatusNotifierItemConfiguration.usage(
-            snapshots: snapshots,
-            displayMode: displayMode
-        )
         do {
             try await tray.update(configuration: configuration, revision: revision)
         } catch {

@@ -13,9 +13,23 @@ final class SettingsView {
 
     var onAppearanceChanged: (GNOMESettings.Appearance) -> Void = { _ in }
     var onTrayUsageDisplayModeChanged: (TrayUsageDisplayMode) -> Void = { _ in }
+    var onMenuBarStyleChanged: (MenuBarStyle) -> Void = { _ in }
+    var onWidgetDisplayModeChanged: (WidgetDisplayMode) -> Void = { _ in }
+    var onResetDisplayModeChanged: (ResetDisplayMode) -> Void = { _ in }
+    var onAlwaysShowPacingChanged: (Bool) -> Void = { _ in }
+    var onDensityChanged: (DensitySetting) -> Void = { _ in }
+    var onTimeFormatChanged: (TimeFormatSetting) -> Void = { _ in }
     var onRefreshScheduleChanged: (Bool, Int) -> Void = { _, _ in }
     var onProviderOrderChanged: ([String]) -> Void = { _ in }
     var onProviderVisibilityChanged: (String, Bool) -> Void = { _, _ in }
+    var onMetricEnabledChanged: (String, MetricPreferenceKey, Bool) -> Void = { _, _, _ in }
+    var onMetricSectionChanged: (
+        String,
+        MetricPreferenceKey,
+        MetricVisibilitySection
+    ) -> Void = { _, _, _ in }
+    var onMetricMoved: (String, MetricPreferenceKey, Int) -> Void = { _, _, _ in }
+    var onPanelPinChanged: (String, MetricPreferenceKey, Bool) -> Bool = { _, _, _ in false }
     var onLaunchAtLoginChanged: (Bool) -> Void = { _ in }
     var onAnalyticsChanged: (Bool) -> Void = { _ in }
     var onLocalAPIChanged: (Bool, Int) -> Void = { _, _ in }
@@ -24,6 +38,12 @@ final class SettingsView {
     private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     let appearanceRow: ComboRow
     let trayUsageDisplayRow: ComboRow
+    let menuBarStyleRow: ComboRow
+    let widgetDisplayModeRow: ComboRow
+    let resetDisplayModeRow: ComboRow
+    let alwaysShowPacingRow: SwitchRow
+    let densityRow: ComboRow
+    let timeFormatRow: ComboRow
     let periodicRow: SwitchRow
     let intervalRow: SpinRow
     let launchRow = SwitchRow(title: "Launch at Login")
@@ -40,12 +60,19 @@ final class SettingsView {
         title: "Provider Order",
         description: "Controls the order of providers in every view."
     )
+    let metricCustomizationGroup = PreferencesGroup(
+        title: "Metric Customization",
+        description: "Enable, order, reveal on demand, and pin up to two metrics per provider."
+    )
     var order: [String] = []
     var hiddenProviderIDs: Set<String> = []
     var providerNames: [String: String] = [:]
     var providerRows: [String: SwitchRow] = [:]
     var connections: [SignalConnection] = []
     var orderConnections: [SignalConnection] = []
+    var metricConnections: [SignalConnection] = []
+    var customizationSnapshots: [ProviderUsageSnapshot] = []
+    var customizationSettings = GNOMESettings()
     var applyingSettings = false
 
     init(settings: GNOMESettings, cachePath: String, version: String) {
@@ -72,6 +99,31 @@ final class SettingsView {
                 + "next to the OpenUsage icon."
         )
         panelIndicatorGroup.add(trayUsageDisplayRow)
+
+        menuBarStyleRow = ComboRow(title: "Panel Style")
+        menuBarStyleRow.setModel(StringList(MenuBarStyle.allCases.map(\.label)))
+        widgetDisplayModeRow = ComboRow(title: "Usage Values")
+        widgetDisplayModeRow.setModel(StringList(WidgetDisplayMode.allCases.map(\.label)))
+        resetDisplayModeRow = ComboRow(title: "Reset Times")
+        resetDisplayModeRow.setModel(StringList(ResetDisplayMode.allCases.map(\.label)))
+        alwaysShowPacingRow = SwitchRow(
+            title: "Always Show Pacing",
+            subtitle: "Show projected usage on healthy quotas as well as quotas near their limit."
+        )
+        densityRow = ComboRow(title: "Density")
+        densityRow.setModel(StringList(DensitySetting.allCases.map(\.label)))
+        timeFormatRow = ComboRow(title: "Time Format")
+        timeFormatRow.setModel(StringList(TimeFormatSetting.allCases.map(\.label)))
+        let displayGroup = PreferencesGroup(
+            title: "Usage Display",
+            description: "Control quota values, reset copy, pacing, and top-panel presentation."
+        )
+        displayGroup.add(menuBarStyleRow)
+        displayGroup.add(widgetDisplayModeRow)
+        displayGroup.add(resetDisplayModeRow)
+        displayGroup.add(alwaysShowPacingRow)
+        displayGroup.add(densityRow)
+        displayGroup.add(timeFormatRow)
 
         // Refresh group
         periodicRow = SwitchRow(
@@ -151,9 +203,11 @@ final class SettingsView {
 
         content.append(appearanceGroup)
         content.append(panelIndicatorGroup)
+        content.append(displayGroup)
         content.append(refreshGroup)
         content.append(startupGroup)
         content.append(orderGroup)
+        content.append(metricCustomizationGroup)
         content.append(apiGroup)
         content.append(shortcutsGroup)
         content.append(privacyGroup)
@@ -176,6 +230,16 @@ final class SettingsView {
         trayUsageDisplayRow.selected = TrayUsageDisplayMode.allCases.firstIndex(
             of: settings.trayUsageDisplayMode
         ) ?? 0
+        menuBarStyleRow.selected = MenuBarStyle.allCases.firstIndex(of: settings.menuBarStyle) ?? 0
+        widgetDisplayModeRow.selected = WidgetDisplayMode.allCases.firstIndex(
+            of: settings.widgetDisplayMode
+        ) ?? 0
+        resetDisplayModeRow.selected = ResetDisplayMode.allCases.firstIndex(
+            of: settings.resetDisplayMode
+        ) ?? 0
+        alwaysShowPacingRow.active = settings.alwaysShowPacing
+        densityRow.selected = DensitySetting.allCases.firstIndex(of: settings.density) ?? 0
+        timeFormatRow.selected = TimeFormatSetting.allCases.firstIndex(of: settings.timeFormat) ?? 0
         periodicRow.active = settings.periodicRefreshEnabled
         intervalRow.value = Double(settings.refreshIntervalMinutes)
         intervalRow.sensitive = settings.periodicRefreshEnabled
@@ -187,6 +251,8 @@ final class SettingsView {
         order = settings.providerOrder
         hiddenProviderIDs = Set(settings.hiddenProviderIDs ?? [])
         rebuildOrderRows()
+        customizationSettings = settings
+        rebuildMetricCustomizationRows()
         applyingSettings = false
     }
 
@@ -197,5 +263,10 @@ final class SettingsView {
         let known = providers.map(\.id)
         order = order.filter { known.contains($0) } + known.filter { !order.contains($0) }
         rebuildOrderRows()
+    }
+
+    func updateMetricCustomization(_ snapshots: [ProviderUsageSnapshot]) {
+        customizationSnapshots = snapshots
+        rebuildMetricCustomizationRows()
     }
 }

@@ -23,12 +23,20 @@ extension OverviewView {
     }
 
     /// Progress metrics closest to exhaustion, most urgent first.
-    func urgentQuotas(_ snapshots: [ProviderUsageSnapshot])
+    func urgentQuotas(
+        _ snapshots: [ProviderUsageSnapshot],
+        metricLayouts: [String: ProviderMetricLayout]
+    )
         -> [(provider: String, metric: UsageMetric)] {
         snapshots
             .filter { $0.errorMessage == nil }
             .flatMap { snapshot in
-                snapshot.metrics
+                var layout = metricLayouts[snapshot.providerID] ?? .init()
+                layout.reconcile(with: snapshot.metrics)
+                return layout.displayedMetrics(
+                    from: snapshot.metrics,
+                    in: .alwaysVisible
+                )
                     .filter { $0.kind == .progress && $0.fraction != nil }
                     .map { (provider: snapshot.displayName, metric: $0) }
             }

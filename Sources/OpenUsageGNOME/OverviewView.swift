@@ -77,7 +77,8 @@ final class OverviewView {
         snapshots: [ProviderUsageSnapshot],
         isRefreshing: Bool,
         metricPresentationSettings: GNOMEMetricPresentationSettings,
-        density: DensitySetting
+        density: DensitySetting,
+        metricLayouts: [String: ProviderMetricLayout]
     ) {
         self.metricPresentationSettings = metricPresentationSettings
         self.density = density
@@ -99,7 +100,7 @@ final class OverviewView {
         spendGroup.visible = !spend.isEmpty
         renderSpend()
 
-        let urgent = urgentQuotas(snapshots)
+        let urgent = urgentQuotas(snapshots, metricLayouts: metricLayouts)
         urgentGroup.visible = !urgent.isEmpty
         replaceUrgentRows(urgent.map(urgentRow(_:)))
 

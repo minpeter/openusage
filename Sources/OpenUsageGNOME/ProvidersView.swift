@@ -54,7 +54,8 @@ final class ProvidersView {
         snapshots: [ProviderUsageSnapshot],
         isRefreshing: Bool,
         metricPresentationSettings: GNOMEMetricPresentationSettings,
-        density: DensitySetting
+        density: DensitySetting,
+        metricLayouts: [String: ProviderMetricLayout]
     ) {
         self.metricPresentationSettings = metricPresentationSettings
         let densityMetrics = density.metrics
@@ -79,7 +80,8 @@ final class ProvidersView {
             row.update(
                 snapshot: snapshot,
                 metricPresentationSettings: metricPresentationSettings,
-                density: density
+                density: density,
+                metricLayout: metricLayouts[snapshot.providerID] ?? .init()
             )
             if DemoFixtures.expandProviders {
                 row.expander.expanded = true
@@ -111,6 +113,7 @@ private final class ProviderRow {
     private var lastSnapshot: ProviderUsageSnapshot?
     private var lastMetricPresentationSettings: GNOMEMetricPresentationSettings?
     private var lastDensity: DensitySetting?
+    private var lastMetricLayout: ProviderMetricLayout?
     private var densityMetrics = DensitySetting.regular.metrics
     private var connections: [SignalConnection] = []
 
@@ -140,13 +143,15 @@ private final class ProviderRow {
     func update(
         snapshot: ProviderUsageSnapshot,
         metricPresentationSettings: GNOMEMetricPresentationSettings,
-        density: DensitySetting
+        density: DensitySetting,
+        metricLayout: ProviderMetricLayout
     ) {
         refreshedLabel.text = GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
         if let lastSnapshot,
            snapshot.hasSameDisplayContent(as: lastSnapshot),
            metricPresentationSettings == lastMetricPresentationSettings,
-           density == lastDensity
+           density == lastDensity,
+           metricLayout == lastMetricLayout
         {
             self.lastSnapshot = snapshot
             return
@@ -154,6 +159,7 @@ private final class ProviderRow {
         lastSnapshot = snapshot
         lastMetricPresentationSettings = metricPresentationSettings
         lastDensity = density
+        lastMetricLayout = metricLayout
         densityMetrics = density.metrics
         detail.spacing = densityMetrics.sectionSpacing
         detail.setMargins(densityMetrics.sectionSpacing)
@@ -180,7 +186,11 @@ private final class ProviderRow {
             stateIcon.visible = false
         }
 
-        rebuildDetail(snapshot, metricPresentationSettings: metricPresentationSettings)
+        rebuildDetail(
+            snapshot,
+            metricPresentationSettings: metricPresentationSettings,
+            metricLayout: metricLayout
+        )
     }
 
     private func stateSummary(_ snapshot: ProviderUsageSnapshot) -> String {
@@ -191,7 +201,8 @@ private final class ProviderRow {
 
     private func rebuildDetail(
         _ snapshot: ProviderUsageSnapshot,
-        metricPresentationSettings: GNOMEMetricPresentationSettings
+        metricPresentationSettings: GNOMEMetricPresentationSettings,
+        metricLayout: ProviderMetricLayout
     ) {
         connections.forEach { $0.disconnect() }
         connections.removeAll(keepingCapacity: true)
@@ -215,7 +226,12 @@ private final class ProviderRow {
                 icon: "dialog-information-symbolic", cssClass: .warning, message: warning))
         }
 
-        for metric in snapshot.metrics {
+        var reconciledLayout = metricLayout
+        reconciledLayout.reconcile(with: snapshot.metrics)
+        let displayedMetrics =
+            reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .alwaysVisible)
+            + reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .onDemand)
+        for metric in displayedMetrics {
             detail.append(MetricViews.widget(
                 for: metric,
                 providerName: snapshot.displayName,
