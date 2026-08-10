@@ -73,6 +73,20 @@ final class OverviewView {
         onRefresh = handler
     }
 
+    func setShareHandler(
+        _ handler: @escaping @MainActor (BrandedShareCard) -> Void
+    ) {
+        totalSpendView.setShareHandler(handler)
+    }
+
+    func shareCurrentSpend() {
+        totalSpendView.shareCurrent()
+    }
+
+    func selectTotalSpendMetric(_ metric: TotalSpendMetric) {
+        totalSpendView.selectMetric(metric)
+    }
+
     /// Rebuilds the three sections. `snapshots` must already be ordered.
     func update(
         snapshots: [ProviderUsageSnapshot],

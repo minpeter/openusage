@@ -78,7 +78,22 @@ extension DashboardController {
                 comments: "AI subscription usage at a glance, natively on GNOME."
             )
         }
-        retainedActions = [refreshAction, aboutAction]
+        let shareAction = SimpleAction(name: "share-total-spend") { [weak self] in
+            self?.overview.shareCurrentSpend()
+        }
+        let spendRateAction = SimpleAction(name: "spend-cost-per-mtok") { [weak self] in
+            self?.overview.selectTotalSpendMetric(.costPerMillionTokens)
+        }
+        let spendTokensAction = SimpleAction(name: "spend-tokens") { [weak self] in
+            self?.overview.selectTotalSpendMetric(.tokens)
+        }
+        retainedActions = [
+            refreshAction,
+            aboutAction,
+            shareAction,
+            spendRateAction,
+            spendTokensAction,
+        ]
         for action in retainedActions {
             application.addAction(action)
         }

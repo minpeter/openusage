@@ -39,6 +39,7 @@ final class DashboardController {
     var isRefreshing = false
     var refreshTimer: SourceID?
     var breakpoint: Breakpoint?
+    var sharePreviewDialog: Dialog?
     var retainedActions: [SimpleAction] = []
     var connections: [SignalConnection] = []
 

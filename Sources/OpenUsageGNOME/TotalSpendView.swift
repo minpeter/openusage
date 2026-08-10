@@ -22,6 +22,8 @@ final class TotalSpendView {
     )
     private var records: [ProviderSpendRecord] = []
     private var connections: [SignalConnection] = []
+    private var currentProjection: TotalSpendProjection?
+    private var onShare: (BrandedShareCard) -> Void = { _ in }
 
     init() {
         periodRow.setModel(StringList(TotalSpendPeriod.allCases.map(\.label)))
@@ -53,6 +55,14 @@ final class TotalSpendView {
         ringLabel.addCSSClass(.dimLabel)
         root.add(ringLabel)
         root.add(legend)
+        let shareButton = Button(label: "Share PNG", onClicked: { [weak self] in
+            self?.shareCurrent()
+        })
+        shareButton.addCSSClass(.suggestedAction)
+        shareButton.addCSSClass(.pill)
+        shareButton.halign = GTK_ALIGN_CENTER
+        shareButton.setAccessibleLabel("Export and open branded share PNG")
+        root.add(shareButton)
 
         connections.append(periodRow.onNotify(.selected) { [weak self] in
             self?.render()
@@ -68,6 +78,31 @@ final class TotalSpendView {
         render()
     }
 
+    func setShareHandler(
+        _ handler: @escaping @MainActor (BrandedShareCard) -> Void
+    ) {
+        onShare = handler
+    }
+
+    func shareCurrent() {
+        guard let currentProjection else { return }
+        onShare(BrandedShareCard(
+            projection: currentProjection,
+            generatedAt: Date()
+        ))
+    }
+
+    func selectMetric(_ metric: TotalSpendMetric) {
+        switch metric {
+        case .cost:
+            metricRow.selected = 0
+        case .costPerMillionTokens:
+            metricRow.selected = 1
+        case .tokens:
+            metricRow.selected = 2
+        }
+    }
+
     private func render() {
         let period = TotalSpendPeriod.allCases[
             min(max(periodRow.selected, 0), TotalSpendPeriod.allCases.count - 1)
@@ -80,6 +115,7 @@ final class TotalSpendView {
             metric: metric,
             period: period
         )
+        currentProjection = projection.slices.isEmpty ? nil : projection
         centerValue.text = format(projection.total, metric: metric)
         centerCaption.text = metric.label
         ringLabel.text = "\(metric.label) provider share ring"
