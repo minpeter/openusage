@@ -205,6 +205,63 @@ public struct LinuxSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Storage for a versioned JSON document that is moving away from a path previously shared with
+/// another schema. Migration is copy-only: the legacy file remains owned by its original store.
+/// Existing destination or legacy bytes must decode before a save can claim or replace the file.
+public struct VersionedJSONSettingsStorage: Sendable {
+    public static var maximumDocumentBytes: Int { 1_048_576 }
+
+    public let fileURL: URL
+    public let legacyFileURL: URL?
+
+    public init(fileURL: URL, legacyFileURL: URL? = nil) {
+        self.fileURL = fileURL
+        self.legacyFileURL = legacyFileURL
+    }
+
+    public func loadMigratingLegacy<Document: Codable>(_ type: Document.Type) throws -> Document? {
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            return try decode(type, from: fileURL)
+        }
+        guard let legacyFileURL, FileManager.default.fileExists(atPath: legacyFileURL.path) else {
+            return nil
+        }
+
+        let document = try decode(type, from: legacyFileURL)
+        try write(document)
+        return document
+    }
+
+    public func save<Document: Codable>(_ document: Document) throws {
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            _ = try decode(Document.self, from: fileURL)
+        } else if let legacyFileURL, FileManager.default.fileExists(atPath: legacyFileURL.path) {
+            _ = try decode(Document.self, from: legacyFileURL)
+        }
+        try write(document)
+    }
+
+    private func decode<Document: Decodable>(_ type: Document.Type, from url: URL) throws -> Document {
+        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        guard data.count <= Self.maximumDocumentBytes else { throw LinuxSettingsError.documentTooLarge }
+        return try JSONDecoder().decode(type, from: data)
+    }
+
+    private func write<Document: Encodable>(_ document: Document) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(document)
+        guard data.count <= Self.maximumDocumentBytes else { throw LinuxSettingsError.documentTooLarge }
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try data.write(to: fileURL, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    }
+}
+
 public protocol LinuxSettingsStorage: Sendable {
     func load() throws -> LinuxSettings?
     func save(_ settings: LinuxSettings) throws

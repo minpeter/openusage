@@ -89,4 +89,80 @@ struct LinuxSettingsServiceTests {
             try LinuxSettings.decode(data)
         }
     }
+
+    @Test("A versioned store migrates once and persists across production restarts")
+    func versionedStoreMigratesAndPersistsAcrossRestarts() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let legacyURL = root.appendingPathComponent("settings.json")
+        let destinationURL = root.appendingPathComponent("gnome-settings.json")
+        let account = LinuxProviderInstanceID(providerID: "claude", accountInstanceID: "work")
+        var original = LinuxSettings(providerOrder: [account], appearance: .dark)
+        original.setVisible(false, for: account)
+        let legacyBytes = try JSONEncoder().encode(original)
+        try legacyBytes.write(to: legacyURL)
+
+        let firstProcess = VersionedJSONSettingsStorage(
+            fileURL: destinationURL,
+            legacyFileURL: legacyURL
+        )
+        let migrated = try #require(try firstProcess.loadMigratingLegacy(LinuxSettings.self))
+        #expect(migrated == original)
+        #expect(try Data(contentsOf: legacyURL) == legacyBytes)
+
+        var changed = migrated
+        changed.setCustomLabel("Work", for: account)
+        try firstProcess.save(changed)
+
+        let restartedProcess = VersionedJSONSettingsStorage(
+            fileURL: destinationURL,
+            legacyFileURL: legacyURL
+        )
+        #expect(try restartedProcess.loadMigratingLegacy(LinuxSettings.self) == changed)
+        #expect(try Data(contentsOf: legacyURL) == legacyBytes)
+    }
+
+    @Test("An incompatible legacy schema is preserved and never claimed")
+    func incompatibleLegacySchemaIsPreserved() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let legacyURL = root.appendingPathComponent("settings.json")
+        let destinationURL = root.appendingPathComponent("gnome-settings.json")
+        let futureBytes = Data(#"{"schemaVersion":999,"providerInstances":[{"future":true}]}"#.utf8)
+        try futureBytes.write(to: legacyURL)
+        let storage = VersionedJSONSettingsStorage(
+            fileURL: destinationURL,
+            legacyFileURL: legacyURL
+        )
+
+        #expect(throws: LinuxSettingsError.unsupportedSchema(999)) {
+            try storage.loadMigratingLegacy(LinuxSettings.self)
+        }
+        #expect(throws: LinuxSettingsError.unsupportedSchema(999)) {
+            try storage.save(LinuxSettings())
+        }
+        #expect(try Data(contentsOf: legacyURL) == futureBytes)
+        #expect(!FileManager.default.fileExists(atPath: destinationURL.path))
+    }
+
+    @Test("Malformed owned documents survive failed loads and saves byte for byte")
+    func malformedOwnedDocumentIsPreserved() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let destinationURL = root.appendingPathComponent("gnome-settings.json")
+        let malformedBytes = Data(#"{"schemaVersion":1,"providerOrder":["#.utf8)
+        try malformedBytes.write(to: destinationURL)
+        let storage = VersionedJSONSettingsStorage(fileURL: destinationURL)
+
+        #expect(throws: (any Error).self) {
+            try storage.loadMigratingLegacy(LinuxSettings.self)
+        }
+        #expect(throws: (any Error).self) {
+            try storage.save(LinuxSettings())
+        }
+        #expect(try Data(contentsOf: destinationURL) == malformedBytes)
+    }
 }
