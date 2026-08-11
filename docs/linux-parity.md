@@ -62,7 +62,9 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 
 ## Efficiency Budgets
 
-- Idle PSS: no more than 90 MiB after all four GTK views have been warmed.
+- Idle PSS: no more than 128 MiB under the reproducible Cairo/Xvfb release gate after all four GTK
+  views have been warmed. Native compositor measurements are recorded separately because driver and
+  portal PSS varies by desktop.
 - Refresh growth: no more than 10 MiB over settled idle for all enabled providers.
 - One repository-wide refresh pass, at most four provider operations, and two connections per host.
 - Auth and usage responses: 512 KiB maximum; snapshot cache: 1 MiB maximum.

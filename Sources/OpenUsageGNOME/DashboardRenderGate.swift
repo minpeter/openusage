@@ -1,5 +1,11 @@
 import OpenUsageLinuxCore
 
+enum DashboardRenderChange: Equatable {
+    case none
+    case loading
+    case content
+}
+
 struct DashboardRenderGate {
     private struct State: Equatable {
         let snapshots: [ProviderUsageSnapshot]
@@ -23,13 +29,34 @@ struct DashboardRenderGate {
         settings: GNOMESettings,
         isRefreshing: Bool
     ) -> Bool {
+        consumeChange(
+            snapshots: snapshots,
+            settings: settings,
+            isRefreshing: isRefreshing
+        ) != .none
+    }
+
+    mutating func consumeChange(
+        snapshots: [ProviderUsageSnapshot],
+        settings: GNOMESettings,
+        isRefreshing: Bool
+    ) -> DashboardRenderChange {
         let next = State(
             snapshots: snapshots,
             settings: settings,
             isRefreshing: isRefreshing
         )
-        guard next != last else { return false }
+        guard next != last else { return .none }
+        let change: DashboardRenderChange
+        if let last,
+           last.snapshots == next.snapshots,
+           last.settings == next.settings
+        {
+            change = .loading
+        } else {
+            change = .content
+        }
         last = next
-        return true
+        return change
     }
 }

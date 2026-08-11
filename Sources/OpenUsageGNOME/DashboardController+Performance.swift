@@ -1,6 +1,12 @@
 import Foundation
 import OpenUsageLinuxCore
 
+enum GTKPerformanceProbeScenario {
+    static func refreshingStates(sampleCount: Int) -> [Bool] {
+        (0..<sampleCount).map { $0.isMultiple(of: 2) }
+    }
+}
+
 extension DashboardController {
     func runPerformanceProbe() {
         guard DemoFixtures.isEnabled,
@@ -15,13 +21,24 @@ extension DashboardController {
                 snapshots = DemoFixtures.snapshots()
             }
             applySnapshots()
+            for index in 0..<100 {
+                stack.visibleChildName =
+                    Self.pageOrder[index % Self.pageOrder.count].name
+            }
+            stack.visibleChildName = Self.pageOrder[0].name
             let memory = LinuxProcessMemoryProbe()
             let idlePSS = try memory.readPSSBytes()
             let clock = ContinuousClock()
             var durations: [Double] = []
             durations.reserveCapacity(100)
-            for _ in 0..<100 {
+            let states = GTKPerformanceProbeScenario.refreshingStates(
+                sampleCount: 100
+            )
+            for (index, refreshing) in states.enumerated() {
                 let started = clock.now
+                isRefreshing = refreshing
+                stack.visibleChildName =
+                    Self.pageOrder[index % Self.pageOrder.count].name
                 applySnapshots()
                 let components = started.duration(to: clock.now).components
                 durations.append(
@@ -29,6 +46,11 @@ extension DashboardController {
                         + Double(components.attoseconds) / 1_000_000_000_000_000
                 )
             }
+            isRefreshing = false
+            stack.visibleChildName = Self.pageOrder[0].name
+            applySnapshots()
+            window.visible = false
+            window.present()
             let report = LinuxRuntimePerformanceReport(
                 idlePSSBytes: idlePSS,
                 finalPSSBytes: try memory.readPSSBytes(),
@@ -40,10 +62,15 @@ extension DashboardController {
                 to: URL(fileURLWithPath: receiptPath),
                 options: .atomic
             )
-            GNOMEAppLog.info(
-                "Performance probe completed: p95 "
-                    + "\(report.updateP95Milliseconds) ms, growth \(report.growthBytes) bytes"
-            )
+            let message = "Performance probe completed: p95 "
+                + "\(report.updateP95Milliseconds) ms, "
+                + "growth \(report.growthBytes) bytes, "
+                + "idle \(report.idlePSSBytes) bytes"
+            if report.passes {
+                GNOMEAppLog.info(message)
+            } else {
+                GNOMEAppLog.error(message)
+            }
         } catch {
             GNOMEAppLog.error(
                 "Performance probe failed: \(error.localizedDescription)"

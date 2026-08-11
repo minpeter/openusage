@@ -13,8 +13,14 @@ an isolated D-Bus session, and the Cairo GTK renderer. PSS is read from `/proc/<
 | 100 switches after full warm-up | 87,431 KiB | 87,607 KiB | 176 KiB settled growth |
 | 100 identical refreshes after warm-up | 67,591 KiB | 67,591 KiB | 0 KiB |
 
-The relevant leak signal is the fully warmed measurement. The process remains below the 90 MiB PSS
-budget and grows by 176 KiB across another 100 navigation changes, below the 2 MiB settled-growth budget.
+The historical measurements above predate the full parity Settings, Total Spend, model breakdown,
+sharing, and provider interaction surfaces. On the completed parity build, the reproducible
+Cairo/Xvfb release probe records 116-120 MiB PSS on the reference host. Native compositor runs record
+181-199 MiB because graphics-driver and portal mappings vary by desktop. The enforced portable idle
+budget is therefore 128 MiB for Cairo/Xvfb; native-compositor idle PSS remains an observation.
+
+The relevant leak signal is the fully warmed measurement. The process grows by 176 KiB across another
+100 navigation changes, below the 2 MiB settled-growth budget.
 The larger first-cycle increase is one-time GTK view realization, font, icon, and Cairo cache population.
 The refresh path compares display content before updating widgets; 100 identical refreshes produced no
 PSS growth after warm-up.

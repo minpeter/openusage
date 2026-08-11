@@ -54,7 +54,9 @@ jobs:
             libglib2.0-dev \
             libgtk-4-dev \
             pkg-config \
-            python3-yaml
+            python3-yaml \
+            xdotool \
+            xvfb
 
       - name: Validate Linux packaging
         run: ./scripts/validate-flatpak.sh
@@ -67,3 +69,6 @@ jobs:
 
       - name: Build Linux release
         run: swift build -c release --disable-automatic-resolution --disable-prefetching
+
+      - name: Verify Linux runtime performance
+        run: ./scripts/verify-linux-performance.sh

@@ -109,11 +109,29 @@ extension DashboardController {
             }
             settingsView.updateProviders(providers)
         }
-        guard renderGate.consume(
+        let renderChange = renderGate.consumeChange(
             snapshots: visible,
             settings: settings,
             isRefreshing: isRefreshing
-        ) else {
+        )
+        guard renderChange != .none else {
+            return
+        }
+        if renderChange == .loading {
+            if visible.isEmpty {
+                overview.update(
+                    snapshots: visible,
+                    isRefreshing: isRefreshing,
+                    metricPresentationSettings:
+                        settings.metricPresentationSettings,
+                    density: settings.density,
+                    metricLayouts: settings.metricLayouts
+                )
+            }
+            updateToolbarSummary(
+                snapshots: visible,
+                isRefreshing: isRefreshing
+            )
             return
         }
         overview.update(

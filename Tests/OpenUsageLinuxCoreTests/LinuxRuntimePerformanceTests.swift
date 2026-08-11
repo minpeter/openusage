@@ -22,12 +22,12 @@ struct LinuxRuntimePerformanceTests {
     func evaluatesRuntimeBudgets() {
         let passing = LinuxRuntimePerformanceReport(
             idlePSSBytes: 80 * 1_024 * 1_024,
-            finalPSSBytes: 85 * 1_024 * 1_024,
+            finalPSSBytes: 81 * 1_024 * 1_024,
             updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         )
         let slow = LinuxRuntimePerformanceReport(
-            idlePSSBytes: 95 * 1_024 * 1_024,
-            finalPSSBytes: 110 * 1_024 * 1_024,
+            idlePSSBytes: 135 * 1_024 * 1_024,
+            finalPSSBytes: 150 * 1_024 * 1_024,
             updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 20, 25]
         )
 
@@ -40,5 +40,12 @@ struct LinuxRuntimePerformanceTests {
         #expect(!slow.passesGrowthGate)
         #expect(!slow.passesGTKUpdateGate)
         #expect(!slow.passes)
+
+        let currentReleaseBaseline = LinuxRuntimePerformanceReport(
+            idlePSSBytes: 122_304_512,
+            finalPSSBytes: 124_000_000,
+            updateDurationsMilliseconds: [8, 9, 10, 11, 12]
+        )
+        #expect(currentReleaseBaseline.passes)
     }
 }

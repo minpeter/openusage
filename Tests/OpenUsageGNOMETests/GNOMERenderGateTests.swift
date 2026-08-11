@@ -73,4 +73,32 @@ struct GNOMERenderGateTests {
         #expect(!duplicate)
         #expect(hiddenRemoved)
     }
+
+    @Test("Performance samples alternate real GTK loading states")
+    func performanceStatesAreDistinct() {
+        #expect(
+            GTKPerformanceProbeScenario.refreshingStates(sampleCount: 6)
+                == [true, false, true, false, true, false]
+        )
+    }
+
+    @Test("Loading-only changes do not rebuild content views")
+    func classifiesLoadingOnlyChanges() {
+        var gate = DashboardRenderGate()
+        let settings = GNOMESettings()
+
+        let initial = gate.consumeChange(
+            snapshots: [snapshot],
+            settings: settings,
+            isRefreshing: false
+        )
+        let loading = gate.consumeChange(
+            snapshots: [snapshot],
+            settings: settings,
+            isRefreshing: true
+        )
+
+        #expect(initial == .content)
+        #expect(loading == .loading)
+    }
 }

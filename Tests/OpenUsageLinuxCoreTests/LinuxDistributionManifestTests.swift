@@ -62,5 +62,6 @@ struct LinuxDistributionManifestTests {
         #expect(workflow.contains(
             "swift build -c release --disable-automatic-resolution --disable-prefetching"
         ))
+        #expect(workflow.contains("./scripts/verify-linux-performance.sh"))
     }
 }
