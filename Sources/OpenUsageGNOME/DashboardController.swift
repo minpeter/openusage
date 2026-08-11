@@ -27,7 +27,7 @@ final class DashboardController {
 
     let repository = LinuxUsageRepository()
     let settingsStore = GNOMESettingsStore()
-    let apiKeyManager = LinuxAPIKeyManager()
+    let apiKeyOperations = APIKeyOperationCoordinator()
     let analyticsClient: LinuxAnalyticsClient
     let launchAtLoginService: LinuxLaunchAtLoginService
     var settings: GNOMESettings
@@ -38,6 +38,8 @@ final class DashboardController {
     var snapshots: [ProviderUsageSnapshot] = []
     var lastGoodByInstance: [String: ProviderUsageSnapshot] = [:]
     var isRefreshing = false
+    var credentialRefreshPending = false
+    var apiKeyRevisions: [ManagedAPIKeyProvider: UInt64] = [:]
     var refreshTimer: SourceID?
     var breakpoint: Breakpoint?
     var sharePreviewDialog: Dialog?

@@ -4,23 +4,22 @@ import OpenUsageLinuxCore
 
 extension DashboardController {
     func refreshAPIKeyStatuses() {
-        let manager = apiKeyManager
-        let callback = DashboardCallback(self)
-        Task.detached {
-            let statuses = ManagedAPIKeyProvider.allCases.map { provider in
-                do {
-                    return (
-                        provider,
-                        try manager.hasStoredKey(for: provider)
-                            ? "Stored"
-                            : "Not Stored"
+        for provider in ManagedAPIKeyProvider.allCases {
+            let revision = nextAPIKeyRevision(for: provider)
+            let operations = apiKeyOperations
+            let callback = DashboardCallback(self)
+            Task.detached {
+                let result = await operations.status(
+                    for: provider,
+                    revision: revision
+                )
+                scheduleOnGTK {
+                    callback.finishAPIKeyOperation(
+                        provider: provider,
+                        revision: revision,
+                        result: result
                     )
-                } catch {
-                    return (provider, "Secret Service Unavailable")
                 }
-            }
-            scheduleOnGTK {
-                callback.applyAPIKeyStatuses(statuses)
             }
         }
     }
@@ -29,83 +28,98 @@ extension DashboardController {
         _ value: String,
         for provider: ManagedAPIKeyProvider
     ) {
-        let manager = apiKeyManager
+        let revision = nextAPIKeyRevision(for: provider)
+        settingsView.updateAPIKeyStatus(provider, text: "Saving…")
+        let operations = apiKeyOperations
         let callback = DashboardCallback(self)
         Task.detached {
-            let error: String?
-            do {
-                try manager.store(value, for: provider)
-                error = nil
-            } catch let caught {
-                error = caught.localizedDescription
-            }
+            let result = await operations.store(
+                value,
+                for: provider,
+                revision: revision
+            )
             scheduleOnGTK {
-                callback.finishAPIKeyStore(provider: provider, error: error)
+                callback.finishAPIKeyOperation(
+                    provider: provider,
+                    revision: revision,
+                    result: result
+                )
             }
         }
     }
 
     func clearAPIKey(for provider: ManagedAPIKeyProvider) {
-        let manager = apiKeyManager
+        let revision = nextAPIKeyRevision(for: provider)
+        settingsView.updateAPIKeyStatus(provider, text: "Clearing…")
+        let operations = apiKeyOperations
         let callback = DashboardCallback(self)
         Task.detached {
-            let error: String?
-            do {
-                try manager.clear(provider)
-                error = nil
-            } catch let caught {
-                error = caught.localizedDescription
-            }
+            let result = await operations.clear(
+                provider,
+                revision: revision
+            )
             scheduleOnGTK {
-                callback.finishAPIKeyClear(provider: provider, error: error)
+                callback.finishAPIKeyOperation(
+                    provider: provider,
+                    revision: revision,
+                    result: result
+                )
             }
         }
     }
 
-    func applyAPIKeyStatuses(
-        _ statuses: [(ManagedAPIKeyProvider, String)]
-    ) {
-        for (provider, status) in statuses {
-            settingsView.updateAPIKeyStatus(provider, text: status)
-        }
-    }
-
-    func finishAPIKeyStore(
+    func finishAPIKeyOperation(
         provider: ManagedAPIKeyProvider,
-        error: String?
+        revision: UInt64,
+        result: APIKeyOperationResult
     ) {
-        guard let error else {
+        guard apiKeyRevisions[provider] == revision else { return }
+        switch result {
+        case .status(let status):
+            settingsView.updateAPIKeyStatus(provider, text: status)
+        case .stored:
             GNOMEAppLog.info("Stored \(provider.providerID) API key in Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Stored")
             toastOverlay.addToast(Toast(
                 title: "\(provider.displayName) API key saved"
             ))
-            return
-        }
-        GNOMEAppLog.warning("Could not store \(provider.providerID) API key: \(error)")
-        toastOverlay.addToast(Toast(
-            title: "Could not save \(provider.displayName) API key: \(error)"
-        ))
-    }
-
-    func finishAPIKeyClear(
-        provider: ManagedAPIKeyProvider,
-        error: String?
-    ) {
-        guard let error else {
+            requestCredentialRefresh()
+        case .cleared:
             GNOMEAppLog.info("Cleared \(provider.providerID) API key from Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Not Stored")
             toastOverlay.addToast(Toast(
                 title: "\(provider.displayName) API key cleared"
             ))
-            return
+            requestCredentialRefresh()
+        case .failed(let error):
+            GNOMEAppLog.warning(
+                "API key operation failed for \(provider.providerID): \(error)"
+            )
+            toastOverlay.addToast(Toast(
+                title: "\(provider.displayName) API key update failed: \(error)"
+            ))
+            refreshAPIKeyStatuses()
+        case .stale:
+            break
         }
-        GNOMEAppLog.warning("Could not clear \(provider.providerID) API key: \(error)")
-        toastOverlay.addToast(Toast(
-            title: "Could not clear \(provider.displayName) API key: \(error)"
-        ))
+    }
+
+    private func nextAPIKeyRevision(
+        for provider: ManagedAPIKeyProvider
+    ) -> UInt64 {
+        let revision = (apiKeyRevisions[provider] ?? 0) + 1
+        apiKeyRevisions[provider] = revision
+        return revision
+    }
+
+    private func requestCredentialRefresh() {
+        if isRefreshing {
+            credentialRefreshPending = true
+        } else {
+            refresh()
+        }
     }
 
     static var qaAPIKeyProvider: ManagedAPIKeyProvider? {

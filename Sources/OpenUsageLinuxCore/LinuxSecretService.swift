@@ -160,7 +160,7 @@ public struct SecretServiceAPIKeySource: ProviderAPIKeySource {
     }
 }
 
-public enum ManagedAPIKeyProvider: String, CaseIterable, Sendable {
+public enum ManagedAPIKeyProvider: String, CaseIterable, Hashable, Sendable {
     case openRouter
     case zai
 

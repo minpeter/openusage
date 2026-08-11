@@ -183,6 +183,10 @@ extension DashboardController {
                 )
             }
         }
+        if credentialRefreshPending {
+            credentialRefreshPending = false
+            refresh()
+        }
     }
 
     func recordAnalyticsIfNeeded() {
@@ -239,26 +243,16 @@ final class DashboardCallback: @unchecked Sendable {
     }
 
     @MainActor
-    func applyAPIKeyStatuses(
-        _ statuses: [(ManagedAPIKeyProvider, String)]
-    ) {
-        controller?.applyAPIKeyStatuses(statuses)
-    }
-
-    @MainActor
-    func finishAPIKeyStore(
+    func finishAPIKeyOperation(
         provider: ManagedAPIKeyProvider,
-        error: String?
+        revision: UInt64,
+        result: APIKeyOperationResult
     ) {
-        controller?.finishAPIKeyStore(provider: provider, error: error)
-    }
-
-    @MainActor
-    func finishAPIKeyClear(
-        provider: ManagedAPIKeyProvider,
-        error: String?
-    ) {
-        controller?.finishAPIKeyClear(provider: provider, error: error)
+        controller?.finishAPIKeyOperation(
+            provider: provider,
+            revision: revision,
+            result: result
+        )
     }
 
     func presentWindow() async {
