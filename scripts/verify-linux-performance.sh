@@ -9,7 +9,8 @@ root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 mkdir -p "$root/home" "$root/config" "$root/cache" "$root/receipt"
 
-xvfb-run -a dbus-run-session -- bash -euo pipefail -c '
+xvfb-run -a dbus-run-session -- bash -euo pipefail -s -- \
+  "$root" "$app" <<'BASH'
   root=$1
   app=$2
   export HOME="$root/home"
@@ -31,7 +32,7 @@ xvfb-run -a dbus-run-session -- bash -euo pipefail -c '
   gapplication action io.github.minpeter.OpenUsage run-performance-probe
   test -s "$OPENUSAGE_PERFORMANCE_RECEIPT"
 
-  python3 - "$OPENUSAGE_PERFORMANCE_RECEIPT" <<"PY"
+  python3 - "$OPENUSAGE_PERFORMANCE_RECEIPT" <<'PY'
 import json
 import math
 import sys
@@ -57,4 +58,4 @@ print(
     f"growth={growth} p95_ms={p95}"
 )
 PY
-' verify-linux-performance "$root" "$app"
+BASH
