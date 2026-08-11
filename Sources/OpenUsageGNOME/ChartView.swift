@@ -11,7 +11,7 @@ import OpenUsageLinuxCore
 @MainActor
 struct ChartView {
     static let maximumPoints = 31
-    static let height = 148
+    static let height = 120
 
     let widget: DrawingArea
 

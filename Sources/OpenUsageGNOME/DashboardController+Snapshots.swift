@@ -23,7 +23,6 @@ extension DashboardController {
             density: settings.density,
             metricLayouts: settings.metricLayouts
         )
-        updateToolbarSummary(snapshots: visible, isRefreshing: true)
 
         let repository = repository
         let callback = DashboardCallback(self)
@@ -128,10 +127,6 @@ extension DashboardController {
                     metricLayouts: settings.metricLayouts
                 )
             }
-            updateToolbarSummary(
-                snapshots: visible,
-                isRefreshing: isRefreshing
-            )
             return
         }
         overview.update(
@@ -149,7 +144,6 @@ extension DashboardController {
             metricLayouts: settings.metricLayouts
         )
         historyView.update(snapshots: visible)
-        updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)
         updateTrayUsage(visible)
         settingsView.updateMetricCustomization(visible)
     }

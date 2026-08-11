@@ -9,7 +9,7 @@ import OpenUsageLinuxCore
 /// provider-ordering group live in SettingsView+*.swift.
 @MainActor
 final class SettingsView {
-    let root: ScrolledWindow
+    let root: Box
 
     var onAppearanceChanged: (GNOMESettings.Appearance) -> Void = { _ in }
     var onTrayUsageDisplayModeChanged: (TrayUsageDisplayMode) -> Void = { _ in }
@@ -44,7 +44,13 @@ final class SettingsView {
     var onLogLevelChanged: (LinuxLogLevel) -> Void = { _ in }
     var onOpenLog: () -> Void = {}
 
-    private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
+    private let pageStack = ViewStack()
+    private let pageSwitcher = ViewSwitcher()
+    let pageHeader = Box(
+        orientation: GTK_ORIENTATION_VERTICAL,
+        spacing: GNOMEStyle.sectionSpacing
+    )
+    private(set) var pageContents: [Box] = []
     let appearanceRow: ComboRow
     let trayUsageDisplayRow: ComboRow
     let menuBarStyleRow: ComboRow
@@ -103,11 +109,8 @@ final class SettingsView {
         defaultSyncPath: String,
         version: String
     ) {
-        root = ScrolledWindow()
+        root = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
         self.defaultSyncPath = defaultSyncPath
-        root.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
-        root.kineticScrolling = true
-        content.setMargins(GNOMEStyle.outerMargin)
         syncDirectoryRow = ActionRow(
             title: "Sync Directory",
             subtitle: settings.syncDirectoryPath ?? defaultSyncPath
@@ -236,21 +239,28 @@ final class SettingsView {
             orientation: GTK_ORIENTATION_HORIZONTAL,
             spacing: GNOMEStyle.controlSpacing
         )
-        syncDirectoryActions.append(Button(label: "Choose…", onClicked: { [weak self] in
+        syncDirectoryActions.addCSSClass(.linked)
+        let chooseSyncDirectory = Button(label: "Choose…", onClicked: { [weak self] in
             self?.onSyncDirectoryRequested()
-        }))
-        syncDirectoryActions.append(Button(label: "Default", onClicked: { [weak self] in
+        })
+        chooseSyncDirectory.addCSSClass(.flat)
+        syncDirectoryActions.append(chooseSyncDirectory)
+        let resetSyncDirectory = Button(label: "Default", onClicked: { [weak self] in
             self?.onSyncDirectoryReset()
-        }))
+        })
+        resetSyncDirectory.addCSSClass(.flat)
+        syncDirectoryActions.append(resetSyncDirectory)
         syncDirectoryRow.addSuffix(syncDirectoryActions)
         privacyGroup.add(syncDirectoryRow)
         let importRow = ActionRow(
             title: "Import Usage",
             subtitle: "Load a JSON usage export into the local snapshot cache."
         )
-        importRow.addSuffix(Button(label: "Import…", onClicked: { [weak self] in
+        let importButton = Button(label: "Import…", onClicked: { [weak self] in
             self?.onImportRequested()
-        }))
+        })
+        importButton.addCSSClass(.flat)
+        importRow.addSuffix(importButton)
         privacyGroup.add(importRow)
         let exportRow = ActionRow(
             title: "Export Usage",
@@ -260,12 +270,17 @@ final class SettingsView {
             orientation: GTK_ORIENTATION_HORIZONTAL,
             spacing: GNOMEStyle.controlSpacing
         )
-        exportActions.append(Button(label: "JSON", onClicked: { [weak self] in
+        exportActions.addCSSClass(.linked)
+        let exportJSON = Button(label: "JSON", onClicked: { [weak self] in
             self?.onExportRequested(.json)
-        }))
-        exportActions.append(Button(label: "CSV", onClicked: { [weak self] in
+        })
+        exportJSON.addCSSClass(.flat)
+        exportActions.append(exportJSON)
+        let exportCSV = Button(label: "CSV", onClicked: { [weak self] in
             self?.onExportRequested(.csv)
-        }))
+        })
+        exportCSV.addCSSClass(.flat)
+        exportActions.append(exportCSV)
         exportRow.addSuffix(exportActions)
         privacyGroup.add(exportRow)
 
@@ -350,28 +365,69 @@ final class SettingsView {
         let aboutGroup = PreferencesGroup(title: "About")
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
 
-        content.append(appearanceGroup)
-        content.append(panelIndicatorGroup)
-        content.append(displayGroup)
-        content.append(notificationGroup)
-        content.append(refreshGroup)
-        content.append(startupGroup)
-        content.append(orderGroup)
-        content.append(metricCustomizationGroup)
-        content.append(apiGroup)
-        content.append(shortcutsGroup)
-        content.append(privacyGroup)
-        content.append(apiKeyGroup)
-        content.append(proxyGroup)
-        content.append(advancedGroup)
-        content.append(updateGroup)
-        content.append(aboutGroup)
+        pageHeader.setMargins(GNOMEStyle.outerMargin)
+        pageHeader.marginBottom = GNOMEStyle.rowSpacing
+        pageHeader.append(GNOMEStyle.pageHeader(
+            title: "Settings",
+            description: "Control refresh, presentation, providers, and local data."
+        ))
+        pageSwitcher.stack = pageStack
+        pageSwitcher.policy = .narrow
+        pageSwitcher.halign = GTK_ALIGN_CENTER
+        pageHeader.append(pageSwitcher)
+        root.append(pageHeader)
 
-        let clamp = Clamp()
-        clamp.maximumSize = GNOMEStyle.contentClamp
-        clamp.tighteningThreshold = GNOMEStyle.clampTightening
-        clamp.child = content
-        root.child = clamp
+        let generalPage = page(containing: [
+            refreshGroup,
+            notificationGroup,
+            startupGroup,
+            apiGroup,
+            shortcutsGroup,
+            aboutGroup,
+        ])
+        let displayPage = page(containing: [
+            appearanceGroup,
+            panelIndicatorGroup,
+            displayGroup,
+        ])
+        let providersPage = page(containing: [
+            orderGroup,
+            metricCustomizationGroup,
+        ])
+        let dataPage = page(containing: [
+            privacyGroup,
+            apiKeyGroup,
+            proxyGroup,
+            advancedGroup,
+            updateGroup,
+        ])
+
+        pageStack.addTitledWithIcon(
+            generalPage,
+            name: "general",
+            title: "General",
+            iconName: "preferences-system-symbolic"
+        )
+        pageStack.addTitledWithIcon(
+            displayPage,
+            name: "display",
+            title: "Display",
+            iconName: "video-display-symbolic"
+        )
+        pageStack.addTitledWithIcon(
+            providersPage,
+            name: "providers",
+            title: "Providers",
+            iconName: "system-users-symbolic"
+        )
+        pageStack.addTitledWithIcon(
+            dataPage,
+            name: "data",
+            title: "Data",
+            iconName: "folder-symbolic"
+        )
+        pageStack.vexpand = true
+        root.append(pageStack)
 
         wireSignals()
         apply(settings: settings)
@@ -448,7 +504,37 @@ final class SettingsView {
     }
 
     func revealDataSettings() {
+        pageStack.visibleChildName = "data"
         _ = proxyEnabledRow.grabFocus()
+    }
+
+    func selectPage(_ name: String) {
+        guard ["general", "display", "providers", "data"].contains(name) else {
+            return
+        }
+        pageStack.visibleChildName = name
+    }
+
+    private func page(containing groups: [Widget]) -> ScrolledWindow {
+        let content = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.sectionSpacing
+        )
+        content.setMargins(GNOMEStyle.outerMargin)
+        content.marginTop = GNOMEStyle.rowSpacing
+        groups.forEach(content.append)
+        pageContents.append(content)
+
+        let clamp = Clamp()
+        clamp.maximumSize = GNOMEStyle.contentClamp
+        clamp.tighteningThreshold = GNOMEStyle.clampTightening
+        clamp.child = content
+
+        let scroll = ScrolledWindow()
+        scroll.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
+        scroll.kineticScrolling = true
+        scroll.child = clamp
+        return scroll
     }
 
     private func addAPIKeyRow(
@@ -458,18 +544,11 @@ final class SettingsView {
     ) {
         status.addCSSClass(.caption)
         row.addSuffix(status)
-        let actions = Box(
-            orientation: GTK_ORIENTATION_HORIZONTAL,
-            spacing: GNOMEStyle.controlSpacing
-        )
-        actions.append(Button(label: "Save", onClicked: { [weak self, weak row] in
-            guard let row else { return }
-            self?.onAPIKeySave(provider, row.text)
-        }))
-        actions.append(Button(label: "Clear", onClicked: { [weak self] in
+        let clear = Button(label: "Clear", onClicked: { [weak self] in
             self?.onAPIKeyClear(provider)
-        }))
-        row.addSuffix(actions)
+        })
+        clear.addCSSClass(.flat)
+        row.addSuffix(clear)
         row.onApply { [weak self, weak row] in
             guard let row else { return }
             self?.onAPIKeySave(provider, row.text)

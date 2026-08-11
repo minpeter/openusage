@@ -10,6 +10,7 @@ enum DemoFixtures {
 
     static let environmentFlag = "OPENUSAGE_DEMO_DATA"
     static let pageFlag = "OPENUSAGE_DEMO_PAGE"
+    static let settingsPageFlag = "OPENUSAGE_DEMO_SETTINGS_PAGE"
     static let sizeFlag = "OPENUSAGE_DEMO_SIZE"
     static let expandFlag = "OPENUSAGE_DEMO_EXPAND"
     static let allProvidersFlag = "OPENUSAGE_DEMO_ALL_PROVIDERS"
@@ -21,6 +22,10 @@ enum DemoFixtures {
     /// Optional initial page override for capturing a specific view.
     static var requestedPage: String? {
         ProcessInfo.processInfo.environment[pageFlag]?.nilIfEmpty
+    }
+
+    static var requestedSettingsPage: String? {
+        ProcessInfo.processInfo.environment[settingsPageFlag]?.nilIfEmpty
     }
 
     /// When set, provider rows render pre-expanded for metric-shape shots.

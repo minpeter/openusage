@@ -39,21 +39,12 @@ extension SettingsView {
                 self.onProviderVisibilityChanged(id, row.active)
             })
 
-            let controls = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: 0)
-            controls.addCSSClass(.linked)
-            controls.valign = GTK_ALIGN_CENTER
-
-            let up = Button(icon: .goUp, onClicked: { [weak self] in self?.move(id, by: -1) })
-            up.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
-            up.sensitive = index > 0
-            up.setAccessibleLabel("Move \(providerNames[id] ?? id) up")
-            let down = Button(icon: .goDown, onClicked: { [weak self] in self?.move(id, by: 1) })
-            down.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
-            down.sensitive = index < order.count - 1
-            down.setAccessibleLabel("Move \(providerNames[id] ?? id) down")
-            controls.append(up)
-            controls.append(down)
-            row.addSuffix(controls)
+            row.addSuffix(reorderMenu(
+                label: providerNames[id] ?? id,
+                canMoveUp: index > 0,
+                canMoveDown: index < order.count - 1,
+                onMove: { [weak self] delta in self?.move(id, by: delta) }
+            ))
             orderGroup.add(row)
         }
     }
@@ -115,24 +106,14 @@ extension SettingsView {
                 )
                 enabled.active = entry.isEnabled
 
-                let controls = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: 0)
-                controls.addCSSClass(.linked)
-                controls.valign = GTK_ALIGN_CENTER
-                let up = Button(icon: .goUp, onClicked: { [weak self] in
-                    self?.onMetricMoved(provider.id, key, -1)
-                })
-                up.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
-                up.sensitive = index > 0
-                up.setAccessibleLabel("Move \(metric.label) up")
-                let down = Button(icon: .goDown, onClicked: { [weak self] in
-                    self?.onMetricMoved(provider.id, key, 1)
-                })
-                down.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
-                down.sensitive = index < provider.metrics.count - 1
-                down.setAccessibleLabel("Move \(metric.label) down")
-                controls.append(up)
-                controls.append(down)
-                enabled.addSuffix(controls)
+                enabled.addSuffix(reorderMenu(
+                    label: metric.label,
+                    canMoveUp: index > 0,
+                    canMoveDown: index < provider.metrics.count - 1,
+                    onMove: { [weak self] delta in
+                        self?.onMetricMoved(provider.id, key, delta)
+                    }
+                ))
                 metricConnections.append(enabled.onNotify(.active) { [weak self, weak enabled] in
                     guard let self, let enabled, !self.applyingSettings else { return }
                     self.onMetricEnabledChanged(provider.id, key, enabled.active)
@@ -200,6 +181,37 @@ extension SettingsView {
             }
         }
         return providers.filter { !$0.metrics.isEmpty }
+    }
+
+    private func reorderMenu(
+        label: String,
+        canMoveUp: Bool,
+        canMoveDown: Bool,
+        onMove: @escaping @MainActor (Int) -> Void
+    ) -> MenuButton {
+        let actions = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        actions.setMargins(GNOMEStyle.rowSpacing)
+        let up = Button(label: "Move Up", onClicked: { onMove(-1) })
+        up.sensitive = canMoveUp
+        actions.append(up)
+        let down = Button(label: "Move Down", onClicked: { onMove(1) })
+        down.sensitive = canMoveDown
+        actions.append(down)
+
+        let popover = Popover()
+        popover.child = actions
+        let menu = MenuButton(icon: .openMenu)
+        menu.addCSSClass(.flat)
+        menu.setSizeRequest(
+            width: GNOMEStyle.minimumTargetHeight,
+            height: GNOMEStyle.minimumTargetHeight
+        )
+        menu.setAccessibleLabel("Reorder \(label)")
+        menu.setPopover(popover)
+        return menu
     }
 }
 

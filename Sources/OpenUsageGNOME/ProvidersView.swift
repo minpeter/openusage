@@ -10,7 +10,7 @@ import OpenUsageLinuxCore
 final class ProvidersView {
     let root: ScrolledWindow
 
-    private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
+    let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let group = PreferencesGroup(title: "Connected Accounts")
     private let emptyPage: StatusPage
     private var rows: [String: ProviderRow] = [:]
@@ -72,6 +72,10 @@ final class ProvidersView {
         emptyPage.visible = showEmpty
         group.visible = !showEmpty
         if content.firstChild == nil {
+            content.append(GNOMEStyle.pageHeader(
+                title: "Providers",
+                description: "Accounts, quota windows, model usage, and quick links."
+            ))
             content.append(emptyPage)
             content.append(group)
         }
@@ -82,8 +86,10 @@ final class ProvidersView {
             group.remove(row.expander)
             rows.removeValue(forKey: id)
         }
+        var orderedRows: [ProviderRow] = []
         for snapshot in snapshots {
             let row = rows[snapshot.instanceID] ?? insertRow(for: snapshot)
+            orderedRows.append(row)
             row.update(
                 snapshot: snapshot,
                 metricPresentationSettings: metricPresentationSettings,
@@ -93,6 +99,12 @@ final class ProvidersView {
             if DemoFixtures.expandProviders {
                 row.expander.expanded = true
             }
+        }
+        for row in orderedRows {
+            group.remove(row.expander)
+        }
+        for row in orderedRows {
+            group.add(row.expander)
         }
     }
 
@@ -108,13 +120,12 @@ final class ProvidersView {
     }
 }
 
-/// One provider/account row: avatar, name, plan pill, state message, and a
+/// One provider/account row: avatar, name, identity subtitle, state message, and a
 /// disclosure with every metric, quick links, and stale/error annotations.
 @MainActor
 private final class ProviderRow {
     let expander: ExpanderRow
 
-    private let planPill = Label("")
     private let stateIcon = Image()
     private let detail = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let refreshedLabel = Label("")
@@ -139,16 +150,11 @@ private final class ProviderRow {
         self.onRetry = onRetry
         self.onRename = onRename
         expander = ExpanderRow(title: "")
+        expander.setSizeRequest(height: 72)
         expander.addPrefix(ProviderIcon.make(providerID: providerID, displayName: displayName))
-
-        planPill.addCSSClass("ou-pill")
-        planPill.addCSSClass(.accent)
-        planPill.addCSSClass(.caption)
-        planPill.valign = GTK_ALIGN_CENTER
 
         let suffix = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
         suffix.valign = GTK_ALIGN_CENTER
-        suffix.append(planPill)
         suffix.append(stateIcon)
 
         renameEntry.title = "Provider Name"
@@ -176,6 +182,10 @@ private final class ProviderRow {
         contextPopover.child = actions
 
         menuButton.setPopover(contextPopover)
+        menuButton.setSizeRequest(
+            width: GNOMEStyle.minimumTargetHeight,
+            height: GNOMEStyle.minimumTargetHeight
+        )
         menuButton.setAccessibleLabel("Actions for \(displayName)")
         suffix.append(menuButton)
         expander.addSuffix(suffix)
@@ -214,10 +224,21 @@ private final class ProviderRow {
         expander.title = snapshot.displayName
         renameEntry.text = snapshot.displayName
         menuButton.setAccessibleLabel("Actions for \(snapshot.displayName)")
-        expander.subtitle = snapshot.accountLabel ?? stateSummary(snapshot)
-
-        planPill.visible = !(snapshot.plan ?? "").isEmpty
-        planPill.text = snapshot.plan ?? ""
+        if let error = snapshot.errorMessage {
+            let identity = [snapshot.accountLabel, snapshot.plan]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            expander.subtitle = "\(identity)\n\(collapsedError(error))"
+        } else if let warning = snapshot.warning {
+            let identity = [snapshot.accountLabel, snapshot.plan]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            expander.subtitle = "\(identity)\n\(warning)"
+        } else {
+            expander.subtitle = [snapshot.accountLabel, snapshot.plan]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+        }
 
         if snapshot.errorMessage != nil {
             stateIcon.iconName = "dialog-error-symbolic"
@@ -246,6 +267,16 @@ private final class ProviderRow {
         if let error = snapshot.errorMessage { return error }
         if let warning = snapshot.warning { return warning }
         return "Usage up to date"
+    }
+
+    private func collapsedError(_ error: String) -> String {
+        if error.contains("401") {
+            return "HTTP 401 · Check credentials"
+        }
+        if error.contains("403") {
+            return "HTTP 403 · Access denied"
+        }
+        return "Provider error · Open for details"
     }
 
     private func rebuildDetail(

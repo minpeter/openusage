@@ -15,9 +15,6 @@ final class DashboardController {
     let headerSwitcher = ViewSwitcher()
     let switcherBar = ViewSwitcherBar()
     let refreshButton = Button(icon: .viewRefresh)
-    let toolbarSummaryButton = Button()
-    let toolbarSummaryProviderLabel = Label("Usage")
-    let toolbarSummaryValueLabel = Label("—")
     let toastOverlay = ToastOverlay()
 
     let overview = OverviewView()
@@ -110,6 +107,9 @@ final class DashboardController {
         if let page = DemoFixtures.requestedPage,
            Self.pageOrder.contains(where: { $0.name == page }) {
             stack.visibleChildName = page
+        }
+        if let settingsPage = DemoFixtures.requestedSettingsPage {
+            settingsView.selectPage(settingsPage)
         }
         configureLocalAPI(
             enabled: settings.localAPIEnabled ?? false,

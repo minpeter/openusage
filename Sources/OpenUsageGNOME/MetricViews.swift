@@ -224,6 +224,21 @@ enum MetricViews {
                               unitLabel: "tokens")
         box.append(chart.widget)
 
+        let points = Array((metric.points ?? []).suffix(ChartView.maximumPoints))
+        if !points.isEmpty {
+            let values = ExpanderRow(title: "Daily Values")
+            values.subtitle = "Every chart point as text, newest first"
+            for point in points.reversed() {
+                let row = ActionRow(title: GNOMEFormat.shortDay(point.date))
+                let value = Label("\(GNOMEFormat.tokens(point.value)) tokens")
+                value.addCSSClass(.numeric)
+                value.valign = GTK_ALIGN_CENTER
+                row.addSuffix(value)
+                values.addRow(row)
+            }
+            box.append(values)
+        }
+
         if let caption = secondaryCopy(metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
@@ -291,6 +306,7 @@ enum MetricViews {
         let popover = Popover()
         popover.child = content
         let button = MenuButton(label: "Model Details")
+        button.addCSSClass(.flat)
         button.setPopover(popover)
         button.setAccessibleLabel("Show \(metric.label) model breakdown")
         button.setAccessibleDescription(breakdown.accessibilityDescription)

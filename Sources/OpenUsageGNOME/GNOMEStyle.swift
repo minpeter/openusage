@@ -14,24 +14,24 @@ enum GNOMEStyle {
     // MARK: - Layout rhythm (DESIGN.md section 3)
 
     /// Outer margins around scrolled content.
-    static let outerMargin = 18
+    static let outerMargin = 24
     /// Vertical spacing between boxed sections.
-    static let sectionSpacing = 12
+    static let sectionSpacing = 18
     /// Spacing inside a row cluster (title/value/caption stacks).
     static let rowSpacing = 6
     /// Horizontal spacing between sibling controls in one row.
     static let controlSpacing = 8
     /// Content is clamped to preserve readable density on wide windows.
-    static let contentClamp = 720
+    static let contentClamp = 840
     /// Clamp starts tightening before the hard maximum.
-    static let clampTightening = 560
+    static let clampTightening = 640
     /// Default and minimum window geometry from the design contract.
-    static let defaultWidth = 720
-    static let defaultHeight = 720
+    static let defaultWidth = 900
+    static let defaultHeight = 760
     static let minimumWidth = 360
     static let minimumHeight = 294
     /// Below this width the header switcher collapses into a bottom bar.
-    static let narrowBreakpointWidth = 640.0
+    static let narrowBreakpointWidth = 680.0
     /// Smallest interactive target height (accessibility contract).
     static let minimumTargetHeight = 40
 
@@ -74,28 +74,27 @@ enum GNOMEStyle {
 
     // MARK: - Custom CSS
 
-    /// The only custom CSS in the app: a plan/state pill built from
-    /// libadwaita accent tokens. No hardcoded colors.
+    /// Small structural accents which libadwaita does not expose as widget
+    /// properties. Colors continue to come from the active Adwaita theme.
     static let css = """
-    .ou-pill {
-        padding: 2px 9px;
-        border-radius: 999px;
+    .ou-summary-card {
+        padding: 18px;
+        border-radius: 12px;
+        background-color: @card_bg_color;
+        box-shadow: 0 1px 3px alpha(@shade_color, 0.14);
     }
-    .ou-pill.accent {
-        background-color: alpha(@accent_bg_color, 0.16);
-        color: @accent_bg_color;
+    .ou-legend-row {
+        min-height: 32px;
+        padding: 0 4px;
     }
-    .ou-pill.success {
-        background-color: alpha(@success_bg_color, 0.18);
-        color: @success_bg_color;
+    .ou-summary-card .title-1,
+    .ou-summary-card .title-2 {
+        font-feature-settings: "tnum";
     }
-    .ou-pill.warning {
-        background-color: alpha(@warning_bg_color, 0.20);
-        color: @warning_bg_color;
-    }
-    .ou-pill.error {
-        background-color: alpha(@error_bg_color, 0.18);
-        color: @error_bg_color;
+    .ou-navigation button {
+        min-width: 0;
+        padding-left: 4px;
+        padding-right: 4px;
     }
     """
 
@@ -107,6 +106,24 @@ enum GNOMEStyle {
     }
 
     private static var retainedCSSProvider: CSSProvider?
+
+    static func pageHeader(title: String, description: String) -> Widget {
+        let header = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: rowSpacing
+        )
+        let titleLabel = Label(title)
+        titleLabel.xalign = 0
+        titleLabel.addCSSClass(.title1)
+        header.append(titleLabel)
+
+        let descriptionLabel = Label(description)
+        descriptionLabel.xalign = 0
+        descriptionLabel.wrap = true
+        descriptionLabel.addCSSClass(.dimLabel)
+        header.append(descriptionLabel)
+        return header
+    }
 }
 
 /// Shared copy builders so every view formats values identically.

@@ -5,6 +5,11 @@
 - Source contract: `assets/screenshot.jpg` and the existing SwiftUI dashboard.
 - GNOME surface: GTK 4 with libadwaita, using native cards, progress bars, header bars, and status pages.
 - Scope: preserve the provider-first information hierarchy rather than reproducing macOS panel chrome.
+- Redesign audit: the first Linux port proved feature parity, but its narrow 720-pixel frame, duplicated spend
+  controls, header summary pill, and one-page settings stack produced a dense utility-panel look rather than a
+  modern GNOME application.
+- GNOME HIG references: adaptive header/bottom view switchers for three to five primary views, semantic boxed
+  lists with at most two row controls, symbolic icons, clear type hierarchy, and clamped content widths.
 
 ## 1. Product Intent
 
@@ -16,17 +21,24 @@ immediately: which account is connected, how much of each limit is used, and whe
 
 - Follow the active libadwaita light or dark appearance.
 - Use native Adwaita surfaces and typography; do not imitate macOS translucency.
+- Prefer hierarchy over decoration: one elevated summary surface, native boxed lists for controls, and open
+  whitespace between sections. Do not stack cards inside cards.
 - Keep the original hierarchy: spend summary, provider identity, plan, quota rows, reset time, refresh status.
 - Use the user's GNOME system accent for healthy usage, amber for warnings, and red for provider failures.
+- Reserve filled accent buttons for the primary action in a section. Secondary actions are flat or neutral.
 
 ## 3. Layout
 
-- Default window: 720 by 720 logical pixels, resizable down to 360 by 294.
-- `AdwHeaderBar`: application identity, adaptive view switcher, and window-level refresh action.
+- Default window: 900 by 760 logical pixels, resizable down to 360 by 294.
+- `AdwHeaderBar`: adaptive view switcher and window-level refresh/menu actions. Usage values belong in the
+  overview, not in a competing header pill.
 - Four views: Overview, Providers, History, Settings.
 - `AdwViewSwitcher` is centered in the header at wide widths and moves to `AdwViewSwitcherBar` at narrow widths.
-- Vertical scrolling content uses 18-pixel outer margins and 12-pixel section spacing.
-- Content is clamped to 720 logical pixels to preserve readable density on wide windows.
+- Vertical scrolling content uses 24-pixel outer margins and 18-pixel section spacing.
+- Content is clamped to 840 logical pixels to preserve readable density on wide windows.
+- Every primary view starts with a title and one-line purpose statement, then presents the strongest signal first.
+- Settings uses four local pages — General, Display, Providers, and Data — so unrelated controls are not placed in
+  one continuous wall. Controls on one page must not unexpectedly change controls on another.
 - Providers are ordered by the user's persisted order, then account label.
 - Each quota row contains label, percentage or value, progress bar, and reset copy.
 
@@ -34,16 +46,19 @@ immediately: which account is connected, how much of each limit is used, and whe
 
 - Provider identity: the upstream vector mark rendered as a monochrome symbolic icon; initials are the
   fallback only when a provider has no bundled mark.
-- Provider card: symbolic provider icon, display name, plan badge, state message.
+- Provider card: symbolic provider icon, display name, account and plan subtitle, state message.
 - Progress metric: title, trailing used percentage, progress bar, optional reset time.
 - Value metric: title, primary value, optional detail.
 - Error state: visible inline message with a retry action in the header.
 - Empty state: actionable login instruction from the provider adapter.
-- Overview: spend summary, time filter, provider health summary, and the most urgent quota windows.
+- Overview: one spend summary surface with period and metric controls, then urgent quotas and provider health.
+  Do not repeat the selected period in a second group.
 - Providers: boxed provider/account rows with disclosure into complete metric details.
 - History: bounded daily charts and a provider/account legend.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
 - Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
+- Summary surface: a single card with the current total, provider-share ring, compact legend, and one export action.
+  The ring is supporting visualization; the total and provider values remain readable text.
 
 ## 5. Interaction
 

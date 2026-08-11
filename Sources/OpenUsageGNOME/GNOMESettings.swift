@@ -63,18 +63,18 @@ extension DensitySetting {
         switch self {
         case .regular:
             .init(
-                outerMargin: 18,
-                sectionSpacing: 12,
-                rowSpacing: 6,
-                controlSpacing: 8,
+                outerMargin: 24,
+                sectionSpacing: 18,
+                rowSpacing: 8,
+                controlSpacing: 10,
                 minimumTargetHeight: 40
             )
         case .compact:
             .init(
-                outerMargin: 12,
-                sectionSpacing: 8,
-                rowSpacing: 4,
-                controlSpacing: 6,
+                outerMargin: 16,
+                sectionSpacing: 12,
+                rowSpacing: 6,
+                controlSpacing: 8,
                 minimumTargetHeight: 40
             )
         }

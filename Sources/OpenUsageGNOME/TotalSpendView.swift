@@ -4,21 +4,24 @@ import OpenUsageLinuxCore
 
 @MainActor
 final class TotalSpendView {
-    let root = PreferencesGroup(
-        title: "Total Spend",
-        description: "Provider share for the selected period and metric."
+    let root = Box(
+        orientation: GTK_ORIENTATION_VERTICAL,
+        spacing: GNOMEStyle.sectionSpacing
     )
 
-    private let periodRow = ComboRow(title: "Spend Period")
-    private let metricRow = ComboRow(title: "Spend Metric")
+    private let periodButtons = TotalSpendPeriod.allCases.map {
+        ToggleButton(label: $0 == .last30Days ? "30 Days" : $0.label)
+    }
+    private let metricButtons = TotalSpendMetric.allCases.map {
+        ToggleButton(label: $0.label)
+    }
     private let drawingArea = DrawingArea()
     private let ringOverlay = Overlay()
     private let centerValue = Label("")
     private let centerCaption = Label("")
-    private let ringLabel = Label("")
     private let legend = Box(
         orientation: GTK_ORIENTATION_VERTICAL,
-        spacing: GNOMEStyle.rowSpacing
+        spacing: GNOMEStyle.controlSpacing
     )
     private var records: [ProviderSpendRecord] = []
     private var connections: [SignalConnection] = []
@@ -26,14 +29,55 @@ final class TotalSpendView {
     private var onShare: (BrandedShareCard) -> Void = { _ in }
 
     init() {
-        periodRow.setModel(StringList(TotalSpendPeriod.allCases.map(\.label)))
-        periodRow.selected = 0
-        metricRow.setModel(StringList(TotalSpendMetric.allCases.map(\.label)))
-        metricRow.selected = 0
-        root.add(periodRow)
-        root.add(metricRow)
+        root.addCSSClass("ou-summary-card")
+        let header = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        let heading = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: 2
+        )
+        heading.hexpand = true
+        let title = Label("Total Spend")
+        title.xalign = 0
+        title.addCSSClass(.title2)
+        heading.append(title)
+        let subtitle = Label("Compare providers across cost and token usage.")
+        subtitle.xalign = 0
+        subtitle.wrap = true
+        subtitle.addCSSClass(.dimLabel)
+        heading.append(subtitle)
+        header.append(heading)
 
-        drawingArea.setSizeRequest(width: 220, height: 220)
+        let shareButton = Button(label: "Share PNG", onClicked: { [weak self] in
+            self?.shareCurrent()
+        })
+        shareButton.addCSSClass(.pill)
+        shareButton.halign = GTK_ALIGN_START
+        shareButton.setAccessibleLabel("Export and open branded share PNG")
+        header.append(shareButton)
+        root.append(header)
+
+        let selectors = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        selectors.append(Self.segmentedSelector(
+            title: "Period",
+            buttons: periodButtons,
+            connections: &connections,
+            onChange: { [weak self] in self?.render() }
+        ))
+        selectors.append(Self.segmentedSelector(
+            title: "Metric",
+            buttons: metricButtons,
+            connections: &connections,
+            onChange: { [weak self] in self?.render() }
+        ))
+        root.append(selectors)
+
+        drawingArea.setSizeRequest(width: 160, height: 160)
         drawingArea.halign = GTK_ALIGN_CENTER
         ringOverlay.child = drawingArea
         let center = Box(
@@ -49,27 +93,8 @@ final class TotalSpendView {
         center.append(centerValue)
         center.append(centerCaption)
         ringOverlay.addOverlay(center)
-        root.add(ringOverlay)
-        ringLabel.halign = GTK_ALIGN_CENTER
-        ringLabel.addCSSClass(.caption)
-        ringLabel.addCSSClass(.dimLabel)
-        root.add(ringLabel)
-        root.add(legend)
-        let shareButton = Button(label: "Share PNG", onClicked: { [weak self] in
-            self?.shareCurrent()
-        })
-        shareButton.addCSSClass(.suggestedAction)
-        shareButton.addCSSClass(.pill)
-        shareButton.halign = GTK_ALIGN_CENTER
-        shareButton.setAccessibleLabel("Export and open branded share PNG")
-        root.add(shareButton)
-
-        connections.append(periodRow.onNotify(.selected) { [weak self] in
-            self?.render()
-        })
-        connections.append(metricRow.onNotify(.selected) { [weak self] in
-            self?.render()
-        })
+        root.append(ringOverlay)
+        root.append(legend)
     }
 
     func update(snapshots: [ProviderUsageSnapshot]) {
@@ -93,23 +118,17 @@ final class TotalSpendView {
     }
 
     func selectMetric(_ metric: TotalSpendMetric) {
-        switch metric {
-        case .cost:
-            metricRow.selected = 0
-        case .costPerMillionTokens:
-            metricRow.selected = 1
-        case .tokens:
-            metricRow.selected = 2
+        guard let index = TotalSpendMetric.allCases.firstIndex(of: metric) else {
+            return
         }
+        metricButtons[index].active = true
     }
 
     private func render() {
-        let period = TotalSpendPeriod.allCases[
-            min(max(periodRow.selected, 0), TotalSpendPeriod.allCases.count - 1)
-        ]
-        let metric = TotalSpendMetric.allCases[
-            min(max(metricRow.selected, 0), TotalSpendMetric.allCases.count - 1)
-        ]
+        let periodIndex = periodButtons.firstIndex { $0.active } ?? 0
+        let metricIndex = metricButtons.firstIndex { $0.active } ?? 0
+        let period = TotalSpendPeriod.allCases[periodIndex]
+        let metric = TotalSpendMetric.allCases[metricIndex]
         let projection = TotalSpendAnalytics.project(
             records: records,
             metric: metric,
@@ -118,8 +137,6 @@ final class TotalSpendView {
         currentProjection = projection.slices.isEmpty ? nil : projection
         centerValue.text = format(projection.total, metric: metric)
         centerCaption.text = metric.label
-        ringLabel.text = "\(metric.label) provider share ring"
-        ringLabel.setAccessibleDescription(accessibilityDescription(projection))
         drawingArea.setAccessibleLabel("Total Spend \(metric.label) ring")
         drawingArea.setAccessibleDescription(accessibilityDescription(projection))
         ringOverlay.setAccessibleLabel("Total Spend \(metric.label) ring")
@@ -136,6 +153,44 @@ final class TotalSpendView {
         rebuildLegend(projection)
     }
 
+    private static func segmentedSelector(
+        title: String,
+        buttons: [ToggleButton],
+        connections: inout [SignalConnection],
+        onChange: @escaping @MainActor () -> Void
+    ) -> Widget {
+        let row = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        let label = Label(title)
+        label.xalign = 0
+        label.addCSSClass(.caption)
+        label.addCSSClass(.dimLabel)
+        row.append(label)
+
+        let control = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: 0
+        )
+        control.addCSSClass(.linked)
+        for (index, button) in buttons.enumerated() {
+            if index > 0 {
+                button.setGroup(buttons[0])
+            }
+            button.active = index == 0
+            button.hexpand = true
+            button.setSizeRequest(height: GNOMEStyle.minimumTargetHeight)
+            connections.append(button.onToggled { [weak button] in
+                guard button?.active == true else { return }
+                onChange()
+            })
+            control.append(button)
+        }
+        row.append(control)
+        return row
+    }
+
     private func rebuildLegend(_ projection: TotalSpendProjection) {
         while let child = legend.firstChild {
             legend.remove(child)
@@ -149,17 +204,21 @@ final class TotalSpendView {
         }
         for slice in projection.slices {
             let row = Box(
-                orientation: GTK_ORIENTATION_HORIZONTAL,
-                spacing: GNOMEStyle.controlSpacing
+                orientation: GTK_ORIENTATION_VERTICAL,
+                spacing: 2
             )
+            row.addCSSClass("ou-legend-row")
             let name = Label(slice.label)
             name.xalign = 0
             name.hexpand = true
+            name.wrap = true
+            name.maxWidthChars = 24
             row.append(name)
             let value = Label(
                 "\(format(slice.value, metric: projection.metric)) · \(slice.wholePercent)%"
             )
             value.addCSSClass(.numeric)
+            value.xalign = 0
             row.append(value)
             row.setAccessibleLabel("\(slice.label) \(slice.wholePercent)%")
             legend.append(row)
@@ -196,13 +255,18 @@ final class TotalSpendView {
         height: Double
     ) {
         guard width > 20, height > 20 else { return }
+        let style = StyleManager.default
+        let theme = GNOMEStyle.chartPalette(
+            dark: style.dark,
+            highContrast: style.highContrast
+        )
         let palette = [
-            (0.93, 0.27, 0.18),
-            (0.96, 0.62, 0.12),
-            (0.20, 0.55, 0.86),
-            (0.45, 0.36, 0.78),
-            (0.20, 0.65, 0.47),
-            (0.80, 0.34, 0.60),
+            (theme.accentRed, theme.accentGreen, theme.accentBlue),
+            (0.42, 0.36, 0.78),
+            (0.16, 0.64, 0.52),
+            (0.91, 0.49, 0.16),
+            (0.78, 0.35, 0.58),
+            (0.25, 0.62, 0.74),
         ]
         let centerX = width / 2
         let centerY = height / 2
@@ -210,7 +274,7 @@ final class TotalSpendView {
         let lineWidth = min(width, height) * 0.13
 
         context.setLineWidth(lineWidth)
-        context.setSourceRGBA(0.5, 0.5, 0.5, 0.18)
+        context.setSourceRGBA(0.5, 0.5, 0.5, theme.trackAlpha)
         context.arc(
             centerX: centerX,
             centerY: centerY,

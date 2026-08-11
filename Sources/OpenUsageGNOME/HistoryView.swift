@@ -10,7 +10,7 @@ import OpenUsageLinuxCore
 final class HistoryView {
     let root: ScrolledWindow
 
-    private let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
+    let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let emptyPage: StatusPage
 
     init() {
@@ -46,6 +46,10 @@ final class HistoryView {
                 .map { (snapshot: snapshot, metric: $0) }
         }
 
+        content.append(GNOMEStyle.pageHeader(
+            title: "History",
+            description: "Daily local usage trends with accessible point-by-point detail."
+        ))
         guard !charts.isEmpty else {
             content.append(emptyPage)
             return
@@ -64,9 +68,32 @@ final class HistoryView {
 
         let chart = ChartView(points: points, providerName: snapshot.displayName,
                               unitLabel: "tokens")
-        chart.widget.setMargins(GNOMEStyle.sectionSpacing)
+        let chartContent = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        chartContent.setMargins(GNOMEStyle.sectionSpacing)
+        chartContent.append(chart.widget)
+        let dates = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: GNOMEStyle.controlSpacing
+        )
+        if let first = points.first, let last = points.last {
+            let start = Label(GNOMEFormat.shortDay(first.date))
+            start.xalign = 0
+            start.hexpand = true
+            start.addCSSClass(.caption)
+            start.addCSSClass(.dimLabel)
+            dates.append(start)
+            let end = Label(GNOMEFormat.shortDay(last.date))
+            end.xalign = 1
+            end.addCSSClass(.caption)
+            end.addCSSClass(.dimLabel)
+            dates.append(end)
+        }
+        chartContent.append(dates)
         let chartRow = ListBoxRow()
-        chartRow.child = chart.widget
+        chartRow.child = chartContent
         chartRow.selectable = false
         chartRow.activatable = false
         group.add(chartRow)

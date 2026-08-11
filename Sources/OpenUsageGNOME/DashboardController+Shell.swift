@@ -12,24 +12,13 @@ extension DashboardController {
         let header = HeaderBar()
         header.titleWidget = headerSwitcher
 
-        let summaryBox = Box(
-            orientation: GTK_ORIENTATION_HORIZONTAL,
-            spacing: GNOMEStyle.controlSpacing
-        )
-        toolbarSummaryProviderLabel.addCSSClass(.caption)
-        toolbarSummaryValueLabel.addCSSClass(.numeric)
-        toolbarSummaryValueLabel.addCSSClass(.heading)
-        summaryBox.append(toolbarSummaryProviderLabel)
-        summaryBox.append(toolbarSummaryValueLabel)
-        toolbarSummaryButton.child = summaryBox
-        toolbarSummaryButton.addCSSClass(.raised)
-        toolbarSummaryButton.addCSSClass(.pill)
-        toolbarSummaryButton.tooltipText = "Open Overview"
-        toolbarSummaryButton.setAccessibleLabel("Usage summary")
-        header.packStart(toolbarSummaryButton)
-
         refreshButton.addCSSClass(.flat)
+        refreshButton.setSizeRequest(
+            width: GNOMEStyle.minimumTargetHeight,
+            height: GNOMEStyle.minimumTargetHeight
+        )
         refreshButton.setAccessibleLabel("Refresh usage")
+        refreshButton.tooltipText = "Refresh Usage"
         header.packEnd(refreshButton)
 
         let menu = GMenuRef()
@@ -37,6 +26,10 @@ extension DashboardController {
         menu.append("About OpenUsage", action: "app.about")
         let menuButton = MenuButton(icon: .openMenu)
         menuButton.addCSSClass(.flat)
+        menuButton.setSizeRequest(
+            width: GNOMEStyle.minimumTargetHeight,
+            height: GNOMEStyle.minimumTargetHeight
+        )
         menuButton.setMenuModel(menu)
         menuButton.setAccessibleLabel("Main menu")
         header.packEnd(menuButton)
@@ -48,6 +41,7 @@ extension DashboardController {
         stack.vexpand = true
 
         switcherBar.stack = stack
+        switcherBar.addCSSClass("ou-navigation")
         let content = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
         content.append(stack)
         content.append(switcherBar)
@@ -57,9 +51,6 @@ extension DashboardController {
 
         connections.append(refreshButton.onClicked { [weak self] in
             self?.refresh()
-        })
-        connections.append(toolbarSummaryButton.onClicked { [weak self] in
-            self?.stack.visibleChildName = "overview"
         })
     }
 
@@ -179,10 +170,30 @@ extension DashboardController {
         let narrow = Breakpoint.maxWidth(GNOMEStyle.narrowBreakpointWidth, unit: .px)
         narrow.addSetter(switcherBar, property: .custom("reveal"), value: true)
         narrow.addSetter(headerSwitcher, property: .visible, value: false)
-        narrow.addSetter(toolbarSummaryButton, property: .visible, value: false)
-        narrow.addSetter(overview.spendGroup, property: .custom("title"), value: "")
         for page in [overview.root, providersView.root, historyView.root, settingsView.root] {
-            narrow.addSetter(page, property: .custom("margin-bottom"), value: 56)
+            narrow.addSetter(
+                page,
+                property: .custom("margin-bottom"),
+                value: GNOMEStyle.sectionSpacing
+            )
+        }
+        let narrowContents = [
+            overview.content,
+            providersView.content,
+            historyView.content,
+            settingsView.pageHeader,
+        ] + settingsView.pageContents
+        for content in narrowContents {
+            narrow.addSetter(
+                content,
+                property: .custom("margin-start"),
+                value: 12
+            )
+            narrow.addSetter(
+                content,
+                property: .custom("margin-end"),
+                value: 12
+            )
         }
         // Balance the transfer-full consumption below with the wrapper's ref.
         _ = g_object_ref(narrow.gobjectPointer)
