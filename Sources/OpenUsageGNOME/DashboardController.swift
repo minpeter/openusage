@@ -43,6 +43,7 @@ final class DashboardController {
     var sharePreviewDialog: Dialog?
     var retainedActions: [SimpleAction] = []
     var connections: [SignalConnection] = []
+    var renderGate = DashboardRenderGate()
 
     static let appVersion = "0.7.0"
     static let pageOrder: [(name: String, title: String, icon: String)] = [

@@ -98,6 +98,13 @@ extension DashboardController {
     func applySnapshots() {
         let ordered = ordered(snapshots)
         let visible = visibleOrdered(snapshots)
+        guard renderGate.consume(
+            snapshots: visible,
+            settings: settings,
+            isRefreshing: isRefreshing
+        ) else {
+            return
+        }
         overview.update(
             snapshots: visible,
             isRefreshing: isRefreshing,
