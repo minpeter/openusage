@@ -128,6 +128,9 @@ extension DashboardController {
             }
             self?.settingsView.onLogLevelChanged(level)
         }
+        let showDataSettingsAction = SimpleAction(name: "show-data-settings") { [weak self] in
+            self?.settingsView.revealDataSettings()
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
@@ -142,6 +145,7 @@ extension DashboardController {
             clearAPIKeyAction,
             saveProxyAction,
             setLogLevelAction,
+            showDataSettingsAction,
         ]
         for action in retainedActions {
             application.addAction(action)

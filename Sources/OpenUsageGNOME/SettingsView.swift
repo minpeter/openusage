@@ -447,6 +447,10 @@ final class SettingsView {
         apiKeyRow(for: provider).text = ""
     }
 
+    func revealDataSettings() {
+        _ = openRouterAPIKeyRow.grabFocusWithoutSelecting()
+    }
+
     private func addAPIKeyRow(
         _ row: PasswordEntryRow,
         status: Label,
