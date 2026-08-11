@@ -30,3 +30,40 @@ jobs:
 
       - name: Run tests
         run: swift test
+
+  linux:
+    name: Linux Build, Test, and Package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.1"
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            appstream \
+            desktop-file-utils \
+            flatpak-builder \
+            libadwaita-1-dev \
+            libglib2.0-dev \
+            libgtk-4-dev \
+            pkg-config \
+            python3-yaml
+
+      - name: Validate Linux packaging
+        run: ./scripts/validate-flatpak.sh
+
+      - name: Use Linux dependency lockfile
+        run: cp linux/Package.resolved Package.resolved
+
+      - name: Run Linux tests
+        run: swift test --disable-automatic-resolution --disable-prefetching
+
+      - name: Build Linux release
+        run: swift build -c release --disable-automatic-resolution --disable-prefetching
