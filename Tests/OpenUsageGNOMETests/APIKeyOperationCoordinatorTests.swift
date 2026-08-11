@@ -52,6 +52,25 @@ struct APIKeyOperationCoordinatorTests {
         #expect(stored == .stored)
         #expect(staleStatus == .stale)
     }
+
+    @Test("Performance probes exclude transient Secret Service work")
+    func performanceProbeSkipsStatusLookups() {
+        #expect(DashboardController.shouldRefreshAPIKeyStatuses(
+            environment: ["OPENUSAGE_PERFORMANCE_RECEIPT": "/tmp/perf.json"]
+        ) == false)
+        #expect(DashboardController.shouldRefreshAPIKeyStatuses(
+            environment: [:]
+        ))
+    }
+
+    @Test("A latest failed mutation still refreshes changed credentials")
+    func failedMutationRequiresRefresh() {
+        #expect(APIKeyOperationResult.failed("clear failed")
+            .requiresCredentialRefresh)
+        #expect(!APIKeyOperationResult.status("Stored")
+            .requiresCredentialRefresh)
+        #expect(!APIKeyOperationResult.stale.requiresCredentialRefresh)
+    }
 }
 
 private final class APIKeyMemoryBackend:

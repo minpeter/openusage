@@ -7,6 +7,15 @@ enum APIKeyOperationResult: Equatable, Sendable {
     case cleared
     case failed(String)
     case stale
+
+    var requiresCredentialRefresh: Bool {
+        switch self {
+        case .stored, .cleared, .failed:
+            true
+        case .status, .stale:
+            false
+        }
+    }
 }
 
 actor APIKeyOperationCoordinator {

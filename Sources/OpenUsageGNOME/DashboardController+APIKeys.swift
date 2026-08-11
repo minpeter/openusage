@@ -3,7 +3,18 @@ import Foundation
 import OpenUsageLinuxCore
 
 extension DashboardController {
+    nonisolated static func shouldRefreshAPIKeyStatuses(
+        environment: [String: String]
+    ) -> Bool {
+        environment["OPENUSAGE_PERFORMANCE_RECEIPT"] == nil
+    }
+
     func refreshAPIKeyStatuses() {
+        guard Self.shouldRefreshAPIKeyStatuses(
+            environment: ProcessInfo.processInfo.environment
+        ) else {
+            return
+        }
         for provider in ManagedAPIKeyProvider.allCases {
             let revision = nextAPIKeyRevision(for: provider)
             let operations = apiKeyOperations
@@ -74,6 +85,9 @@ extension DashboardController {
         result: APIKeyOperationResult
     ) {
         guard apiKeyRevisions[provider] == revision else { return }
+        if result.requiresCredentialRefresh {
+            requestCredentialRefresh()
+        }
         switch result {
         case .status(let status):
             settingsView.updateAPIKeyStatus(provider, text: status)
@@ -84,7 +98,6 @@ extension DashboardController {
             toastOverlay.addToast(Toast(
                 title: "\(provider.displayName) API key saved"
             ))
-            requestCredentialRefresh()
         case .cleared:
             GNOMEAppLog.info("Cleared \(provider.providerID) API key from Secret Service")
             settingsView.clearAPIKeyEntry(provider)
@@ -92,7 +105,6 @@ extension DashboardController {
             toastOverlay.addToast(Toast(
                 title: "\(provider.displayName) API key cleared"
             ))
-            requestCredentialRefresh()
         case .failed(let error):
             GNOMEAppLog.warning(
                 "API key operation failed for \(provider.providerID): \(error)"
