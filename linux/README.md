@@ -20,6 +20,8 @@ resolution runs on Linux.
 The app reads Claude Code credentials from `~/.claude/.credentials.json` and Codex credentials from
 `${XDG_CONFIG_HOME:-~/.config}/codex/auth.json` or `~/.codex/auth.json`. In Flatpak those locations
 are mounted read-only. Application cache and settings remain in Flatpak's private XDG directories.
+The sandbox exposes only host Downloads and Pictures for usage exports and branded share images.
+Other selected files and directories are granted through the desktop document portal.
 
 ### Host keyring permission
 

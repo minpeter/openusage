@@ -13,6 +13,21 @@ struct LinuxDistributionManifestTests {
             .contains("--filesystem=~/.gemini/antigravity-cli:ro"))
     }
 
+    @Test("Flatpak exposes user-visible export destinations")
+    func flatpakExportDestinations() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let manifest = try String(
+            contentsOf: root.appendingPathComponent(
+                "linux/io.github.minpeter.OpenUsage.yml"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(manifest.contains("--filesystem=xdg-download"))
+        #expect(manifest.contains("--filesystem=xdg-pictures"))
+    }
+
     @Test("Packaged StatusNotifierItem XML matches the live Ayatana contract")
     func statusNotifierItemXML() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()

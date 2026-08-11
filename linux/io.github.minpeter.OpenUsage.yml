@@ -18,6 +18,8 @@ finish-args:
   # Flatpak grants this whole D-Bus destination; see linux/README.md before shipping it.
   - --talk-name=org.freedesktop.secrets
   - --talk-name=org.kde.StatusNotifierWatcher
+  - --filesystem=xdg-download
+  - --filesystem=xdg-pictures
   - --filesystem=~/.claude:ro
   - --filesystem=~/.codex:ro
   - --filesystem=~/.grok:ro
