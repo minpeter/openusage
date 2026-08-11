@@ -27,7 +27,7 @@ final class TotalSpendView {
 
     init() {
         periodRow.setModel(StringList(TotalSpendPeriod.allCases.map(\.label)))
-        periodRow.selected = 1
+        periodRow.selected = 0
         metricRow.setModel(StringList(TotalSpendMetric.allCases.map(\.label)))
         metricRow.selected = 0
         root.add(periodRow)

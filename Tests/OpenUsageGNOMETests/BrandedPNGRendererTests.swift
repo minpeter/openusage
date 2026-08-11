@@ -15,7 +15,7 @@ struct BrandedPNGRendererTests {
         #expect(card.brand == "OpenUsage")
         #expect(card.title == "Total Spend")
         #expect(card.total == "$14.00")
-        #expect(card.subtitle == "30 Days · Cost")
+        #expect(card.subtitle == "Last 30 Days · Cost")
         #expect(card.entries.map(\.label) == ["Claude", "Codex"])
         #expect(card.entries.map(\.value) == ["$10.00", "$4.00"])
         #expect(card.entries.map(\.wholePercent) == [71, 29])
@@ -75,7 +75,7 @@ struct BrandedPNGRendererTests {
     private func projection() -> TotalSpendProjection {
         TotalSpendProjection(
             metric: .cost,
-            period: .thirtyDays,
+            period: .last30Days,
             total: 14,
             slices: [
                 .init(

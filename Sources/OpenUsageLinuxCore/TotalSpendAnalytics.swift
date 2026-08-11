@@ -15,15 +15,15 @@ public enum TotalSpendMetric: String, CaseIterable, Codable, Sendable {
 }
 
 public enum TotalSpendPeriod: String, CaseIterable, Codable, Sendable {
-    case sevenDays
-    case thirtyDays
-    case all
+    case today
+    case yesterday
+    case last30Days
 
     public var label: String {
         switch self {
-        case .sevenDays: "7 Days"
-        case .thirtyDays: "30 Days"
-        case .all: "All Time"
+        case .today: "Today"
+        case .yesterday: "Yesterday"
+        case .last30Days: "Last 30 Days"
         }
     }
 }
@@ -31,22 +31,22 @@ public enum TotalSpendPeriod: String, CaseIterable, Codable, Sendable {
 public struct ProviderSpendRecord: Equatable, Sendable {
     public let providerID: String
     public let providerName: String
+    public let period: TotalSpendPeriod
     public let cost: Double
     public let tokens: Double
-    public let date: Date
 
     public init(
         providerID: String,
         providerName: String,
+        period: TotalSpendPeriod,
         cost: Double,
-        tokens: Double,
-        date: Date
+        tokens: Double
     ) {
         self.providerID = providerID
         self.providerName = providerName
+        self.period = period
         self.cost = cost
         self.tokens = tokens
-        self.date = date
     }
 }
 
@@ -95,36 +95,37 @@ public enum TotalSpendAnalytics {
     public static func records(
         from snapshots: [ProviderUsageSnapshot]
     ) -> [ProviderSpendRecord] {
-        snapshots.compactMap { snapshot in
-            let cost = snapshot.metrics.compactMap {
-                dimensionTotal(metric: $0, unit: .dollars)
-            }.max() ?? 0
-            let tokens = snapshot.metrics.compactMap {
-                dimensionTotal(metric: $0, unit: .tokens)
-            }.max() ?? 0
-            guard cost > 0 || tokens > 0 else { return nil }
-            return ProviderSpendRecord(
-                providerID: snapshot.providerID,
-                providerName: snapshot.displayName,
-                cost: cost,
-                tokens: tokens,
-                date: snapshot.refreshedAt
-            )
+        snapshots.flatMap { snapshot in
+            let providerName = snapshot.accountLabel.map {
+                "\(snapshot.displayName) · \($0)"
+            } ?? snapshot.displayName
+            return TotalSpendPeriod.allCases.compactMap {
+                period -> ProviderSpendRecord? in
+                guard let metric = snapshot.metrics.first(where: {
+                    $0.kind == .values && $0.label == period.label
+                }) else {
+                    return nil
+                }
+                let cost = dimensionTotal(metric: metric, unit: .dollars) ?? 0
+                let tokens = dimensionTotal(metric: metric, unit: .tokens) ?? 0
+                guard cost > 0 || tokens > 0 else { return nil }
+                return ProviderSpendRecord(
+                    providerID: snapshot.instanceID,
+                    providerName: providerName,
+                    period: period,
+                    cost: cost,
+                    tokens: tokens
+                )
+            }
         }
     }
 
     public static func project(
         records: [ProviderSpendRecord],
         metric: TotalSpendMetric,
-        period: TotalSpendPeriod,
-        now: Date = Date()
+        period: TotalSpendPeriod
     ) -> TotalSpendProjection {
-        let start = startDate(for: period, now: now)
-        let filtered = records.filter { record in
-            guard record.date <= now else { return false }
-            guard let start else { return true }
-            return record.date >= start
-        }
+        let filtered = records.filter { $0.period == period }
         var aggregates: [String: ProviderAggregate] = [:]
         for record in filtered {
             var aggregate = aggregates[record.providerID] ?? .init(
@@ -191,17 +192,6 @@ public enum TotalSpendAnalytics {
             total = aggregates.values.reduce(0) { $0 + $1.tokens }
         }
         return .init(metric: metric, period: period, total: total, slices: slices)
-    }
-
-    private static func startDate(
-        for period: TotalSpendPeriod,
-        now: Date
-    ) -> Date? {
-        switch period {
-        case .sevenDays: now.addingTimeInterval(-7 * 24 * 60 * 60)
-        case .thirtyDays: now.addingTimeInterval(-30 * 24 * 60 * 60)
-        case .all: nil
-        }
     }
 
     private static func dimensionTotal(
