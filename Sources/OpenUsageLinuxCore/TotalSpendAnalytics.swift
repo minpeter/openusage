@@ -185,8 +185,11 @@ public enum TotalSpendAnalytics {
         case .cost:
             total = aggregates.values.reduce(0) { $0 + $1.cost }
         case .costPerMillionTokens:
-            let totalCost = aggregates.values.reduce(0) { $0 + $1.cost }
-            let totalTokens = aggregates.values.reduce(0) { $0 + $1.tokens }
+            let complete = aggregates.values.filter {
+                $0.cost > 0 && $0.tokens > 0
+            }
+            let totalCost = complete.reduce(0) { $0 + $1.cost }
+            let totalTokens = complete.reduce(0) { $0 + $1.tokens }
             total = totalTokens > 0 ? totalCost / totalTokens * 1_000_000 : 0
         case .tokens:
             total = aggregates.values.reduce(0) { $0 + $1.tokens }

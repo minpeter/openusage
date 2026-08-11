@@ -61,6 +61,37 @@ struct TotalSpendAnalyticsTests {
         #expect(projection.slices.map(\.share) == [0.8, 0.2])
     }
 
+    @Test("Cost per MTok center excludes incomplete accounts")
+    func costPerMillionIgnoresIncompleteAccounts() {
+        let projection = TotalSpendAnalytics.project(
+            records: [
+                record(
+                    providerID: "complete",
+                    providerName: "Complete",
+                    cost: 10,
+                    tokens: 1_000_000
+                ),
+                record(
+                    providerID: "tokens-only",
+                    providerName: "Tokens Only",
+                    cost: 0,
+                    tokens: 9_000_000
+                ),
+                record(
+                    providerID: "cost-only",
+                    providerName: "Cost Only",
+                    cost: 5,
+                    tokens: 0
+                ),
+            ],
+            metric: .costPerMillionTokens,
+            period: .today
+        )
+
+        #expect(projection.slices.map(\.label) == ["Complete"])
+        #expect(projection.total == 10)
+    }
+
     @Test("Period projection selects the exact macOS spend metric")
     func exactPeriodSelection() {
         let projection = TotalSpendAnalytics.project(
