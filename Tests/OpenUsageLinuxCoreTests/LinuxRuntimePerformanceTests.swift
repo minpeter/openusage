@@ -1,0 +1,44 @@
+import Foundation
+import Testing
+@testable import OpenUsageLinuxCore
+
+@Suite("Linux runtime performance gates")
+struct LinuxRuntimePerformanceTests {
+    @Test("smaps rollup parser reads only the total proportional set size")
+    func parsesPSS() throws {
+        let fixture = """
+        Rss:               42000 kB
+        Pss:               12345 kB
+        Pss_Dirty:          2345 kB
+        """
+
+        #expect(try LinuxProcessMemoryProbe.parsePSSBytes(fixture) == 12_641_280)
+        #expect(throws: LinuxProcessMemoryProbeError.missingPSS) {
+            try LinuxProcessMemoryProbe.parsePSSBytes("Rss: 42 kB")
+        }
+    }
+
+    @Test("GTK p95 and memory gates use documented Linux budgets")
+    func evaluatesRuntimeBudgets() {
+        let passing = LinuxRuntimePerformanceReport(
+            idlePSSBytes: 80 * 1_024 * 1_024,
+            finalPSSBytes: 85 * 1_024 * 1_024,
+            updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        )
+        let slow = LinuxRuntimePerformanceReport(
+            idlePSSBytes: 95 * 1_024 * 1_024,
+            finalPSSBytes: 110 * 1_024 * 1_024,
+            updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 20, 25]
+        )
+
+        #expect(passing.updateP95Milliseconds == 10)
+        #expect(passing.passesIdleMemoryGate)
+        #expect(passing.passesGrowthGate)
+        #expect(passing.passesGTKUpdateGate)
+        #expect(passing.passes)
+        #expect(!slow.passesIdleMemoryGate)
+        #expect(!slow.passesGrowthGate)
+        #expect(!slow.passesGTKUpdateGate)
+        #expect(!slow.passes)
+    }
+}

@@ -131,6 +131,9 @@ extension DashboardController {
         let showDataSettingsAction = SimpleAction(name: "show-data-settings") { [weak self] in
             self?.settingsView.revealDataSettings()
         }
+        let performanceProbeAction = SimpleAction(name: "run-performance-probe") { [weak self] in
+            self?.runPerformanceProbe()
+        }
         retainedActions = [
             refreshAction,
             aboutAction,
@@ -146,6 +149,7 @@ extension DashboardController {
             saveProxyAction,
             setLogLevelAction,
             showDataSettingsAction,
+            performanceProbeAction,
         ]
         for action in retainedActions {
             application.addAction(action)
