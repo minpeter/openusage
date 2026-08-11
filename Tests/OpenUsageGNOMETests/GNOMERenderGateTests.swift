@@ -20,28 +20,32 @@ struct GNOMERenderGateTests {
         var gate = DashboardRenderGate()
         let settings = GNOMESettings()
 
-        #expect(gate.consume(
+        let first = gate.consume(
             snapshots: [snapshot],
             settings: settings,
             isRefreshing: false
-        ))
-        #expect(!gate.consume(
+        )
+        let duplicate = gate.consume(
             snapshots: [snapshot],
             settings: settings,
             isRefreshing: false
-        ))
+        )
+        #expect(first)
+        #expect(!duplicate)
 
         var renamed = settings
         renamed.renameProvider("codex", to: "Work Codex")
-        #expect(gate.consume(
+        let renamedRender = gate.consume(
             snapshots: [snapshot],
             settings: renamed,
             isRefreshing: false
-        ))
-        #expect(gate.consume(
+        )
+        let loadingRender = gate.consume(
             snapshots: [snapshot],
             settings: renamed,
             isRefreshing: true
-        ))
+        )
+        #expect(renamedRender)
+        #expect(loadingRender)
     }
 }
