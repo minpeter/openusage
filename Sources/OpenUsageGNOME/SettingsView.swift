@@ -448,7 +448,7 @@ final class SettingsView {
     }
 
     func revealDataSettings() {
-        _ = openRouterAPIKeyRow.grabFocusWithoutSelecting()
+        _ = proxyEnabledRow.grabFocus()
     }
 
     private func addAPIKeyRow(
