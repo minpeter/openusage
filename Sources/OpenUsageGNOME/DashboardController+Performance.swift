@@ -1,3 +1,4 @@
+import Adwaita
 import Foundation
 import OpenUsageLinuxCore
 
@@ -21,11 +22,20 @@ extension DashboardController {
                 snapshots = DemoFixtures.snapshots()
             }
             applySnapshots()
-            for index in 0..<100 {
+            let warmupStates = GTKPerformanceProbeScenario.refreshingStates(
+                sampleCount: 300
+            )
+            for (index, refreshing) in warmupStates.enumerated() {
+                isRefreshing = refreshing
                 stack.visibleChildName =
                     Self.pageOrder[index % Self.pageOrder.count].name
+                applySnapshots()
+                flushGTKPerformanceWork()
             }
+            isRefreshing = false
             stack.visibleChildName = Self.pageOrder[0].name
+            applySnapshots()
+            flushGTKPerformanceWork()
             let memory = LinuxProcessMemoryProbe()
             let idlePSS = try memory.readPSSBytes()
             let clock = ContinuousClock()
@@ -40,6 +50,7 @@ extension DashboardController {
                 stack.visibleChildName =
                     Self.pageOrder[index % Self.pageOrder.count].name
                 applySnapshots()
+                flushGTKPerformanceWork()
                 let components = started.duration(to: clock.now).components
                 durations.append(
                     Double(components.seconds) * 1_000
@@ -51,6 +62,7 @@ extension DashboardController {
             applySnapshots()
             window.visible = false
             window.present()
+            flushGTKPerformanceWork()
             let report = LinuxRuntimePerformanceReport(
                 idlePSSBytes: idlePSS,
                 finalPSSBytes: try memory.readPSSBytes(),
@@ -75,6 +87,12 @@ extension DashboardController {
             GNOMEAppLog.error(
                 "Performance probe failed: \(error.localizedDescription)"
             )
+        }
+    }
+
+    private func flushGTKPerformanceWork() {
+        while g_main_context_pending(nil) != 0 {
+            _ = g_main_context_iteration(nil, 0)
         }
     }
 }
