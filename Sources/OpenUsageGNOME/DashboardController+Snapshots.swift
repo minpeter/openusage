@@ -98,6 +98,17 @@ extension DashboardController {
     func applySnapshots() {
         let ordered = ordered(snapshots)
         let visible = visibleOrdered(snapshots)
+        if renderGate.consumeProviderSettings(snapshots: ordered) {
+            var seen: Set<String> = []
+            let providers = ordered.compactMap {
+                snapshot -> (id: String, name: String)? in
+                guard seen.insert(snapshot.providerID).inserted else {
+                    return nil
+                }
+                return (snapshot.providerID, snapshot.displayName)
+            }
+            settingsView.updateProviders(providers)
+        }
         guard renderGate.consume(
             snapshots: visible,
             settings: settings,
@@ -122,13 +133,6 @@ extension DashboardController {
         historyView.update(snapshots: visible)
         updateToolbarSummary(snapshots: visible, isRefreshing: isRefreshing)
         updateTrayUsage(visible)
-
-        var seen: Set<String> = []
-        let providers = ordered.compactMap { snapshot -> (id: String, name: String)? in
-            guard seen.insert(snapshot.providerID).inserted else { return nil }
-            return (snapshot.providerID, snapshot.displayName)
-        }
-        settingsView.updateProviders(providers)
         settingsView.updateMetricCustomization(visible)
     }
 

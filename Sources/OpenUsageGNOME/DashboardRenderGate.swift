@@ -8,6 +8,15 @@ struct DashboardRenderGate {
     }
 
     private var last: State?
+    private var lastProviderSettingsSnapshots: [ProviderUsageSnapshot]?
+
+    mutating func consumeProviderSettings(
+        snapshots: [ProviderUsageSnapshot]
+    ) -> Bool {
+        guard snapshots != lastProviderSettingsSnapshots else { return false }
+        lastProviderSettingsSnapshots = snapshots
+        return true
+    }
 
     mutating func consume(
         snapshots: [ProviderUsageSnapshot],

@@ -48,4 +48,29 @@ struct GNOMERenderGateTests {
         #expect(renamedRender)
         #expect(loadingRender)
     }
+
+    @Test("Hidden provider changes independently consume Settings updates")
+    func consumesHiddenProviderSettingsChanges() {
+        var gate = DashboardRenderGate()
+        let hidden = ProviderUsageSnapshot(
+            providerID: "openrouter",
+            displayName: "OpenRouter",
+            plan: nil,
+            metrics: [],
+            refreshedAt: Date(timeIntervalSince1970: 1_700_000_001)
+        )
+
+        let initial = gate.consumeProviderSettings(
+            snapshots: [snapshot, hidden]
+        )
+        let duplicate = gate.consumeProviderSettings(
+            snapshots: [snapshot, hidden]
+        )
+        let hiddenRemoved = gate.consumeProviderSettings(
+            snapshots: [snapshot]
+        )
+        #expect(initial)
+        #expect(!duplicate)
+        #expect(hiddenRemoved)
+    }
 }
