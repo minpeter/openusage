@@ -114,7 +114,12 @@ extension DashboardController {
             do {
                 try self.launchAtLoginService.setEnabled(enabled)
             } catch {
-                self.settings = previous
+                self.settings.launchAtLogin =
+                    Self.reconciledLaunchAtLoginState(
+                        fallback: previous.launchAtLogin ?? false
+                    ) {
+                        try self.launchAtLoginService.isEnabled()
+                    }
                 _ = self.persistSettings()
                 self.toastOverlay.addToast(Toast(
                     title: "Could not update launch at login: \(error.localizedDescription)"
@@ -200,6 +205,13 @@ extension DashboardController {
             ))
             return false
         }
+    }
+
+    nonisolated static func reconciledLaunchAtLoginState(
+        fallback: Bool,
+        readActualState: () throws -> Bool
+    ) -> Bool {
+        (try? readActualState()) ?? fallback
     }
 
     private func setMetricEnabled(

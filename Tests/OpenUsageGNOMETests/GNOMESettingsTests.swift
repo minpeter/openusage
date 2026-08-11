@@ -119,4 +119,21 @@ struct GNOMESettingsTests {
             try store.save(GNOMESettings())
         }
     }
+
+    @Test("Launch-at-login failure reconciles the actual backend state")
+    func launchAtLoginFailureReconciliation() {
+        let actual = DashboardController.reconciledLaunchAtLoginState(
+            fallback: false
+        ) {
+            true
+        }
+        let unavailable = DashboardController.reconciledLaunchAtLoginState(
+            fallback: true
+        ) {
+            throw CocoaError(.fileReadUnknown)
+        }
+
+        #expect(actual)
+        #expect(unavailable)
+    }
 }
