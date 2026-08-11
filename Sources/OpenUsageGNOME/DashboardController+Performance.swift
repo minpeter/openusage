@@ -30,7 +30,7 @@ extension DashboardController {
                 stack.visibleChildName =
                     Self.pageOrder[index % Self.pageOrder.count].name
                 applySnapshots()
-                flushGTKPerformanceWork()
+                flushGTKPerformanceWork(waitForFrame: true)
             }
             isRefreshing = false
             stack.visibleChildName = Self.pageOrder[0].name
@@ -56,13 +56,14 @@ extension DashboardController {
                     Double(components.seconds) * 1_000
                         + Double(components.attoseconds) / 1_000_000_000_000_000
                 )
+                flushGTKPerformanceWork(waitForFrame: true)
             }
             isRefreshing = false
             stack.visibleChildName = Self.pageOrder[0].name
             applySnapshots()
             window.visible = false
             window.present()
-            flushGTKPerformanceWork()
+            flushGTKPerformanceWork(waitForFrame: true)
             let report = LinuxRuntimePerformanceReport(
                 idlePSSBytes: idlePSS,
                 finalPSSBytes: try memory.readPSSBytes(),
@@ -90,9 +91,15 @@ extension DashboardController {
         }
     }
 
-    private func flushGTKPerformanceWork() {
+    private func flushGTKPerformanceWork(waitForFrame: Bool = false) {
         while g_main_context_pending(nil) != 0 {
             _ = g_main_context_iteration(nil, 0)
+        }
+        if waitForFrame {
+            _ = g_main_context_iteration(nil, 1)
+            while g_main_context_pending(nil) != 0 {
+                _ = g_main_context_iteration(nil, 0)
+            }
         }
     }
 }
