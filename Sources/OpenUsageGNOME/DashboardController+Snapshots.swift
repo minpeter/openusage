@@ -167,20 +167,24 @@ extension DashboardController {
         refreshButton.sensitive = true
         applySnapshots()
         recordAnalyticsIfNeeded()
+        let notificationToggles = UsageNotificationToggles(
+            almostOut: settings.notifyAlmostOut,
+            cuttingItClose: settings.notifyCuttingItClose,
+            willRunOut: settings.notifyWillRunOut
+        )
+        let notificationSnapshots = refreshed.map {
+            $0.applyingProviderRenames(settings.providerRenames)
+        }
+        notificationRevision &+= 1
+        let notificationState = GNOMENotificationState(
+            snapshots: notificationSnapshots,
+            toggles: notificationToggles,
+            revision: notificationRevision
+        )
+        latestNotificationState = notificationState
         if let desktopIntegration {
-            let notificationToggles = UsageNotificationToggles(
-                almostOut: settings.notifyAlmostOut,
-                cuttingItClose: settings.notifyCuttingItClose,
-                willRunOut: settings.notifyWillRunOut
-            )
-            let notificationSnapshots = refreshed.map {
-                $0.applyingProviderRenames(settings.providerRenames)
-            }
             Task.detached {
-                await desktopIntegration.postRefresh(
-                    notificationSnapshots,
-                    toggles: notificationToggles
-                )
+                await desktopIntegration.postRefresh(notificationState)
             }
         }
         if credentialRefreshPending {
@@ -269,5 +273,11 @@ final class DashboardCallback: @unchecked Sendable {
         guard let controller else { return }
         controller.desktopIntegration = integration
         controller.updateTrayUsage(controller.visibleOrdered(controller.snapshots))
+        guard let notificationState = controller.latestNotificationState else {
+            return
+        }
+        Task.detached {
+            await integration.postRefresh(notificationState)
+        }
     }
 }

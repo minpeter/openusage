@@ -35,6 +35,8 @@ final class DashboardController {
     var localAPIServer: LoopbackHTTPServer?
     var desktopIntegration: GNOMEDesktopIntegration?
     var trayUpdateRevision: UInt64 = 0
+    var notificationRevision: UInt64 = 0
+    var latestNotificationState: GNOMENotificationState?
     var analyticsRecorded = false
     var snapshots: [ProviderUsageSnapshot] = []
     var lastGoodByInstance: [String: ProviderUsageSnapshot] = [:]
