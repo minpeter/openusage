@@ -1,4 +1,5 @@
 import Foundation
+import OpenUsageLinuxCore
 import Testing
 @testable import OpenUsageGNOME
 
@@ -101,5 +102,21 @@ struct GNOMESettingsTests {
             from: JSONEncoder().encode(settings)
         )
         #expect(restarted.logLevel == .debug)
+    }
+
+    @Test("Persistence failures are returned to the controller")
+    func persistenceFailureIsObservable() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data("not a directory".utf8).write(to: root)
+        let store = GNOMESettingsStore(paths: LinuxPaths(environment: [
+            "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
+            "XDG_CONFIG_HOME": root.path,
+        ]))
+
+        #expect(throws: (any Error).self) {
+            try store.save(GNOMESettings())
+        }
     }
 }

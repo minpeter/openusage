@@ -14,7 +14,7 @@ extension DashboardController {
         providersView.setRenameHandler { [weak self] providerID, name in
             guard let self else { return }
             self.settings.renameProvider(providerID, to: name)
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.applySnapshots()
         }
     }
@@ -23,13 +23,13 @@ extension DashboardController {
         settingsView.onAppearanceChanged = { [weak self] appearance in
             guard let self else { return }
             self.settings.appearance = appearance
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.applyAppearance(appearance)
         }
         settingsView.onTrayUsageDisplayModeChanged = { [weak self] mode in
             guard let self else { return }
             self.settings.trayUsageDisplayMode = mode
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.updateTrayUsage(self.visibleOrdered(self.snapshots))
         }
         settingsView.onMenuBarStyleChanged = { [weak self] style in
@@ -67,19 +67,19 @@ extension DashboardController {
             self.settings.notifyAlmostOut = toggles.almostOut
             self.settings.notifyCuttingItClose = toggles.cuttingItClose
             self.settings.notifyWillRunOut = toggles.willRunOut
-            self.settingsStore.save(self.settings)
+            _ = self.persistSettings()
         }
         settingsView.onRefreshScheduleChanged = { [weak self] enabled, minutes in
             guard let self else { return }
             self.settings.periodicRefreshEnabled = enabled
             self.settings.refreshIntervalMinutes = minutes
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.scheduleRefreshTimer()
         }
         settingsView.onProviderOrderChanged = { [weak self] order in
             guard let self else { return }
             self.settings.providerOrder = order
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.applySnapshots()
         }
         settingsView.onProviderVisibilityChanged = { [weak self] providerID, isVisible in
@@ -91,7 +91,7 @@ extension DashboardController {
                 hidden.insert(providerID)
             }
             self.settings.hiddenProviderIDs = hidden.sorted()
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.applySnapshots()
         }
         settingsView.onMetricEnabledChanged = { [weak self] providerID, key, enabled in
@@ -108,11 +108,14 @@ extension DashboardController {
         }
         settingsView.onLaunchAtLoginChanged = { [weak self] enabled in
             guard let self else { return }
+            let previous = self.persistedSettings
+            self.settings.launchAtLogin = enabled
+            guard self.persistSettings() else { return }
             do {
                 try self.launchAtLoginService.setEnabled(enabled)
-                self.settings.launchAtLogin = enabled
-                self.settingsStore.save(self.settings)
             } catch {
+                self.settings = previous
+                _ = self.persistSettings()
                 self.toastOverlay.addToast(Toast(
                     title: "Could not update launch at login: \(error.localizedDescription)"
                 ))
@@ -122,7 +125,7 @@ extension DashboardController {
         settingsView.onAnalyticsChanged = { [weak self] enabled in
             guard let self else { return }
             self.settings.analyticsEnabled = enabled
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             let client = self.analyticsClient
             Task.detached {
                 await client.setEnabled(enabled)
@@ -132,7 +135,7 @@ extension DashboardController {
             guard let self else { return }
             self.settings.localAPIEnabled = enabled
             self.settings.localAPIPort = port
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             self.configureLocalAPI(enabled: enabled, port: port)
         }
         settingsView.onSyncDirectoryRequested = { [weak self] in
@@ -163,7 +166,7 @@ extension DashboardController {
         settingsView.onLogLevelChanged = { [weak self] level in
             guard let self else { return }
             self.settings.logLevel = level
-            self.settingsStore.save(self.settings)
+            guard self.persistSettings() else { return }
             GNOMEAppLog.configure(level: level)
             GNOMEAppLog.info("Log level changed to \(level.rawValue)")
         }
@@ -175,9 +178,28 @@ extension DashboardController {
     }
 
     private func saveAndApplyDisplaySettings() {
-        settingsStore.save(settings)
+        guard persistSettings() else { return }
         settingsView.apply(settings: settings)
         applySnapshots()
+    }
+
+    @discardableResult
+    func persistSettings() -> Bool {
+        do {
+            try settingsStore.save(settings)
+            persistedSettings = settings
+            return true
+        } catch {
+            settings = persistedSettings
+            settingsView.apply(settings: settings)
+            GNOMEAppLog.error(
+                "Failed to save GNOME settings: \(error.localizedDescription)"
+            )
+            toastOverlay.addToast(Toast(
+                title: "Could not save settings: \(error.localizedDescription)"
+            ))
+            return false
+        }
     }
 
     private func setMetricEnabled(
@@ -321,7 +343,7 @@ extension DashboardController {
 
     func setSyncDirectory(_ path: String?) {
         settings.setSyncDirectory(path)
-        settingsStore.save(settings)
+        guard persistSettings() else { return }
         settingsView.syncDirectoryRow.subtitle = usageDataDirectory.path
         toastOverlay.addToast(Toast(
             title: settings.syncDirectoryPath == nil

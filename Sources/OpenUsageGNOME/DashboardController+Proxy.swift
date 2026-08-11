@@ -13,7 +13,7 @@ extension DashboardController {
                 url: url,
                 bypassText: bypassText
             )
-            settingsStore.save(settings)
+            guard persistSettings() else { return }
             settingsView.apply(settings: settings)
             toastOverlay.addToast(Toast(
                 title: enabled

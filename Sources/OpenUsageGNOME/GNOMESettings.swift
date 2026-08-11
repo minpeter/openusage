@@ -470,14 +470,8 @@ struct GNOMESettingsStore: Sendable {
         }
     }
 
-    func save(_ settings: GNOMESettings) {
-        do {
-            try savePreservingLegacyOwnership(settings)
-        } catch {
-            GNOMEAppLog.error(
-                "Failed to save GNOME settings: \(error.localizedDescription)"
-            )
-        }
+    func save(_ settings: GNOMESettings) throws {
+        try savePreservingLegacyOwnership(settings)
     }
 
     private func savePreservingLegacyOwnership(_ settings: GNOMESettings) throws {

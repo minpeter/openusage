@@ -31,6 +31,7 @@ final class DashboardController {
     let analyticsClient: LinuxAnalyticsClient
     let launchAtLoginService: LinuxLaunchAtLoginService
     var settings: GNOMESettings
+    var persistedSettings: GNOMESettings
     var localAPIServer: LoopbackHTTPServer?
     var desktopIntegration: GNOMEDesktopIntegration?
     var trayUpdateRevision: UInt64 = 0
@@ -57,7 +58,9 @@ final class DashboardController {
 
     init(application: Application) {
         self.application = application
-        settings = settingsStore.load()
+        let loadedSettings = settingsStore.load()
+        settings = loadedSettings
+        persistedSettings = loadedSettings
         analyticsClient = LinuxAnalyticsClient(enabled: settings.analyticsEnabled ?? true)
         let paths = LinuxPaths()
         let executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
