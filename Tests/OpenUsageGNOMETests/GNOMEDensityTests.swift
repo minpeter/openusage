@@ -15,4 +15,11 @@ struct GNOMEDensityTests {
         #expect(compact.minimumTargetHeight == regular.minimumTargetHeight)
         #expect(compact.minimumTargetHeight == 40)
     }
+
+    @Test("Modern rhythm tightens cards without shrinking targets")
+    func modernRhythm() {
+        #expect(DensitySetting.regular.metrics.sectionSpacing == 16)
+        #expect(DensitySetting.regular.metrics.rowSpacing == 7)
+        #expect(DensitySetting.regular.metrics.minimumTargetHeight == 40)
+    }
 }

@@ -41,7 +41,7 @@ final class TotalSpendView {
         heading.hexpand = true
         let title = Label("Total Spend")
         title.xalign = 0
-        title.addCSSClass(.title2)
+        title.addCSSClass(GNOMETypographyRole.cardTitle.cssClass)
         heading.append(title)
         let subtitle = Label("Compare providers across cost and token usage.")
         subtitle.xalign = 0
@@ -89,7 +89,7 @@ final class TotalSpendView {
         )
         total.setMargins(GNOMEStyle.rowSpacing)
         totalValue.xalign = 0
-        totalValue.addCSSClass(.title1)
+        totalValue.addCSSClass(GNOMETypographyRole.heroValue.cssClass)
         totalValue.addCSSClass(.numeric)
         totalCaption.xalign = 0
         totalCaption.addCSSClass(.caption)

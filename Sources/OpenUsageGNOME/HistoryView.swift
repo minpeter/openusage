@@ -144,7 +144,7 @@ final class HistoryView {
         item.hexpand = true
         let valueLabel = Label(value)
         valueLabel.xalign = 0
-        valueLabel.addCSSClass(.title3)
+        valueLabel.addCSSClass(GNOMETypographyRole.statValue.cssClass)
         valueLabel.addCSSClass(.numeric)
         item.append(valueLabel)
         let caption = Label(label)

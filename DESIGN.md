@@ -40,9 +40,11 @@ immediately: which account is connected, how much of each limit is used, and whe
   overview, not in a competing header pill.
 - Four views: Overview, Providers, History, Settings.
 - `AdwViewSwitcher` is centered in the header at wide widths and moves to `AdwViewSwitcherBar` at narrow widths.
-- Vertical scrolling content uses 24-pixel outer margins and 18-pixel section spacing.
+- Vertical scrolling content uses 24-pixel outer margins and 16-pixel section spacing at default density.
 - Content is clamped to 840 logical pixels to preserve readable density on wide windows.
 - Every primary view starts with a title and one-line purpose statement, then presents the strongest signal first.
+- Page titles use libadwaita's compact title role; card titles and summary statistics use the quieter heading role
+  so hierarchy comes from placement and spacing rather than several competing display sizes.
 - Settings uses four local pages — General, Display, Providers, and Data — so unrelated controls are not placed in
   one continuous wall. Controls on one page must not unexpectedly change controls on another.
 - Providers are ordered by the user's persisted order, then account label.

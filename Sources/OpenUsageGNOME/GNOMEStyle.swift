@@ -34,6 +34,7 @@ enum GNOMEStyle {
     static let narrowBreakpointWidth = 680.0
     /// Smallest interactive target height (accessibility contract).
     static let minimumTargetHeight = 40
+    static let summaryCardPadding = 16
 
     // MARK: - Chart palette
 
@@ -79,7 +80,7 @@ enum GNOMEStyle {
     }
 
     .ou-summary-card {
-        padding: 18px;
+        padding: \(summaryCardPadding)px;
         border-radius: 12px;
         background-color: @card_bg_color;
         box-shadow: 0 1px 3px alpha(@shade_color, 0.14);
@@ -126,7 +127,7 @@ enum GNOMEStyle {
         )
         let titleLabel = Label(title)
         titleLabel.xalign = 0
-        titleLabel.addCSSClass(.title1)
+        titleLabel.addCSSClass(GNOMETypographyRole.pageTitle.cssClass)
         header.append(titleLabel)
 
         let descriptionLabel = Label(description)
@@ -135,6 +136,22 @@ enum GNOMEStyle {
         descriptionLabel.addCSSClass(.dimLabel)
         header.append(descriptionLabel)
         return header
+    }
+}
+
+enum GNOMETypographyRole: Sendable {
+    case pageTitle
+    case cardTitle
+    case heroValue
+    case statValue
+
+    var cssClass: String {
+        switch self {
+        case .pageTitle, .heroValue:
+            "title-2"
+        case .cardTitle, .statValue:
+            "heading"
+        }
     }
 }
 

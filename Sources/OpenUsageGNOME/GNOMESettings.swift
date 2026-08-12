@@ -64,8 +64,8 @@ extension DensitySetting {
         case .regular:
             .init(
                 outerMargin: 24,
-                sectionSpacing: 18,
-                rowSpacing: 8,
+                sectionSpacing: 16,
+                rowSpacing: 7,
                 controlSpacing: 10,
                 minimumTargetHeight: 40
             )

@@ -375,7 +375,11 @@ final class SettingsView {
         pageSwitcher.policy = .narrow
         pageSwitcher.halign = GTK_ALIGN_CENTER
         pageHeader.append(pageSwitcher)
-        root.append(pageHeader)
+        let headerClamp = Clamp()
+        headerClamp.maximumSize = GNOMEStyle.contentClamp
+        headerClamp.tighteningThreshold = GNOMEStyle.clampTightening
+        headerClamp.child = pageHeader
+        root.append(headerClamp)
 
         let generalPage = page(containing: [
             refreshGroup,
