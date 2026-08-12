@@ -47,4 +47,12 @@ struct AnalyticsPresentationTests {
     func multipleProviderSpend() {
         #expect(TotalSpendPresentationMode(sliceCount: 3) == .providerComparison)
     }
+
+    @Test("GTK share action preserves the macOS copy control semantics")
+    func shareActionParity() {
+        #expect(TotalSpendShareAction.iconName == "edit-copy-symbolic")
+        #expect(TotalSpendShareAction.successIconName == "object-select-symbolic")
+        #expect(TotalSpendShareAction.accessibilityLabel(metric: .cost) == "Copy Cost Screenshot")
+        #expect(TotalSpendShareAction.feedbackDuration == .milliseconds(1_400))
+    }
 }

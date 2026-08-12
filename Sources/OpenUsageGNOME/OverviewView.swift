@@ -57,6 +57,10 @@ final class OverviewView {
         totalSpendView.shareCurrent()
     }
 
+    func showTotalSpendCopyFeedback() {
+        totalSpendView.showCopyFeedback()
+    }
+
     func selectTotalSpendMetric(_ metric: TotalSpendMetric) {
         totalSpendView.selectMetric(metric)
     }

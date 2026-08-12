@@ -60,6 +60,16 @@ enum TotalSpendPresentationMode: Equatable, Sendable {
     }
 }
 
+enum TotalSpendShareAction {
+    static let iconName = "edit-copy-symbolic"
+    static let successIconName = "object-select-symbolic"
+    static let feedbackDuration = Duration.milliseconds(1_400)
+
+    static func accessibilityLabel(metric: TotalSpendMetric) -> String {
+        "Copy \(metric.label) Screenshot"
+    }
+}
+
 /// One Cairo drawing area per chart (efficiency contract: never one widget
 /// per point). Renders up to 31 daily values as accent bars over a baseline
 /// track, in light, dark, and high-contrast appearances.

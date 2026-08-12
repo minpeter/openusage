@@ -74,6 +74,10 @@ enum GNOMEStyle {
     /// Small structural accents which libadwaita does not expose as widget
     /// properties. Colors continue to come from the active Adwaita theme.
     static let css = """
+    button.ou-copy-success image {
+      color: @success_color;
+    }
+
     .ou-summary-card {
         padding: 18px;
         border-radius: 12px;

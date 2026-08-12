@@ -8,7 +8,7 @@ extension DashboardController {
     func wireViews() {
         overview.setRefreshHandler { [weak self] in self?.refresh() }
         overview.setShareHandler { [weak self] card in
-            self?.exportShareCard(card)
+            self?.copyShareCard(card)
         }
         providersView.setRefreshHandler { [weak self] in self?.refresh() }
         providersView.setRenameHandler { [weak self] providerID, name in
@@ -418,47 +418,29 @@ extension DashboardController {
         )
     }
 
-    func exportShareCard(_ card: BrandedShareCard) {
+    func copyShareCard(_ card: BrandedShareCard) {
         do {
-            let environment = ProcessInfo.processInfo.environment
-            let home = environment["HOME"].map {
-                URL(fileURLWithPath: $0, isDirectory: true)
-            } ?? FileManager.default.homeDirectoryForCurrentUser
-            let directory = environment["XDG_PICTURES_DIR"].map {
-                URL(
-                    fileURLWithPath: $0.replacingOccurrences(
-                        of: "$HOME",
-                        with: home.path
-                    ),
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent(
+                    "openusage-share-\(UUID().uuidString)",
                     isDirectory: true
                 )
-            } ?? home.appendingPathComponent("Pictures", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            defer { try? FileManager.default.removeItem(at: directory) }
             let file = try BrandedPNGExportService.export(card: card, to: directory)
-            showSharePreview(file)
-            UriLauncher(uri: file.absoluteString).launch()
-            toastOverlay.addToast(Toast(title: "Exported \(file.lastPathComponent)"))
+            guard let texture = Texture(filename: file.path) else {
+                throw BrandedPNGRendererError.writeFailure
+            }
+            window.clipboard.setTexture(texture)
+            overview.showTotalSpendCopyFeedback()
+            toastOverlay.addToast(Toast(title: "Copied screenshot"))
         } catch {
             toastOverlay.addToast(Toast(
-                title: "Could not export share image: \(error.localizedDescription)"
+                title: "Could not copy screenshot: \(error.localizedDescription)"
             ))
         }
-    }
-
-    private func showSharePreview(_ file: URL) {
-        _ = sharePreviewDialog?.close()
-        let preview = Dialog()
-        preview.title = file.lastPathComponent
-        preview.contentWidth = 960
-        preview.contentHeight = 600
-        let picture = Picture(filename: file.path)
-        picture.canShrink = true
-        picture.contentFit = GTK_CONTENT_FIT_CONTAIN
-        picture.hexpand = true
-        picture.vexpand = true
-        picture.setMargins(GNOMEStyle.outerMargin)
-        picture.alternativeText = "OpenUsage branded Total Spend share image"
-        preview.child = picture
-        preview.present(window)
-        sharePreviewDialog = preview
     }
 }

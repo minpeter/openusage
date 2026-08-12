@@ -17,19 +17,21 @@ final class TotalSpendView {
     }
     private let totalValue = Label("")
     private let totalCaption = Label("")
+    private let shareButton = Button(icon: .editCopy)
     private let legend = Box(
         orientation: GTK_ORIENTATION_VERTICAL,
         spacing: GNOMEStyle.controlSpacing
     )
     private var records: [ProviderSpendRecord] = []
     private var connections: [SignalConnection] = []
+    private var feedbackSource: SourceID?
     private var currentProjection: TotalSpendProjection?
     private var onShare: (BrandedShareCard) -> Void = { _ in }
 
     init() {
         root.addCSSClass("ou-summary-card")
         let header = Box(
-            orientation: GTK_ORIENTATION_VERTICAL,
+            orientation: GTK_ORIENTATION_HORIZONTAL,
             spacing: GNOMEStyle.rowSpacing
         )
         let heading = Box(
@@ -48,12 +50,18 @@ final class TotalSpendView {
         heading.append(subtitle)
         header.append(heading)
 
-        let shareButton = Button(label: "Share PNG", onClicked: { [weak self] in
+        shareButton.iconName = TotalSpendShareAction.iconName
+        shareButton.addCSSClass(.flat)
+        shareButton.halign = GTK_ALIGN_END
+        shareButton.valign = GTK_ALIGN_START
+        shareButton.setSizeRequest(
+            width: GNOMEStyle.minimumTargetHeight,
+            height: GNOMEStyle.minimumTargetHeight
+        )
+        shareButton.tooltipText = "Copy screenshot"
+        connections.append(shareButton.onClicked { [weak self] in
             self?.shareCurrent()
         })
-        shareButton.addCSSClass(.pill)
-        shareButton.halign = GTK_ALIGN_START
-        shareButton.setAccessibleLabel("Export and open branded share PNG")
         header.append(shareButton)
         root.append(header)
 
@@ -112,6 +120,22 @@ final class TotalSpendView {
         ))
     }
 
+    func showCopyFeedback() {
+        if let feedbackSource {
+            _ = MainContext.cancel(sourceId: feedbackSource)
+        }
+        shareButton.iconName = TotalSpendShareAction.successIconName
+        shareButton.addCSSClass("ou-copy-success")
+        feedbackSource = MainContext.timeout(every: TotalSpendShareAction.feedbackDuration) {
+            [weak self] in
+            guard let self else { return false }
+            self.shareButton.iconName = TotalSpendShareAction.iconName
+            self.shareButton.removeCSSClass("ou-copy-success")
+            self.feedbackSource = nil
+            return false
+        }
+    }
+
     func selectMetric(_ metric: TotalSpendMetric) {
         guard let index = TotalSpendMetric.allCases.firstIndex(of: metric) else {
             return
@@ -124,6 +148,9 @@ final class TotalSpendView {
         let metricIndex = metricButtons.firstIndex { $0.active } ?? 0
         let period = TotalSpendPeriod.allCases[periodIndex]
         let metric = TotalSpendMetric.allCases[metricIndex]
+        shareButton.setAccessibleLabel(
+            TotalSpendShareAction.accessibilityLabel(metric: metric)
+        )
         let projection = TotalSpendAnalytics.project(
             records: records,
             metric: metric,

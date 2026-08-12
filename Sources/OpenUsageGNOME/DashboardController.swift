@@ -42,7 +42,6 @@ final class DashboardController {
     var apiKeyRevisions: [ManagedAPIKeyProvider: UInt64] = [:]
     var refreshTimer: SourceID?
     var breakpoint: Breakpoint?
-    var sharePreviewDialog: Dialog?
     var retainedActions: [SimpleAction] = []
     var connections: [SignalConnection] = []
     var renderGate = DashboardRenderGate()

@@ -45,7 +45,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 | Notifications | Freedesktop notification portal | Threshold and provider errors are actionable |
 | Sparkle | Flatpak or package-manager updates | No application-managed privileged updater |
 | iCloud sync | Export/import plus optional user-selected sync directory | Settings and snapshots round-trip without Apple services |
-| Share sheet | Export file and default application opener | User can share equivalent machine-readable data |
+| Share screenshot | PNG image clipboard with inline copy feedback | Matches the macOS copy action using GTK's native `GdkClipboard` texture support |
 | Hide during screen share | Disabled with a documented GNOME Wayland limitation | No false privacy claim; public compositor APIs are re-evaluated when available |
 
 ## GNOME Experience
