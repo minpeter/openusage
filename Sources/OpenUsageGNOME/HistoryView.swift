@@ -62,6 +62,7 @@ final class HistoryView {
 
     private func chartGroup(_ snapshot: ProviderUsageSnapshot, metric: UsageMetric) -> Widget {
         let points = Array((metric.points ?? []).suffix(ChartView.maximumPoints))
+        let presentation = UsageTrendPresentation(points: points)
         let group = PreferencesGroup(title: snapshot.displayName)
         group.description = [snapshot.accountLabel, metric.label]
             .compactMap { $0 }.joined(separator: " · ").nilIfEmpty
@@ -73,6 +74,8 @@ final class HistoryView {
             spacing: GNOMEStyle.rowSpacing
         )
         chartContent.setMargins(GNOMEStyle.sectionSpacing)
+        chartContent.addCSSClass("ou-chart-card")
+        chartContent.append(summaryStrip(presentation))
         chartContent.append(chart.widget)
         let dates = Box(
             orientation: GTK_ORIENTATION_HORIZONTAL,
@@ -98,14 +101,6 @@ final class HistoryView {
         chartRow.activatable = false
         group.add(chartRow)
 
-        let legend = ActionRow(title: "Total over \(points.count) days")
-        legend.subtitle = legendSubtitle(points)
-        let total = Label("\(GNOMEFormat.tokens(points.reduce(0) { $0 + $1.value })) tokens")
-        total.addCSSClass(.numeric)
-        total.valign = GTK_ALIGN_CENTER
-        legend.addSuffix(total)
-        group.add(legend)
-
         let table = ExpanderRow(title: "Daily Values")
         table.subtitle = "Every chart point as text, newest first"
         for point in points.reversed() {
@@ -120,8 +115,43 @@ final class HistoryView {
         return group
     }
 
-    private func legendSubtitle(_ points: [UsagePoint]) -> String {
-        guard let first = points.first, let last = points.last else { return "" }
-        return "\(GNOMEFormat.shortDay(first.date)) - \(GNOMEFormat.shortDay(last.date))"
+    private func summaryStrip(_ presentation: UsageTrendPresentation) -> Widget {
+        let strip = Box(
+            orientation: GTK_ORIENTATION_HORIZONTAL,
+            spacing: GNOMEStyle.rowSpacing
+        )
+        strip.addCSSClass("ou-stat-strip")
+        strip.append(stat(
+            value: GNOMEFormat.compactNumber(presentation.total),
+            label: "Total"
+        ))
+        strip.append(stat(
+            value: GNOMEFormat.compactNumber(presentation.average),
+            label: "Avg / Day"
+        ))
+        strip.append(stat(
+            value: GNOMEFormat.compactNumber(presentation.peak?.value ?? 0),
+            label: "Peak"
+        ))
+        return strip
+    }
+
+    private func stat(value: String, label: String) -> Widget {
+        let item = Box(
+            orientation: GTK_ORIENTATION_VERTICAL,
+            spacing: 2
+        )
+        item.hexpand = true
+        let valueLabel = Label(value)
+        valueLabel.xalign = 0
+        valueLabel.addCSSClass(.title3)
+        valueLabel.addCSSClass(.numeric)
+        item.append(valueLabel)
+        let caption = Label(label)
+        caption.xalign = 0
+        caption.addCSSClass(.caption)
+        caption.addCSSClass(.dimLabel)
+        item.append(caption)
+        return item
     }
 }

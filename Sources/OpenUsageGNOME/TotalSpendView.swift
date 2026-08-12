@@ -15,10 +15,8 @@ final class TotalSpendView {
     private let metricButtons = TotalSpendMetric.allCases.map {
         ToggleButton(label: $0.label)
     }
-    private let drawingArea = DrawingArea()
-    private let ringOverlay = Overlay()
-    private let centerValue = Label("")
-    private let centerCaption = Label("")
+    private let totalValue = Label("")
+    private let totalCaption = Label("")
     private let legend = Box(
         orientation: GTK_ORIENTATION_VERTICAL,
         spacing: GNOMEStyle.controlSpacing
@@ -77,23 +75,20 @@ final class TotalSpendView {
         ))
         root.append(selectors)
 
-        drawingArea.setSizeRequest(width: 160, height: 160)
-        drawingArea.halign = GTK_ALIGN_CENTER
-        ringOverlay.child = drawingArea
-        let center = Box(
+        let total = Box(
             orientation: GTK_ORIENTATION_VERTICAL,
             spacing: GNOMEStyle.rowSpacing
         )
-        center.halign = GTK_ALIGN_CENTER
-        center.valign = GTK_ALIGN_CENTER
-        centerValue.addCSSClass(.title1)
-        centerValue.addCSSClass(.numeric)
-        centerCaption.addCSSClass(.caption)
-        centerCaption.addCSSClass(.dimLabel)
-        center.append(centerValue)
-        center.append(centerCaption)
-        ringOverlay.addOverlay(center)
-        root.append(ringOverlay)
+        total.setMargins(GNOMEStyle.rowSpacing)
+        totalValue.xalign = 0
+        totalValue.addCSSClass(.title1)
+        totalValue.addCSSClass(.numeric)
+        totalCaption.xalign = 0
+        totalCaption.addCSSClass(.caption)
+        totalCaption.addCSSClass(.dimLabel)
+        total.append(totalValue)
+        total.append(totalCaption)
+        root.append(total)
         root.append(legend)
     }
 
@@ -135,21 +130,17 @@ final class TotalSpendView {
             period: period
         )
         currentProjection = projection.slices.isEmpty ? nil : projection
-        centerValue.text = format(projection.total, metric: metric)
-        centerCaption.text = metric.label
-        drawingArea.setAccessibleLabel("Total Spend \(metric.label) ring")
-        drawingArea.setAccessibleDescription(accessibilityDescription(projection))
-        ringOverlay.setAccessibleLabel("Total Spend \(metric.label) ring")
-        ringOverlay.setAccessibleDescription(accessibilityDescription(projection))
-        drawingArea.setDrawFunc { context, width, height in
-            Self.draw(
-                context: context,
-                projection: projection,
-                width: Double(width),
-                height: Double(height)
-            )
+        totalValue.text = format(projection.total, metric: metric)
+        let mode = TotalSpendPresentationMode(sliceCount: projection.slices.count)
+        totalCaption.text = switch mode {
+        case .empty:
+            projection.period.label
+        case .singleProvider:
+            "\(projection.period.label) · \(projection.slices[0].label)"
+        case .providerComparison:
+            "\(projection.period.label) · \(projection.slices.count) providers"
         }
-        drawingArea.queueDraw()
+        totalValue.setAccessibleDescription(accessibilityDescription(projection))
         rebuildLegend(projection)
     }
 
@@ -205,21 +196,30 @@ final class TotalSpendView {
         for slice in projection.slices {
             let row = Box(
                 orientation: GTK_ORIENTATION_VERTICAL,
-                spacing: 2
+                spacing: GNOMEStyle.controlSpacing
             )
             row.addCSSClass("ou-legend-row")
+            let labels = Box(
+                orientation: GTK_ORIENTATION_HORIZONTAL,
+                spacing: GNOMEStyle.controlSpacing
+            )
             let name = Label(slice.label)
             name.xalign = 0
             name.hexpand = true
             name.wrap = true
-            name.maxWidthChars = 24
-            row.append(name)
-            let value = Label(
-                "\(format(slice.value, metric: projection.metric)) · \(slice.wholePercent)%"
-            )
+            name.maxWidthChars = 18
+            labels.append(name)
+            let value = Label(format(slice.value, metric: projection.metric))
             value.addCSSClass(.numeric)
-            value.xalign = 0
-            row.append(value)
+            value.valign = GTK_ALIGN_CENTER
+            labels.append(value)
+            row.append(labels)
+            let bar = ProgressBar()
+            bar.setSizeRequest(width: 1)
+            bar.fraction = slice.share
+            bar.setAccessibleLabel("\(slice.label) spend share")
+            bar.setAccessibleDescription("\(slice.wholePercent)%")
+            row.append(bar)
             row.setAccessibleLabel("\(slice.label) \(slice.wholePercent)%")
             legend.append(row)
         }
@@ -248,56 +248,4 @@ final class TotalSpendView {
         }
     }
 
-    private static func draw(
-        context: CairoContext,
-        projection: TotalSpendProjection,
-        width: Double,
-        height: Double
-    ) {
-        guard width > 20, height > 20 else { return }
-        let style = StyleManager.default
-        let theme = GNOMEStyle.chartPalette(
-            dark: style.dark,
-            highContrast: style.highContrast
-        )
-        let palette = [
-            (theme.accentRed, theme.accentGreen, theme.accentBlue),
-            (0.42, 0.36, 0.78),
-            (0.16, 0.64, 0.52),
-            (0.91, 0.49, 0.16),
-            (0.78, 0.35, 0.58),
-            (0.25, 0.62, 0.74),
-        ]
-        let centerX = width / 2
-        let centerY = height / 2
-        let radius = min(width, height) * 0.34
-        let lineWidth = min(width, height) * 0.13
-
-        context.setLineWidth(lineWidth)
-        context.setSourceRGBA(0.5, 0.5, 0.5, theme.trackAlpha)
-        context.arc(
-            centerX: centerX,
-            centerY: centerY,
-            radius: radius,
-            startAngle: 0,
-            endAngle: 2 * Double.pi
-        )
-        context.stroke()
-
-        var angle = -Double.pi / 2
-        for (index, slice) in projection.slices.enumerated() {
-            let end = angle + slice.share * 2 * Double.pi
-            let color = palette[index % palette.count]
-            context.setSourceRGBA(color.0, color.1, color.2, 1)
-            context.arc(
-                centerX: centerX,
-                centerY: centerY,
-                radius: radius,
-                startAngle: angle,
-                endAngle: end
-            )
-            context.stroke()
-            angle = end
-        }
-    }
 }

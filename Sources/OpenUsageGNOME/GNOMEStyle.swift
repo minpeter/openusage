@@ -41,8 +41,6 @@ enum GNOMEStyle {
         let accentRed: Double
         let accentGreen: Double
         let accentBlue: Double
-        /// Alpha used for the fill under the accent stroke.
-        let fillAlpha: Double
         /// Alpha used for the baseline/track.
         let trackAlpha: Double
     }
@@ -60,16 +58,15 @@ enum GNOMEStyle {
                       blue: Double(rgba.pointee.blue))
             g_free(rgba)
         }
-        let fillAlpha: Double
         let trackAlpha: Double
         switch (dark, highContrast) {
-        case (false, false): (fillAlpha, trackAlpha) = (0.18, 0.25)
-        case (false, true): (fillAlpha, trackAlpha) = (0.30, 0.55)
-        case (true, false): (fillAlpha, trackAlpha) = (0.22, 0.30)
-        case (true, true): (fillAlpha, trackAlpha) = (0.35, 0.60)
+        case (false, false): trackAlpha = 0.25
+        case (false, true): trackAlpha = 0.55
+        case (true, false): trackAlpha = 0.30
+        case (true, true): trackAlpha = 0.60
         }
         return ChartPalette(accentRed: accent.red, accentGreen: accent.green,
-                            accentBlue: accent.blue, fillAlpha: fillAlpha, trackAlpha: trackAlpha)
+                            accentBlue: accent.blue, trackAlpha: trackAlpha)
     }
 
     // MARK: - Custom CSS
@@ -86,6 +83,17 @@ enum GNOMEStyle {
     .ou-legend-row {
         min-height: 32px;
         padding: 0 4px;
+    }
+    .ou-chart-card {
+        padding: 6px;
+    }
+    .ou-stat-strip {
+        padding: 2px 4px 8px;
+    }
+    .ou-comparison-track {
+        min-height: 8px;
+        border-radius: 999px;
+        background-color: alpha(@accent_bg_color, 0.14);
     }
     .ou-summary-card .title-1,
     .ou-summary-card .title-2 {
@@ -154,6 +162,26 @@ enum GNOMEFormat {
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value.rounded())) ?? "\(Int(value.rounded()))"
+    }
+
+    static func compactNumber(_ value: Double) -> String {
+        let absolute = abs(value)
+        let scaled: Double
+        let suffix: String
+        switch absolute {
+        case 1_000_000_000...:
+            scaled = value / 1_000_000_000
+            suffix = "B"
+        case 1_000_000...:
+            scaled = value / 1_000_000
+            suffix = "M"
+        case 1_000...:
+            scaled = value / 1_000
+            suffix = "K"
+        default:
+            return tokens(value)
+        }
+        return String(format: scaled >= 100 ? "%.0f%@" : "%.1f%@", scaled, suffix)
     }
 
     static func shortDay(_ date: Date) -> String {

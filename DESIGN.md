@@ -26,6 +26,12 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Keep the original hierarchy: spend summary, provider identity, plan, quota rows, reset time, refresh status.
 - Use the user's GNOME system accent for healthy usage, amber for warnings, and red for provider failures.
 - Reserve filled accent buttons for the primary action in a section. Secondary actions are flat or neutral.
+- Prefer direct-value analytics over decorative charts:
+  - Total Spend leads with the selected total and ranked provider progress bars; a single provider never produces
+    a meaningless 100-percent donut.
+  - History uses subtle grid lines, a daily-average guide, muted historical bars, and a stronger latest bar.
+  - Total, daily average, and peak stay visible above each trend while every point remains available in the
+    accessible disclosure.
 
 ## 3. Layout
 
@@ -57,8 +63,8 @@ immediately: which account is connected, how much of each limit is used, and whe
 - History: bounded daily charts and a provider/account legend.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
 - Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
-- Summary surface: a single card with the current total, provider-share ring, compact legend, and one export action.
-  The ring is supporting visualization; the total and provider values remain readable text.
+- Summary surface: a single card with the current total, ranked provider comparison bars, and one export action.
+  Provider values remain readable text; a single provider never produces a meaningless 100-percent chart.
 
 ## 5. Interaction
 
