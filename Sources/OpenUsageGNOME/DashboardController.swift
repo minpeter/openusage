@@ -51,7 +51,6 @@ final class DashboardController {
         ("overview", "Overview", "view-grid-symbolic"),
         ("providers", "Providers", "view-list-symbolic"),
         ("history", "History", "document-open-recent-symbolic"),
-        ("settings", "Settings", "emblem-system-symbolic"),
     ]
 
     init(application: Application) {
@@ -107,9 +106,6 @@ final class DashboardController {
            Self.pageOrder.contains(where: { $0.name == page }) {
             stack.visibleChildName = page
         }
-        if let settingsPage = DemoFixtures.requestedSettingsPage {
-            settingsView.selectPage(settingsPage)
-        }
         configureLocalAPI(
             enabled: settings.localAPIEnabled ?? false,
             port: settings.localAPIPort ?? LoopbackHTTPServer.defaultPort
@@ -120,6 +116,9 @@ final class DashboardController {
 
     func present() {
         window.present()
+        if let settingsPage = DemoFixtures.requestedSettingsPage {
+            settingsView.present(parent: window, page: settingsPage)
+        }
     }
 
     func start() {

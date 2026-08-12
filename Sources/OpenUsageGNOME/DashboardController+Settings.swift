@@ -5,6 +5,14 @@ import OpenUsageLinuxCore
 // MARK: - View wiring
 
 extension DashboardController {
+    func showSettingsToast(_ toast: Toast) {
+        if settingsView.isPresented {
+            settingsView.addToast(toast)
+        } else {
+            toastOverlay.addToast(toast)
+        }
+    }
+
     func wireViews() {
         overview.setRefreshHandler { [weak self] in self?.refresh() }
         overview.setShareHandler { [weak self] card in
@@ -121,7 +129,7 @@ extension DashboardController {
                         try self.launchAtLoginService.isEnabled()
                     }
                 _ = self.persistSettings()
-                self.toastOverlay.addToast(Toast(
+                self.showSettingsToast(Toast(
                     title: "Could not update launch at login: \(error.localizedDescription)"
                 ))
                 self.settingsView.apply(settings: self.settings)
@@ -200,7 +208,7 @@ extension DashboardController {
             GNOMEAppLog.error(
                 "Failed to save GNOME settings: \(error.localizedDescription)"
             )
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "Could not save settings: \(error.localizedDescription)"
             ))
             return false
@@ -272,7 +280,7 @@ extension DashboardController {
                 return false
             }
             guard pins.pin(key, for: providerID) else {
-                toastOverlay.addToast(Toast(title: "Pin up to two metrics per provider."))
+                showSettingsToast(Toast(title: "Pin up to two metrics per provider."))
                 settingsView.apply(settings: settings)
                 return false
             }
@@ -317,7 +325,7 @@ extension DashboardController {
             try server.start()
             localAPIServer = server
         } catch {
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "Could not start local API: \(error.localizedDescription)"
             ))
         }
@@ -331,9 +339,9 @@ extension DashboardController {
                 to: usageDataDirectory
             )
             UriLauncher(uri: file.absoluteString).launch()
-            toastOverlay.addToast(Toast(title: "Exported \(file.lastPathComponent)"))
+            showSettingsToast(Toast(title: "Exported \(file.lastPathComponent)"))
         } catch {
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "Could not export usage: \(error.localizedDescription)"
             ))
         }
@@ -347,7 +355,9 @@ extension DashboardController {
         let dialog = FileDialog()
         dialog.title = "Choose Usage Sync Directory"
         dialog.acceptLabel = "Choose"
-        dialog.selectFolder(parent: window) { [weak self] path in
+        dialog.selectFolder(
+            parent: settingsView.presentationParent(fallback: window)
+        ) { [weak self] path in
             guard let path else { return }
             self?.setSyncDirectory(path)
         }
@@ -357,7 +367,7 @@ extension DashboardController {
         settings.setSyncDirectory(path)
         guard persistSettings() else { return }
         settingsView.syncDirectoryRow.subtitle = usageDataDirectory.path
-        toastOverlay.addToast(Toast(
+        showSettingsToast(Toast(
             title: settings.syncDirectoryPath == nil
                 ? "Using the Downloads directory"
                 : "Sync directory updated"
@@ -373,7 +383,9 @@ extension DashboardController {
         dialog.title = "Import Usage"
         dialog.acceptLabel = "Import"
         dialog.setFilters([FileFilter(name: "OpenUsage JSON", suffixes: ["json"])])
-        dialog.open(parent: window) { [weak self] path in
+        dialog.open(
+            parent: settingsView.presentationParent(fallback: window)
+        ) { [weak self] path in
             guard let path else { return }
             self?.importSnapshots(from: URL(fileURLWithPath: path))
         }
@@ -385,9 +397,9 @@ extension DashboardController {
                 try UsageDataSyncService().importSnapshots(from: file)
             )
             applySnapshots()
-            toastOverlay.addToast(Toast(title: "Imported \(file.lastPathComponent)"))
+            showSettingsToast(Toast(title: "Imported \(file.lastPathComponent)"))
         } catch {
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "Could not import usage: \(error.localizedDescription)"
             ))
         }

@@ -71,7 +71,7 @@ unnamed = [
 progress = [node for node in nodes if node.getRole() == pyatspi.ROLE_PROGRESS_BAR]
 unnamed_progress = [node for node in progress if not (node.name or "").strip()]
 names = {(node.name or "").strip() for node in nodes}
-required = {"Overview", "Providers", "History", "Settings", "Refresh usage"}
+required = {"Overview", "Providers", "History", "Refresh usage", "Main menu"}
 missing = sorted(required - names)
 
 print(f"accessible_nodes={len(nodes)}")

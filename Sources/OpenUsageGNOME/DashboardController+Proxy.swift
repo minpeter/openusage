@@ -15,14 +15,14 @@ extension DashboardController {
             )
             guard persistSettings() else { return }
             settingsView.apply(settings: settings)
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: enabled
                     ? "Proxy saved - restart OpenUsage to apply"
                     : "Proxy disabled - restart OpenUsage to apply"
             ))
         } catch {
             settingsView.apply(settings: settings)
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "Could not save proxy: \(error.localizedDescription)"
             ))
         }

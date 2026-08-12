@@ -22,4 +22,14 @@ struct GNOMEDensityTests {
         #expect(DensitySetting.regular.metrics.rowSpacing == 7)
         #expect(DensitySetting.regular.metrics.minimumTargetHeight == 40)
     }
+
+    @Test("Primary navigation contains content destinations only")
+    @MainActor
+    func primaryNavigationExcludesPreferences() {
+        #expect(DashboardController.pageOrder.map(\.name) == [
+            "overview",
+            "providers",
+            "history",
+        ])
+    }
 }

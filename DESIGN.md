@@ -38,15 +38,16 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Default window: 900 by 760 logical pixels, resizable down to 360 by 294.
 - `AdwHeaderBar`: adaptive view switcher and window-level refresh/menu actions. Usage values belong in the
   overview, not in a competing header pill.
-- Four views: Overview, Providers, History, Settings.
+- Three primary content views: Overview, Providers, and History.
 - `AdwViewSwitcher` is centered in the header at wide widths and moves to `AdwViewSwitcherBar` at narrow widths.
 - Vertical scrolling content uses 24-pixel outer margins and 16-pixel section spacing at default density.
 - Content is clamped to 840 logical pixels to preserve readable density on wide windows.
 - Every primary view starts with a title and one-line purpose statement, then presents the strongest signal first.
 - Page titles use libadwaita's compact title role; card titles and summary statistics use the quieter heading role
   so hierarchy comes from placement and spacing rather than several competing display sizes.
-- Settings uses four local pages — General, Display, Providers, and Data — so unrelated controls are not placed in
-  one continuous wall. Controls on one page must not unexpectedly change controls on another.
+- Preferences opens from the application menu in a native `AdwPreferencesDialog`; it is not a peer content
+  destination. Its General, Display, Providers, and Data pages keep unrelated controls out of one continuous wall.
+  Controls on one page must not unexpectedly change controls on another.
 - Providers are ordered by the user's persisted order, then account label.
 - Each quota row contains label, percentage or value, progress bar, and reset copy.
 

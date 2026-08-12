@@ -23,6 +23,7 @@ extension DashboardController {
 
         let menu = GMenuRef()
         menu.append("Refresh", action: "app.refresh")
+        menu.append("Preferences", action: "app.preferences")
         menu.append("About OpenUsage", action: "app.about")
         let menuButton = MenuButton(icon: .openMenu)
         menuButton.addCSSClass(.flat)
@@ -34,7 +35,7 @@ extension DashboardController {
         menuButton.setAccessibleLabel("Main menu")
         header.packEnd(menuButton)
 
-        let views: [Widget] = [overview.root, providersView.root, historyView.root, settingsView.root]
+        let views: [Widget] = [overview.root, providersView.root, historyView.root]
         for (page, view) in zip(Self.pageOrder, views) {
             stack.addTitledWithIcon(view, name: page.name, title: page.title, iconName: page.icon)
         }
@@ -57,6 +58,10 @@ extension DashboardController {
     func buildActions() {
         let refreshAction = SimpleAction(name: "refresh") { [weak self] in
             self?.refresh()
+        }
+        let preferencesAction = SimpleAction(name: "preferences") { [weak self] in
+            guard let self else { return }
+            self.settingsView.present(parent: self.window)
         }
         let aboutAction = SimpleAction(name: "about") { [weak self] in
             guard let self else { return }
@@ -120,13 +125,15 @@ extension DashboardController {
             self?.settingsView.onLogLevelChanged(level)
         }
         let showDataSettingsAction = SimpleAction(name: "show-data-settings") { [weak self] in
-            self?.settingsView.revealDataSettings()
+            guard let self else { return }
+            self.settingsView.revealDataSettings(parent: self.window)
         }
         let performanceProbeAction = SimpleAction(name: "run-performance-probe") { [weak self] in
             self?.runPerformanceProbe()
         }
         retainedActions = [
             refreshAction,
+            preferencesAction,
             aboutAction,
             shareAction,
             spendRateAction,
@@ -155,6 +162,11 @@ extension DashboardController {
             application.quit()
             return true
         }
+        shortcuts.addShortcut("<Control>comma") { [weak self] in
+            guard let self else { return false }
+            self.settingsView.present(parent: self.window)
+            return true
+        }
         for (index, page) in Self.pageOrder.enumerated() {
             shortcuts.addShortcut("<Control>\(index + 1)") { [weak self] in
                 self?.stack.visibleChildName = page.name
@@ -170,7 +182,7 @@ extension DashboardController {
         let narrow = Breakpoint.maxWidth(GNOMEStyle.narrowBreakpointWidth, unit: .px)
         narrow.addSetter(switcherBar, property: .custom("reveal"), value: true)
         narrow.addSetter(headerSwitcher, property: .visible, value: false)
-        for page in [overview.root, providersView.root, historyView.root, settingsView.root] {
+        for page in [overview.root, providersView.root, historyView.root] {
             narrow.addSetter(
                 page,
                 property: .custom("margin-bottom"),
@@ -181,8 +193,7 @@ extension DashboardController {
             overview.content,
             providersView.content,
             historyView.content,
-            settingsView.pageHeader,
-        ] + settingsView.pageContents
+        ]
         for content in narrowContents {
             narrow.addSetter(
                 content,

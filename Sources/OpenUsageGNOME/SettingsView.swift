@@ -9,7 +9,16 @@ import OpenUsageLinuxCore
 /// provider-ordering group live in SettingsView+*.swift.
 @MainActor
 final class SettingsView {
-    let root: Box
+    static let pageOrder: [(name: String, title: String, icon: String)] = [
+        ("general", "General", "preferences-system-symbolic"),
+        ("display", "Display", "video-display-symbolic"),
+        ("providers", "Providers", "system-users-symbolic"),
+        ("data", "Data", "folder-symbolic"),
+    ]
+
+    private let dialog = PreferencesDialog()
+    private(set) var isPresented = false
+    private var focusDataPageOnMap = false
 
     var onAppearanceChanged: (GNOMESettings.Appearance) -> Void = { _ in }
     var onTrayUsageDisplayModeChanged: (TrayUsageDisplayMode) -> Void = { _ in }
@@ -44,13 +53,6 @@ final class SettingsView {
     var onLogLevelChanged: (LinuxLogLevel) -> Void = { _ in }
     var onOpenLog: () -> Void = {}
 
-    private let pageStack = ViewStack()
-    private let pageSwitcher = ViewSwitcher()
-    let pageHeader = Box(
-        orientation: GTK_ORIENTATION_VERTICAL,
-        spacing: GNOMEStyle.sectionSpacing
-    )
-    private(set) var pageContents: [Box] = []
     let appearanceRow: ComboRow
     let trayUsageDisplayRow: ComboRow
     let menuBarStyleRow: ComboRow
@@ -109,7 +111,6 @@ final class SettingsView {
         defaultSyncPath: String,
         version: String
     ) {
-        root = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
         self.defaultSyncPath = defaultSyncPath
         syncDirectoryRow = ActionRow(
             title: "Sync Directory",
@@ -220,7 +221,7 @@ final class SettingsView {
         shortcutsGroup.add(shortcutRow(title: "Show Overview", accelerator: "<Control>1"))
         shortcutsGroup.add(shortcutRow(title: "Show Providers", accelerator: "<Control>2"))
         shortcutsGroup.add(shortcutRow(title: "Show History", accelerator: "<Control>3"))
-        shortcutsGroup.add(shortcutRow(title: "Show Settings", accelerator: "<Control>4"))
+        shortcutsGroup.add(shortcutRow(title: "Preferences", accelerator: "<Control>comma"))
         shortcutsGroup.add(shortcutRow(title: "Quit", accelerator: "<Control>q"))
 
         // Data & privacy group
@@ -365,23 +366,11 @@ final class SettingsView {
         let aboutGroup = PreferencesGroup(title: "About")
         aboutGroup.add(ActionRow(title: "OpenUsage", subtitle: "Version \(version)"))
 
-        pageHeader.setMargins(GNOMEStyle.outerMargin)
-        pageHeader.marginBottom = GNOMEStyle.rowSpacing
-        pageHeader.append(GNOMEStyle.pageHeader(
-            title: "Settings",
-            description: "Control refresh, presentation, providers, and local data."
-        ))
-        pageSwitcher.stack = pageStack
-        pageSwitcher.policy = .narrow
-        pageSwitcher.halign = GTK_ALIGN_CENTER
-        pageHeader.append(pageSwitcher)
-        let headerClamp = Clamp()
-        headerClamp.maximumSize = GNOMEStyle.contentClamp
-        headerClamp.tighteningThreshold = GNOMEStyle.clampTightening
-        headerClamp.child = pageHeader
-        root.append(headerClamp)
-
-        let generalPage = page(containing: [
+        let generalPage = page(
+            name: "general",
+            title: "General",
+            icon: "preferences-system-symbolic",
+            groups: [
             refreshGroup,
             notificationGroup,
             startupGroup,
@@ -389,49 +378,50 @@ final class SettingsView {
             shortcutsGroup,
             aboutGroup,
         ])
-        let displayPage = page(containing: [
+        let displayPage = page(
+            name: "display",
+            title: "Display",
+            icon: "video-display-symbolic",
+            groups: [
             appearanceGroup,
             panelIndicatorGroup,
             displayGroup,
         ])
-        let providersPage = page(containing: [
+        let providersPage = page(
+            name: "providers",
+            title: "Providers",
+            icon: "system-users-symbolic",
+            groups: [
             orderGroup,
             metricCustomizationGroup,
         ])
-        let dataPage = page(containing: [
+        let dataPage = page(
+            name: "data",
+            title: "Data",
+            icon: "folder-symbolic",
+            groups: [
             privacyGroup,
             apiKeyGroup,
             proxyGroup,
             advancedGroup,
             updateGroup,
         ])
-
-        pageStack.addTitledWithIcon(
-            generalPage,
-            name: "general",
-            title: "General",
-            iconName: "preferences-system-symbolic"
-        )
-        pageStack.addTitledWithIcon(
-            displayPage,
-            name: "display",
-            title: "Display",
-            iconName: "video-display-symbolic"
-        )
-        pageStack.addTitledWithIcon(
-            providersPage,
-            name: "providers",
-            title: "Providers",
-            iconName: "system-users-symbolic"
-        )
-        pageStack.addTitledWithIcon(
-            dataPage,
-            name: "data",
-            title: "Data",
-            iconName: "folder-symbolic"
-        )
-        pageStack.vexpand = true
-        root.append(pageStack)
+        [generalPage, displayPage, providersPage, dataPage].forEach(dialog.add)
+        dialog.title = "Preferences"
+        dialog.searchEnabled = true
+        dialog.contentWidth = 760
+        dialog.contentHeight = 680
+        connections.append(dialog.onMap { [weak self] in
+            guard let self else { return }
+            self.isPresented = true
+            if self.focusDataPageOnMap {
+                self.focusDataPageOnMap = false
+                _ = self.proxyEnabledRow.grabFocus()
+            }
+        })
+        connections.append(dialog.onUnmap { [weak self] in
+            self?.isPresented = false
+        })
 
         wireSignals()
         apply(settings: settings)
@@ -507,38 +497,43 @@ final class SettingsView {
         apiKeyRow(for: provider).text = ""
     }
 
-    func revealDataSettings() {
-        pageStack.visibleChildName = "data"
-        _ = proxyEnabledRow.grabFocus()
+    func present(parent: Widget, page name: String = "general") {
+        selectPage(name)
+        dialog.present(parent)
+    }
+
+    func revealDataSettings(parent: Widget) {
+        focusDataPageOnMap = true
+        present(parent: parent, page: "data")
+    }
+
+    func addToast(_ toast: Toast) {
+        dialog.addToast(toast)
+    }
+
+    func presentationParent(fallback: Widget) -> Widget {
+        isPresented ? dialog : fallback
     }
 
     func selectPage(_ name: String) {
-        guard ["general", "display", "providers", "data"].contains(name) else {
+        guard Self.pageOrder.contains(where: { $0.name == name }) else {
             return
         }
-        pageStack.visibleChildName = name
+        dialog.visiblePageName = name
     }
 
-    private func page(containing groups: [Widget]) -> ScrolledWindow {
-        let content = Box(
-            orientation: GTK_ORIENTATION_VERTICAL,
-            spacing: GNOMEStyle.sectionSpacing
-        )
-        content.setMargins(GNOMEStyle.outerMargin)
-        content.marginTop = GNOMEStyle.rowSpacing
-        groups.forEach(content.append)
-        pageContents.append(content)
-
-        let clamp = Clamp()
-        clamp.maximumSize = GNOMEStyle.contentClamp
-        clamp.tighteningThreshold = GNOMEStyle.clampTightening
-        clamp.child = content
-
-        let scroll = ScrolledWindow()
-        scroll.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
-        scroll.kineticScrolling = true
-        scroll.child = clamp
-        return scroll
+    private func page(
+        name: String,
+        title: String,
+        icon: String,
+        groups: [Widget]
+    ) -> PreferencesPage {
+        let page = PreferencesPage()
+        page.name = name
+        page.title = title
+        page.iconName = icon
+        groups.forEach(page.add)
+        return page
     }
 
     private func addAPIKeyRow(

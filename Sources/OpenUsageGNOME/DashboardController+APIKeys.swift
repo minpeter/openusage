@@ -95,21 +95,21 @@ extension DashboardController {
             GNOMEAppLog.info("Stored \(provider.providerID) API key in Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Stored")
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "\(provider.displayName) API key saved"
             ))
         case .cleared:
             GNOMEAppLog.info("Cleared \(provider.providerID) API key from Secret Service")
             settingsView.clearAPIKeyEntry(provider)
             settingsView.updateAPIKeyStatus(provider, text: "Not Stored")
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "\(provider.displayName) API key cleared"
             ))
         case .failed(let error):
             GNOMEAppLog.warning(
                 "API key operation failed for \(provider.providerID): \(error)"
             )
-            toastOverlay.addToast(Toast(
+            showSettingsToast(Toast(
                 title: "\(provider.displayName) API key update failed: \(error)"
             ))
             refreshAPIKeyStatuses()
