@@ -57,7 +57,7 @@ struct LinuxDistributionManifestTests {
         #expect(workflow.contains("./scripts/validate-flatpak.sh"))
         #expect(workflow.contains("cp linux/Package.resolved Package.resolved"))
         #expect(workflow.contains(
-            "swift test --disable-automatic-resolution --disable-prefetching"
+            "swift test --no-parallel --disable-automatic-resolution --disable-prefetching"
         ))
         #expect(workflow.contains(
             "swift build -c release --disable-automatic-resolution --disable-prefetching"

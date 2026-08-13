@@ -45,7 +45,17 @@ struct RepositoryLocalUsageIntegrationTests {
             ],
             foldIns: LinuxUsageRepository.localUsageFoldIns(
                 environment: environment,
-                now: { now }),
+                now: { now },
+                pricing: ModelPricing(
+                    supplement: PricingSupplement(),
+                    primary: PricingCatalog(entries: [
+                        "claude-sonnet-4-5": ModelRates(
+                            inputPerMillion: 3,
+                            outputPerMillion: 15,
+                            cacheWritePerMillion: 3.75,
+                            cacheReadPerMillion: 0.30),
+                    ]),
+                    secondary: PricingCatalog(entries: [:]))),
             now: { now }
         )
         let repository = LinuxUsageRepository(registry: registry)

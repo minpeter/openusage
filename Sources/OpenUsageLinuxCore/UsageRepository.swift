@@ -32,12 +32,12 @@ public actor LinuxUsageRepository: ProviderSnapshotSource {
 
     static func localUsageFoldIns(
         environment: [String: String],
-        now: @escaping @Sendable () -> Date
+        now: @escaping @Sendable () -> Date,
+        pricing: ModelPricing? = try? ModelPricing.bundled()
     ) -> [ProviderSnapshotFoldIn] {
         let pi = PiLinuxUsageScanner(environment: environment)
         let claudeLocal = ClaudeLocalLogScanner(environment: environment)
         let codexLocal = CodexLocalLogScanner(environment: environment)
-        let pricing = try? ModelPricing.bundled()
         var foldIns = [
             ProviderSnapshotFoldIn(providerIDs: Set(ProviderCatalog.cardEntries.map(\.id))) { snapshot in
                 guard snapshot.instanceID == snapshot.providerID else { return [] }

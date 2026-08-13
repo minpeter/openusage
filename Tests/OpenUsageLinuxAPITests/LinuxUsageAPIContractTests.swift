@@ -113,7 +113,11 @@ struct LinuxUsageAPIContractTests {
         try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
         let response = try client.readToEnd(timeoutMilliseconds: 15_000)
         #expect(response.contains("HTTP/1.1 200 OK"))
-        #expect(response.contains("\"providerID\":\"claude\""))
+        let body = try #require(response.components(separatedBy: "\r\n\r\n").last)
+        let snapshots = try #require(
+            JSONSerialization.jsonObject(with: Data(body.utf8)) as? [[String: Any]]
+        )
+        #expect(snapshots.first?["providerID"] as? String == "claude")
         server.stop()
         server.stop()
         server.waitUntilStopped()
