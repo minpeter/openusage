@@ -36,7 +36,6 @@ static inline gboolean openusage_secret_fail(
     if (result != NULL) {
         result->error = g_strdup(error != NULL ? error->message : fallback);
     }
-    g_clear_error(&error);
     return FALSE;
 }
 
@@ -113,7 +112,13 @@ static inline gboolean openusage_secret_service_lookup(
 
     connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
     if (connection == NULL) {
-        return openusage_secret_fail(result, error, "Session bus unavailable");
+        gboolean failed = openusage_secret_fail(
+            result,
+            error,
+            "Session bus unavailable"
+        );
+        g_clear_error(&error);
+        return failed;
     }
 
     GVariantBuilder attributes;

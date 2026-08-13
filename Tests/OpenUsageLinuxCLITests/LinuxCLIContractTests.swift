@@ -79,6 +79,80 @@ struct LinuxCLIContractTests {
         #expect(!errorText.contains("non-zero retain count"))
     }
 
+    @Test("Missing Secret Service exits cleanly without corrupting memory")
+    func missingSecretServiceCleanup() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("probe.c")
+        let executable = root.appendingPathComponent("probe")
+        try """
+        #include "CSecretService.h"
+        int main(void) {
+            OpenUsageSecretResult result = {0};
+            GError *error = g_error_new_literal(
+                G_IO_ERROR,
+                G_IO_ERROR_FAILED,
+                "expected failure"
+            );
+            openusage_secret_fail(&result, error, "fallback");
+            g_clear_error(&error);
+            openusage_secret_result_clear(&result);
+            return 0;
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+
+        let flags = try Self.commandOutput(
+            executable: "/usr/bin/pkg-config",
+            arguments: ["--cflags", "--libs", "gio-2.0", "glib-2.0"])
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+        let compile = Process()
+        compile.executableURL = URL(fileURLWithPath: "/usr/bin/cc")
+        compile.arguments = [
+            source.path,
+            "-I",
+            FileManager.default.currentDirectoryPath
+                + "/Sources/CSecretService/include",
+            "-o",
+            executable.path,
+        ] + flags
+        try compile.run()
+        compile.waitUntilExit()
+        #expect(compile.terminationStatus == 0)
+
+        let process = Process()
+        process.executableURL = executable
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+
+        try process.run()
+        process.waitUntilExit()
+
+        #expect(process.terminationReason == .exit)
+        #expect(process.terminationStatus == 0)
+    }
+
+    private static func commandOutput(
+        executable: String,
+        arguments: [String]
+    ) throws -> String {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = output
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+        return String(
+            decoding: output.fileHandleForReading.readDataToEndOfFile(),
+            as: UTF8.self)
+    }
+
     @Test("Help documents JSON and does not read providers")
     func help() async {
         let source = CLIFixtureSource()
