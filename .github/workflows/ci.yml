@@ -71,7 +71,7 @@ jobs:
         run: cp linux/Package.resolved Package.resolved
 
       - name: Run Linux tests
-        run: swift test --disable-automatic-resolution --disable-prefetching
+        run: swift test --no-parallel --disable-automatic-resolution --disable-prefetching
 
       - name: Build Linux release
         run: swift build -c release --disable-automatic-resolution --disable-prefetching
