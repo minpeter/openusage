@@ -61,6 +61,19 @@ public struct ModelRates: Sendable, Equatable {
             + Double(tokens.cacheRead) / million * readRate
         return total * (tokens.isFast ? self.fastMultiplier : 1)
     }
+
+    public func scaled(by factor: Double) -> ModelRates {
+        var copy = self
+        copy.inputPerMillion *= factor
+        copy.outputPerMillion *= factor
+        copy.cacheWritePerMillion *= factor
+        copy.cacheReadPerMillion *= factor
+        copy.inputAbove200kPerMillion = copy.inputAbove200kPerMillion.map { $0 * factor }
+        copy.outputAbove200kPerMillion = copy.outputAbove200kPerMillion.map { $0 * factor }
+        copy.cacheWriteAbove200kPerMillion = copy.cacheWriteAbove200kPerMillion.map { $0 * factor }
+        copy.cacheReadAbove200kPerMillion = copy.cacheReadAbove200kPerMillion.map { $0 * factor }
+        return copy
+    }
 }
 
 public struct TokenBreakdown: Codable, Sendable, Equatable {
@@ -118,6 +131,62 @@ public struct PricingCatalog: Sendable, Equatable {
         return self.entries.first(where: {
             Self.contains($0.key.lowercased(), key)
         })?.value
+    }
+
+    public func findExact(_ model: String) -> (key: String, rates: ModelRates)? {
+        let normalized = Self.normalizedKey(model)
+        guard let pair = self.entries.first(where: {
+            Self.normalizedKey($0.key) == normalized
+        }) else {
+            return nil
+        }
+        return (key: pair.key, rates: pair.value)
+    }
+
+    public func findFuzzy(_ model: String) -> (key: String, rates: ModelRates)? {
+        let normalized = Self.normalizedKey(model)
+        guard let pair = self.entries.first(where: {
+            Self.keyMatches(
+                candidate: $0.key,
+                model: model,
+                normalizedModel: normalized)
+        }) else {
+            return nil
+        }
+        return (key: pair.key, rates: pair.value)
+    }
+
+    public func merging(_ other: PricingCatalog) -> PricingCatalog {
+        var merged = self.entries
+        for (key, value) in other.entries {
+            merged[key] = value
+        }
+        return PricingCatalog(
+            entries: merged,
+            retrievedAt: other.retrievedAt ?? self.retrievedAt)
+    }
+
+    public static func normalizedKey(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    public static func keyMatches(
+        candidate: String,
+        model: String,
+        normalizedModel: String
+    ) -> Bool {
+        let key = Self.normalizedKey(candidate)
+        guard !key.isEmpty else {
+            return false
+        }
+        if key == normalizedModel {
+            return true
+        }
+        return Self.contains(model.lowercased(), key)
+            || Self.contains(normalizedModel, key)
+            || Self.contains(key, normalizedModel)
     }
 
     private static func contains(_ value: String, _ key: String) -> Bool {
