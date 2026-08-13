@@ -22,6 +22,7 @@ struct RepositoryLocalUsageIntegrationTests {
 
         let environment = [
             "HOME": root.path,
+            "CLAUDE_CONFIG_DIR": root.appendingPathComponent(".claude").path,
             "XDG_CONFIG_HOME": root.appendingPathComponent("config").path,
             "XDG_CACHE_HOME": root.appendingPathComponent("cache").path,
         ]
