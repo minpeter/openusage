@@ -166,7 +166,7 @@ enum PaceNotificationLogic {
         if !next.primed {
             next.primed = true
             next.previousBucket = currentBucket
-            next.wasUnderTenPercent = fraction < 0.10
+            next.wasUnderTenPercent = UsageThresholdMath.isAlmostOut(fraction)
             next.firedMilestones = []
             return Transition(fire: [], newState: next)
         }

@@ -99,6 +99,42 @@ struct OpenUsageCoreNotificationTests {
         #expect(first.milestones.isEmpty)
         #expect(crossed.milestones == [.almostOut])
     }
+
+    @Test("threshold math clamps invalid input and uses strict ten percent")
+    func thresholdMath() {
+        #expect(UsageThresholdMath.normalizedRemaining(.nan) == 1)
+        #expect(UsageThresholdMath.normalizedRemaining(-1) == 0)
+        #expect(UsageThresholdMath.normalizedRemaining(2) == 1)
+        #expect(UsageThresholdMath.isAlmostOut(0.09))
+        #expect(!UsageThresholdMath.isAlmostOut(0.1))
+    }
+}
+
+@Suite("OpenUsageCore shared policies")
+struct OpenUsageCoreSharedPolicyTests {
+    @Test("projection math ranks positive finite values")
+    func projectionMath() {
+        let ranked = SpendProjectionMath.rankedPositive([
+            .init(id: "b", label: "Beta", amount: 2),
+            .init(id: "a", label: "Alpha", amount: 2),
+            .init(id: "zero", label: "Zero", amount: 0),
+            .init(id: "nan", label: "NaN", amount: .nan),
+        ])
+
+        #expect(ranked.map(\.id) == ["a", "b"])
+        #expect(SpendProjectionMath.total(ranked) == 4)
+    }
+
+    @Test("JSON codec preserves ISO dates")
+    func jsonCodec() throws {
+        struct Payload: Codable, Equatable {
+            let date: Date
+        }
+        let value = Payload(date: Date(timeIntervalSince1970: 1_700_000_000))
+
+        let data = try SharedJSONCodec.encoder().encode(value)
+        #expect(try SharedJSONCodec.decoder().decode(Payload.self, from: data) == value)
+    }
 }
 
 @Suite("OpenUsageCore provider parser")

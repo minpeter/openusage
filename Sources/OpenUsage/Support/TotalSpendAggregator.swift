@@ -133,10 +133,18 @@ struct TotalSpend: Equatable {
             }
         }
 
-        let ranked = included.sorted { lhs, rhs in
-            if lhs.display != rhs.display { return lhs.display > rhs.display }
-            return lhs.slice.title.localizedStandardCompare(rhs.slice.title) == .orderedAscending
-        }
+        let indexed = Dictionary(
+            uniqueKeysWithValues: included.map {
+                ($0.slice.provider.id, $0)
+            })
+        let ranked = SpendProjectionMath.rankedPositive(
+            included.map {
+                .init(
+                    id: $0.slice.provider.id,
+                    label: $0.slice.title,
+                    amount: $0.display)
+            })
+            .compactMap { indexed[$0.id] }
 
         let projected = ranked.map {
             TotalSpendProjectedSlice(

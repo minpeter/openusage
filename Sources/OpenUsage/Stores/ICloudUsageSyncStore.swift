@@ -52,13 +52,8 @@ actor ICloudUsageHistoryFileStore: UsageHistoryFileStoring {
     private let decoder: JSONDecoder
 
     init() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        self.encoder = encoder
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        self.decoder = decoder
+        self.encoder = SharedJSONCodec.encoder()
+        self.decoder = SharedJSONCodec.decoder()
     }
 
     func loadDocuments() async throws -> UsageHistoryLoadResult {

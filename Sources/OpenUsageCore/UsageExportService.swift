@@ -22,10 +22,7 @@ public struct UsageExportService: Sendable {
     ) throws -> Data {
         switch format {
         case .json:
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            return try encoder.encode(snapshots)
+            return try SharedJSONCodec.encoder().encode(snapshots)
         case .csv:
             return Data(csv(snapshots).utf8)
         }
@@ -35,9 +32,9 @@ public struct UsageExportService: Sendable {
         guard data.count <= self.maximumImportBytes else {
             throw UsageImportError.fileTooLarge(maximumBytes: self.maximumImportBytes)
         }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([ProviderUsageSnapshot].self, from: data)
+        return try SharedJSONCodec.decoder().decode(
+            [ProviderUsageSnapshot].self,
+            from: data)
     }
 
     private func csv(_ snapshots: [ProviderUsageSnapshot]) -> String {

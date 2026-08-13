@@ -118,11 +118,11 @@ public enum UsageThresholdNotificationPolicy {
         }
         next.resetsAt = resetsAt ?? previous.resetsAt
 
-        let remaining = min(max(remainingFraction.isFinite ? remainingFraction : 1, 0), 1)
+        let remaining = UsageThresholdMath.normalizedRemaining(remainingFraction)
         if !next.primed {
             next.primed = true
             next.previousBucket = bucket
-            next.wasUnderTenPercent = remaining < 0.1
+            next.wasUnderTenPercent = UsageThresholdMath.isAlmostOut(remaining)
             next.firedMilestones = []
             return .init(milestones: [], state: next)
         }
