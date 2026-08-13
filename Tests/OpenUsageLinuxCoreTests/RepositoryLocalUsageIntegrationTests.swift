@@ -35,8 +35,12 @@ struct RepositoryLocalUsageIntegrationTests {
                     ProviderUsageSnapshot(
                         providerID: "claude",
                         displayName: "Claude",
+                        plan: nil,
                         metrics: [],
-                        refreshedAt: now)
+                        links: [],
+                        widgets: [],
+                        refreshedAt: now,
+                        errorMessage: nil)
                 },
             ],
             foldIns: LinuxUsageRepository.localUsageFoldIns(
@@ -50,6 +54,8 @@ struct RepositoryLocalUsageIntegrationTests {
         let claude = try #require(snapshots.first { $0.providerID == "claude" })
 
         #expect(claude.metrics.contains { $0.label == "Last 30 Days" })
-        #expect(claude.metrics.contains { $0.kind == .chart && $0.label == "Usage Trend" })
+        #expect(claude.metrics.contains {
+            $0.kind == MetricKind.chart && $0.label == "Usage Trend"
+        })
     }
 }
