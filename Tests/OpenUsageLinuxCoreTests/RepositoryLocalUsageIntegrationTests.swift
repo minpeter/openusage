@@ -29,14 +29,22 @@ struct RepositoryLocalUsageIntegrationTests {
         let now = try #require(
             ISO8601DateFormatter().date(from: "2026-08-09T13:00:00Z")
         )
-        let repository = LinuxUsageRepository(
-            credentials: LinuxCredentialStore(paths: paths),
-            transport: OfflineTransport(),
-            cache: SnapshotCache(paths: paths),
-            now: { now },
-            environment: environment,
-            credentialBackend: EmptyCredentialBackend()
+        let registry = ProviderSnapshotRegistry(
+            registrations: [
+                ProviderSnapshotRegistration(providerID: "claude", displayName: "Claude") {
+                    ProviderUsageSnapshot(
+                        providerID: "claude",
+                        displayName: "Claude",
+                        metrics: [],
+                        refreshedAt: now)
+                },
+            ],
+            foldIns: LinuxUsageRepository.localUsageFoldIns(
+                environment: environment,
+                now: { now }),
+            now: { now }
         )
+        let repository = LinuxUsageRepository(registry: registry)
 
         let snapshots = await repository.refresh()
         let claude = try #require(snapshots.first { $0.providerID == "claude" })
@@ -44,16 +52,4 @@ struct RepositoryLocalUsageIntegrationTests {
         #expect(claude.metrics.contains { $0.label == "Last 30 Days" })
         #expect(claude.metrics.contains { $0.kind == .chart && $0.label == "Usage Trend" })
     }
-}
-
-private struct OfflineTransport: HTTPTransport {
-    func execute(_ request: URLRequest) async throws -> HTTPResult {
-        HTTPResult(data: Data(), statusCode: 503)
-    }
-}
-
-private struct EmptyCredentialBackend: LinuxCredentialBackend {
-    func load(for key: LinuxCredentialKey) throws -> Data? { nil }
-    func store(_ secret: Data, for key: LinuxCredentialKey) throws {}
-    func remove(_ key: LinuxCredentialKey) throws {}
 }

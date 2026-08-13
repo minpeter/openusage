@@ -20,6 +20,20 @@ public actor LinuxUsageRepository: ProviderSnapshotSource {
             credentials: credentials, transport: transport, now: now,
             environment: environment, credentialBackend: credentialBackend
         ) + additionalRegistrations
+        let foldIns = Self.localUsageFoldIns(environment: environment, now: now)
+        self.registry = ProviderSnapshotRegistry(
+            registrations: registrations,
+            knownProviderIDs: Set(ProviderCatalog.entries.map(\.id)).union(additionalRegistrations.map(\.providerID)),
+            foldIns: foldIns,
+            cache: cache,
+            now: now
+        )
+    }
+
+    static func localUsageFoldIns(
+        environment: [String: String],
+        now: @escaping @Sendable () -> Date
+    ) -> [ProviderSnapshotFoldIn] {
         let pi = PiLinuxUsageScanner(environment: environment)
         let claudeLocal = ClaudeLocalLogScanner(environment: environment)
         let codexLocal = CodexLocalLogScanner(environment: environment)
@@ -48,13 +62,7 @@ public actor LinuxUsageRepository: ProviderSnapshotSource {
                 return LocalSpendAggregator.metrics(from: scan, now: now())
             })
         }
-        self.registry = ProviderSnapshotRegistry(
-            registrations: registrations,
-            knownProviderIDs: Set(ProviderCatalog.entries.map(\.id)).union(additionalRegistrations.map(\.providerID)),
-            foldIns: foldIns,
-            cache: cache,
-            now: now
-        )
+        return foldIns
     }
 
     public func knownProviderIDs() async -> Set<String> { await registry.knownProviderIDs() }
