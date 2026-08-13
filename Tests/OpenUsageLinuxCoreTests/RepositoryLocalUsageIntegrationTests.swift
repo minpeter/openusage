@@ -55,7 +55,7 @@ struct RepositoryLocalUsageIntegrationTests {
 
         #expect(claude.metrics.contains { $0.label == "Last 30 Days" })
         #expect(claude.metrics.contains {
-            $0.kind == MetricKind.chart && $0.label == "Usage Trend"
+            $0.kind == UsageMetric.Kind.chart && $0.label == "Usage Trend"
         })
     }
 }
