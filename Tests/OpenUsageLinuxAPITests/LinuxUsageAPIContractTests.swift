@@ -117,7 +117,7 @@ struct LinuxUsageAPIContractTests {
         let snapshots = try #require(
             JSONSerialization.jsonObject(with: Data(body.utf8)) as? [[String: Any]]
         )
-        #expect(snapshots.first?["providerId"] as? String == "claude")
+        #expect(snapshots.first?["providerId"] as? String == "fixture")
         server.stop()
         server.stop()
         server.waitUntilStopped()
