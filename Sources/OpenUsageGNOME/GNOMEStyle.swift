@@ -1,5 +1,6 @@
 import Adwaita
 import Foundation
+import Glibc
 import OpenUsageLinuxCore
 
 /// Design tokens for the OpenUsage GNOME shell.
@@ -46,18 +47,24 @@ enum GNOMEStyle {
         let trackAlpha: Double
     }
 
+    struct AccentColor: Sendable {
+        let red: Double
+        let green: Double
+        let blue: Double
+    }
+
     /// Live system accent (e.g. blue on stock GNOME, orange on Ubuntu) with
     /// appearance-aware alpha levels. High contrast raises the track alpha so
     /// chart geometry never depends on subtle shades. Falls back to Adwaita
     /// blue when the platform cannot report an accent.
-    static func chartPalette(dark: Bool, highContrast: Bool) -> ChartPalette {
+    static func chartPalette(
+        dark: Bool,
+        highContrast: Bool,
+        accentColor: @MainActor () -> AccentColor? = systemAccentColor
+    ) -> ChartPalette {
         var accent = (red: 0.208, green: 0.518, blue: 0.894)
-        if let rgba = adw_style_manager_get_accent_color_rgba(
-            OpaquePointer(StyleManager.default.pointer)
-        ) {
-            accent = (red: Double(rgba.pointee.red), green: Double(rgba.pointee.green),
-                      blue: Double(rgba.pointee.blue))
-            g_free(rgba)
+        if let rgba = accentColor() {
+            accent = (red: rgba.red, green: rgba.green, blue: rgba.blue)
         }
         let trackAlpha: Double
         switch (dark, highContrast) {
@@ -68,6 +75,35 @@ enum GNOMEStyle {
         }
         return ChartPalette(accentRed: accent.red, accentGreen: accent.green,
                             accentBlue: accent.blue, trackAlpha: trackAlpha)
+    }
+
+    static func systemAccentColor() -> AccentColor? {
+        guard let function = accentColorFunction() else {
+            return nil
+        }
+        guard let rgba = function(OpaquePointer(StyleManager.default.pointer)) else {
+            return nil
+        }
+        defer { g_free(rgba) }
+        let components = rgba.assumingMemoryBound(to: Double.self)
+        return AccentColor(
+            red: components[0],
+            green: components[1],
+            blue: components[2])
+    }
+
+    static func accentColorFunction() -> (
+        @convention(c) (OpaquePointer?) -> UnsafeMutableRawPointer?
+    )? {
+        guard let symbol = dlsym(
+            nil,
+            "adw_style_manager_get_accent_color_rgba"
+        ) else {
+            return nil
+        }
+        return unsafeBitCast(
+            symbol,
+            to: (@convention(c) (OpaquePointer?) -> UnsafeMutableRawPointer?).self)
     }
 
     // MARK: - Custom CSS
