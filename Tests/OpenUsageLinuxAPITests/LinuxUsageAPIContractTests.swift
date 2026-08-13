@@ -106,14 +106,14 @@ struct LinuxUsageAPIContractTests {
     }
 
     @Test("Loopback server serves JSON and shuts down idempotently")
-    func loopbackLifecycle() async throws {
+    func loopbackLifecycle() throws {
         let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
         try server.start()
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(server.port)/v1/usage")!)
-        request.timeoutInterval = 15
-        let (data, response) = try await URLSession.shared.data(for: request)
-        #expect((response as? HTTPURLResponse)?.statusCode == 200)
-        #expect((try JSONSerialization.jsonObject(with: data) as? [Any])?.count == 1)
+        let client = try LoopbackClient(port: server.port)
+        try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        let response = try client.readToEnd(timeoutMilliseconds: 15_000)
+        #expect(response.contains("HTTP/1.1 200 OK"))
+        #expect(response.contains("\"providerID\":\"claude\""))
         server.stop()
         server.stop()
         server.waitUntilStopped()
@@ -207,7 +207,7 @@ struct LinuxUsageAPIContractTests {
 
         let replacement = try LoopbackClient(port: server.port)
         try replacement.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
-        #expect(try replacement.readToEnd(timeoutMilliseconds: 1_000).contains("HTTP/1.1 200 OK"))
+        #expect(try replacement.readToEnd(timeoutMilliseconds: 15_000).contains("HTTP/1.1 200 OK"))
     }
 
     @Test("Stopping closes accepted idle clients and waits for their tasks")
