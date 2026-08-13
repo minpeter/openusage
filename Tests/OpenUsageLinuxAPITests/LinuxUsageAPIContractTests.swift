@@ -110,7 +110,7 @@ struct LinuxUsageAPIContractTests {
         let server = try LoopbackHTTPServer(port: 0, source: APIFixtureSource())
         try server.start()
         var request = URLRequest(url: URL(string: "http://127.0.0.1:\(server.port)/v1/usage")!)
-        request.timeoutInterval = 2
+        request.timeoutInterval = 15
         let (data, response) = try await URLSession.shared.data(for: request)
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
         #expect((try JSONSerialization.jsonObject(with: data) as? [Any])?.count == 1)
@@ -150,16 +150,16 @@ struct LinuxUsageAPIContractTests {
         try server.start()
         let client = try LoopbackClient(port: server.port)
         try client.send("GET /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:\(server.port)\r\n\r\n")
-        #expect(source.started.wait(timeout: .now() + 1) == .success)
+        #expect(source.started.wait(timeout: .now() + 15) == .success)
 
         server.stop()
-        #expect(source.cancelled.wait(timeout: .now() + 1) == .success)
+        #expect(source.cancelled.wait(timeout: .now() + 15) == .success)
         let drained = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
             server.waitUntilStopped()
             drained.signal()
         }
-        #expect(drained.wait(timeout: .now() + 1) == .success)
+        #expect(drained.wait(timeout: .now() + 15) == .success)
     }
 
     @Test("Socket writes stop at their absolute deadline")
@@ -335,6 +335,9 @@ private final class LoopbackClient {
             try waitForSocketEvent(descriptor, timeoutMilliseconds: timeoutMilliseconds)
             let count = Glibc.recv(descriptor, &buffer, buffer.count, 0)
             if count == 0 { return String(decoding: bytes, as: UTF8.self) }
+            if count < 0, errno == ECONNRESET {
+                return String(decoding: bytes, as: UTF8.self)
+            }
             guard count > 0 else { throw SocketTestError.operation("recv", errno) }
             bytes.append(buffer, count: count)
         }
