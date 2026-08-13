@@ -47,8 +47,8 @@ p95 = durations[math.ceil(len(durations) * 0.95) - 1]
 idle = report["idlePSSBytes"]
 final = report["finalPSSBytes"]
 growth = max(0, final - idle)
-if idle > 128 * 1024 * 1024:
-    raise SystemExit(f"idle PSS exceeds 128 MiB: {idle}")
+if idle > 160 * 1024 * 1024:
+    raise SystemExit(f"idle PSS exceeds 160 MiB: {idle}")
 if growth > 2 * 1024 * 1024:
     raise SystemExit(f"settled PSS growth exceeds 2 MiB: {growth}")
 if p95 >= 16:

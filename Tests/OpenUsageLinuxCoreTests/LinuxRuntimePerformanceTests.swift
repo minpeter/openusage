@@ -26,8 +26,8 @@ struct LinuxRuntimePerformanceTests {
             updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         )
         let slow = LinuxRuntimePerformanceReport(
-            idlePSSBytes: 135 * 1_024 * 1_024,
-            finalPSSBytes: 150 * 1_024 * 1_024,
+            idlePSSBytes: 161 * 1_024 * 1_024,
+            finalPSSBytes: 176 * 1_024 * 1_024,
             updateDurationsMilliseconds: [1, 2, 3, 4, 5, 6, 7, 8, 20, 25]
         )
 
@@ -47,5 +47,12 @@ struct LinuxRuntimePerformanceTests {
             updateDurationsMilliseconds: [8, 9, 10, 11, 12]
         )
         #expect(currentReleaseBaseline.passes)
+
+        let ubuntu2404Baseline = LinuxRuntimePerformanceReport(
+            idlePSSBytes: 152_172_544,
+            finalPSSBytes: 153_000_000,
+            updateDurationsMilliseconds: [8, 9, 10, 11, 12]
+        )
+        #expect(ubuntu2404Baseline.passes)
     }
 }

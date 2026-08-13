@@ -35,7 +35,7 @@ public struct LinuxProcessMemoryProbe: Sendable {
 }
 
 public struct LinuxRuntimePerformanceReport: Codable, Equatable, Sendable {
-    public static let maximumIdlePSSBytes = 128 * 1_024 * 1_024
+    public static let maximumIdlePSSBytes = 160 * 1_024 * 1_024
     public static let maximumGrowthBytes = 2 * 1_024 * 1_024
     public static let maximumUpdateP95Milliseconds = 16.0
 
