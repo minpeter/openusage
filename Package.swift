@@ -5,6 +5,7 @@ import PackageDescription
 let package = Package(
     name: "OpenUsage",
     products: [
+        .library(name: "OpenUsageCore", targets: ["OpenUsageCore"]),
         .library(name: "OpenUsageLinuxCore", targets: ["OpenUsageLinuxCore"]),
         .executable(name: "OpenUsageGNOME", targets: ["OpenUsageGNOME"]),
         .executable(name: "openusage", targets: ["OpenUsageLinuxCLI"]),
@@ -14,6 +15,11 @@ let package = Package(
         .package(url: "https://github.com/makoni/swift-adwaita.git", from: "1.0.0")
     ],
     targets: [
+        .target(
+            name: "OpenUsageCore",
+            path: "Sources/OpenUsageCore",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .systemLibrary(
             name: "CSecretService",
             pkgConfig: "gio-2.0",
@@ -40,7 +46,12 @@ let package = Package(
         ),
         .target(
             name: "OpenUsageLinuxCore",
-            dependencies: ["CDesktopPortal", "CSecretService", "OpenUsagePricingResources"],
+            dependencies: [
+                "CDesktopPortal",
+                "CSecretService",
+                "OpenUsageCore",
+                "OpenUsagePricingResources"
+            ],
             path: "Sources/OpenUsageLinuxCore",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -66,6 +77,12 @@ let package = Package(
             name: "OpenUsageLinuxAPI",
             dependencies: ["OpenUsageLinuxCore"],
             path: "Sources/OpenUsageLinuxAPI",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "OpenUsageCoreTests",
+            dependencies: ["OpenUsageCore"],
+            path: "Tests/OpenUsageCoreTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
@@ -101,6 +118,7 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
+        .library(name: "OpenUsageCore", targets: ["OpenUsageCore"]),
         .executable(name: "OpenUsage", targets: ["OpenUsageApp"]),
         .executable(name: "openusage-cli", targets: ["OpenUsageCLI"])
     ],
@@ -115,8 +133,16 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "OpenUsageCore",
+            path: "Sources/OpenUsageCore",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .target(
             name: "OpenUsage",
             dependencies: [
+                "OpenUsageCore",
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                 .product(name: "Sparkle", package: "Sparkle"),
                 .product(name: "PostHog", package: "posthog-ios")
@@ -144,6 +170,14 @@ let package = Package(
             name: "OpenUsageCLI",
             dependencies: ["OpenUsage"],
             path: "Sources/OpenUsageCLI",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "OpenUsageCoreTests",
+            dependencies: ["OpenUsageCore"],
+            path: "Tests/OpenUsageCoreTests",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
