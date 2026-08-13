@@ -78,9 +78,16 @@ enum GNOMEStyle {
     }
 
     static func systemAccentColor() -> AccentColor? {
-        guard let function = accentColorFunction() else {
+        typealias AccentColorFunction = @convention(c) (
+            OpaquePointer?
+        ) -> UnsafeMutableRawPointer?
+        guard let symbol = dlsym(
+            nil,
+            "adw_style_manager_get_accent_color_rgba"
+        ) else {
             return nil
         }
+        let function = unsafeBitCast(symbol, to: AccentColorFunction.self)
         guard let rgba = function(OpaquePointer(StyleManager.default.pointer)) else {
             return nil
         }
@@ -90,20 +97,6 @@ enum GNOMEStyle {
             red: components[0],
             green: components[1],
             blue: components[2])
-    }
-
-    static func accentColorFunction() -> (
-        @convention(c) (OpaquePointer?) -> UnsafeMutableRawPointer?
-    )? {
-        guard let symbol = dlsym(
-            nil,
-            "adw_style_manager_get_accent_color_rgba"
-        ) else {
-            return nil
-        }
-        return unsafeBitCast(
-            symbol,
-            to: (@convention(c) (OpaquePointer?) -> UnsafeMutableRawPointer?).self)
     }
 
     // MARK: - Custom CSS
