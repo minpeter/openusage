@@ -21,6 +21,51 @@ struct OpenUsageCorePricingTests {
 
         #expect(rates.costDollars(for: tokens) == 7)
     }
+
+    @Test("catalog lookup preserves macOS separator and numeric-version boundaries")
+    func catalogLookupCompatibility() {
+        let baseRates = ModelRates(
+            inputPerMillion: 1,
+            outputPerMillion: 2,
+            cacheWritePerMillion: 1,
+            cacheReadPerMillion: 0.1)
+        let versionedRates = ModelRates(
+            inputPerMillion: 3,
+            outputPerMillion: 4,
+            cacheWritePerMillion: 3,
+            cacheReadPerMillion: 0.3)
+        let catalog = PricingCatalog(entries: [
+            "grok-4.3": baseRates,
+            "claude-sonnet-4": baseRates,
+            "claude-sonnet-4-5": versionedRates,
+        ])
+
+        #expect(catalog.findFuzzy("xai/grok-4-3")?.rates == baseRates)
+        #expect(catalog.findFuzzy("claude-sonnet-4-20250514")?.rates == baseRates)
+        #expect(catalog.findFuzzy("claude-sonnet-4-5-20250929")?.rates == versionedRates)
+        #expect(catalog.findFuzzy("claude-sonnet-4-6") == nil)
+    }
+
+    @Test("cost and scaling preserve macOS cache and fast contracts")
+    func costAndScalingCompatibility() {
+        let rates = ModelRates(
+            inputPerMillion: 2,
+            outputPerMillion: 8,
+            cacheWritePerMillion: 1,
+            cacheReadPerMillion: 0.2,
+            fastMultiplier: 3)
+        let tokens = TokenBreakdown(
+            input: 1_000_000,
+            cacheWrite5m: 1_000_000,
+            cacheWrite1h: 1_000_000,
+            cacheRead: 1_000_000,
+            output: 1_000_000)
+
+        #expect(rates.costDollars(for: tokens) == 15.2)
+        let scaled = rates.scaled(by: 3)
+        #expect(scaled.inputPerMillion == 6)
+        #expect(scaled.fastMultiplier == 1)
+    }
 }
 
 @Suite("OpenUsageCore analytics")

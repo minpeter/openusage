@@ -1,6 +1,8 @@
 import Foundation
 
 public struct ModelRates: Sendable, Equatable {
+    private static let cacheWrite1hInputMultiplier = 2.0
+
     public var inputPerMillion: Double
     public var outputPerMillion: Double
     public var cacheWritePerMillion: Double
@@ -54,10 +56,11 @@ public struct ModelRates: Sendable, Equatable {
         let readRate = useLong ? self.cacheReadAbove200kPerMillion
             ?? self.cacheReadPerMillion : self.cacheReadPerMillion
         let million = 1_000_000.0
-        let cacheWriteTokens = tokens.cacheWrite5m + tokens.cacheWrite1h
         let total = Double(tokens.input) / million * inputRate
             + Double(tokens.output) / million * outputRate
-            + Double(cacheWriteTokens) / million * writeRate
+            + Double(tokens.cacheWrite5m) / million * writeRate
+            + Double(tokens.cacheWrite1h) / million
+            * inputRate * Self.cacheWrite1hInputMultiplier
             + Double(tokens.cacheRead) / million * readRate
         return total * (tokens.isFast ? self.fastMultiplier : 1)
     }
@@ -72,6 +75,7 @@ public struct ModelRates: Sendable, Equatable {
         copy.outputAbove200kPerMillion = copy.outputAbove200kPerMillion.map { $0 * factor }
         copy.cacheWriteAbove200kPerMillion = copy.cacheWriteAbove200kPerMillion.map { $0 * factor }
         copy.cacheReadAbove200kPerMillion = copy.cacheReadAbove200kPerMillion.map { $0 * factor }
+        copy.fastMultiplier = 1
         return copy
     }
 }
@@ -145,15 +149,24 @@ public struct PricingCatalog: Sendable, Equatable {
 
     public func findFuzzy(_ model: String) -> (key: String, rates: ModelRates)? {
         let normalized = Self.normalizedKey(model)
-        guard let pair = self.entries.first(where: {
-            Self.keyMatches(
-                candidate: $0.key,
+        var best: (key: String, rates: ModelRates)?
+        for (key, rates) in self.entries
+            where Self.keyMatches(
+                candidate: key,
                 model: model,
                 normalizedModel: normalized)
-        }) else {
-            return nil
+        {
+            if let current = best {
+                if key.count > current.key.count
+                    || (key.count == current.key.count && key < current.key)
+                {
+                    best = (key, rates)
+                }
+            } else {
+                best = (key, rates)
+            }
         }
-        return (key: pair.key, rates: pair.value)
+        return best
     }
 
     public func merging(_ other: PricingCatalog) -> PricingCatalog {
@@ -170,6 +183,8 @@ public struct PricingCatalog: Sendable, Equatable {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+            .replacingOccurrences(of: ".", with: "-")
+            .replacingOccurrences(of: "@", with: "-")
     }
 
     public static func keyMatches(
@@ -184,7 +199,10 @@ public struct PricingCatalog: Sendable, Equatable {
         if key == normalizedModel {
             return true
         }
-        return Self.contains(model.lowercased(), key)
+        let rawModel = model.lowercased()
+        let rawCandidate = candidate.lowercased()
+        return Self.contains(rawModel, rawCandidate)
+            || Self.contains(rawCandidate, rawModel)
             || Self.contains(normalizedModel, key)
             || Self.contains(key, normalizedModel)
     }
@@ -199,9 +217,8 @@ public struct PricingCatalog: Sendable, Equatable {
         {
             let leftOK = range.lowerBound == value.startIndex
                 || !Self.isAlphanumeric(value[value.index(before: range.lowerBound)])
-            let rightOK = range.upperBound == value.endIndex
-                || !Self.isAlphanumeric(value[range.upperBound])
-            if leftOK, rightOK {
+            let suffix = value[range.upperBound...]
+            if leftOK, Self.suffixAllowsMatch(key: key, suffix: suffix) {
                 return true
             }
             start = value.index(after: range.lowerBound)
@@ -211,6 +228,31 @@ public struct PricingCatalog: Sendable, Equatable {
 
     private static func isAlphanumeric(_ character: Character) -> Bool {
         character.isLetter || character.isNumber
+    }
+
+    private static func suffixAllowsMatch(
+        key: String,
+        suffix: Substring
+    ) -> Bool {
+        guard let separator = suffix.first else {
+            return true
+        }
+        guard !Self.isAlphanumeric(separator) else {
+            return false
+        }
+        guard key.last?.isNumber == true,
+              separator == "-" || separator == "."
+        else {
+            return true
+        }
+        let digits = suffix.dropFirst().prefix(while: \.isNumber)
+        guard !digits.isEmpty else {
+            return true
+        }
+        let afterDigits = suffix.dropFirst(digits.count + 1).first
+        let isDateSuffix = digits.count == 8
+            && (afterDigits.map { !Self.isAlphanumeric($0) } ?? true)
+        return isDateSuffix
     }
 }
 
