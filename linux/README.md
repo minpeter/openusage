@@ -5,7 +5,7 @@ OpenUsage GNOME requires Swift 6.1 or newer, GTK 4, and libadwaita 1.6 or newer.
 On Ubuntu, a host build can be run with:
 
 ```sh
-sudo apt install swiftlang libadwaita-1-dev xvfb
+sudo apt install swiftlang libadwaita-1-dev libgtksourceview-5-dev xvfb
 cp linux/Package.resolved Package.resolved
 swift test
 swift run OpenUsageGNOME
