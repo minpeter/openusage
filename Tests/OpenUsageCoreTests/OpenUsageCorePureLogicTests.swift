@@ -103,6 +103,27 @@ struct OpenUsageCoreNotificationTests {
 
 @Suite("OpenUsageCore provider parser")
 struct OpenUsageCoreProviderParserTests {
+    @Test("Cursor CSV parser streams quoted records")
+    func cursorCSV() {
+        let csv = """
+        Date,Kind,Note
+        2026-08-12,usage,"hello, world"
+        """
+        var records: [[String: String]] = []
+
+        let summary = CursorCSVParser.forEachRecord(in: csv) {
+            records.append($0)
+        }
+
+        #expect(summary.isStructurallyComplete)
+        #expect(summary.rejectedRecordCount == 0)
+        #expect(records == [[
+            "Date": "2026-08-12",
+            "Kind": "usage",
+            "Note": "hello, world",
+        ]])
+    }
+
     @Test("delimited usage parser rejects malformed numeric input")
     func malformedInput() {
         #expect(throws: DelimitedUsageParser.Error.invalidNumber("oops")) {
