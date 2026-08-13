@@ -39,6 +39,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # setup-swift v3 verifies Swiftly before importing Swift's current signing key.
+      # Import the official key bundle first and keep signature verification enabled.
+      - name: Import Swift signing keys
+        run: curl --fail --silent --show-error https://swift.org/keys/all-keys.asc | gpg --import
+
       - uses: swift-actions/setup-swift@v3
         with:
           swift-version: "6.1"
