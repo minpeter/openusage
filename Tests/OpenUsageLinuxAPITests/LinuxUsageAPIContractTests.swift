@@ -8,7 +8,7 @@ import Glibc
 import Testing
 @testable import OpenUsageLinuxCore
 
-@Suite("Linux usage API contract")
+@Suite("Linux usage API contract", .serialized)
 struct LinuxUsageAPIContractTests {
     private let date = Date(timeIntervalSince1970: 1_700_000_000)
 

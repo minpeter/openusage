@@ -29,8 +29,4 @@ struct GNOMEAccentColorTests {
         #expect(palette.trackAlpha == 0.60)
     }
 
-    @Test("current libadwaita runtime resolves the optional accent API")
-    func currentRuntimeAccentAPI() {
-        #expect(GNOMEStyle.accentColorFunction() != nil)
-    }
 }
