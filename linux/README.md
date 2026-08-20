@@ -1,5 +1,7 @@
 # Linux and Flatpak development
 
+This tree is the `linux` product branch. `upstream` and `main` are fast-forward mirrors of [robinebers/openusage](https://github.com/robinebers/openusage) `main`; see [docs/linux-factory.md](../docs/linux-factory.md).
+
 OpenUsage GNOME requires Swift 6.1 or newer, GTK 4, and libadwaita 1.6 or newer.
 
 On Ubuntu, a host build can be run with:
