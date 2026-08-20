@@ -235,14 +235,14 @@ enum CursorUsageMapper {
     }
 
     static func grokBotWeeklyLine(from raw: [String: Any]?) -> MetricLine? {
-        guard let raw, let percent = ProviderParse.number(raw["usagePercent"]), percent.isFinite else {
+        guard let raw, let percent = grokBotWeeklyPercent(raw["usagePercent"]), percent.isFinite else {
             return nil
         }
-        if raw["hasNonZeroIncludedLimit"] as? Bool == false { return nil }
-        if raw["includedLimitZero"] as? Bool == true { return nil }
+        if grokBotWeeklyFlag(raw["hasNonZeroIncludedLimit"]) == false { return nil }
+        if grokBotWeeklyFlag(raw["includedLimitZero"]) == true { return nil }
         let start = grokBotWeeklyDate(raw["currentPeriodStart"])
         let reset = grokBotWeeklyDate(raw["nextResetTimestampUtc"])
-        let entitled = raw["hasNonZeroIncludedLimit"] as? Bool == true || start != nil || reset != nil
+        let entitled = grokBotWeeklyFlag(raw["hasNonZeroIncludedLimit"]) == true || start != nil || reset != nil
         guard entitled else { return nil }
         return .progress(
             label: "Grok Bot weekly",
@@ -259,6 +259,21 @@ enum CursorUsageMapper {
             return Int((reset.timeIntervalSince(start) * 1000).rounded())
         }
         return 604_800_000
+    }
+
+    private static func grokBotWeeklyPercent(_ value: Any?) -> Double? {
+        if let value, type(of: value) == Bool.self { return nil }
+        if let value = value as? NSNumber { return value.doubleValue }
+        if let value = value as? Double { return value }
+        if let value = value as? Int { return Double(value) }
+        if let value = value as? String { return Double(value) }
+        return ProviderParse.number(value)
+    }
+
+    private static func grokBotWeeklyFlag(_ value: Any?) -> Bool? {
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return nil
     }
 
     private static func grokBotWeeklyDate(_ value: Any?) -> Date? {

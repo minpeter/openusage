@@ -122,12 +122,12 @@ public enum CursorLinuxMapper {
     }
 
     static func grokBotWeeklyMetric(from raw: [String: Any]?) -> UsageMetric? {
-        guard let raw, let percent = cursorMapperNumber(raw["usagePercent"]), percent.isFinite else { return nil }
-        if raw["hasNonZeroIncludedLimit"] as? Bool == false { return nil }
-        if raw["includedLimitZero"] as? Bool == true { return nil }
+        guard let raw, let percent = cursorMapperPercent(raw["usagePercent"]), percent.isFinite else { return nil }
+        if cursorMapperFlag(raw["hasNonZeroIncludedLimit"]) == false { return nil }
+        if cursorMapperFlag(raw["includedLimitZero"]) == true { return nil }
         let start = cursorMapperDate(raw["currentPeriodStart"])
         let reset = cursorMapperDate(raw["nextResetTimestampUtc"])
-        let entitled = raw["hasNonZeroIncludedLimit"] as? Bool == true || start != nil || reset != nil
+        let entitled = cursorMapperFlag(raw["hasNonZeroIncludedLimit"]) == true || start != nil || reset != nil
         guard entitled else { return nil }
         let period = grokBotWeeklyPeriodMs(start: start, reset: reset)
         return UsageMetric(
@@ -203,6 +203,23 @@ private func cursorMapperNumber(_ value: Any?) -> Double? {
     if value is Bool { return nil }
     if let value = value as? NSNumber { return value.doubleValue }
     if let value = value as? String { return Double(value) }
+    return nil
+}
+
+/// JSON `0` can bridge as `NSNumber` that `is Bool`, which `cursorMapperNumber` rejects.
+/// Grok Bot weekly must keep a real 0% week and still ignore actual JSON booleans.
+private func cursorMapperPercent(_ value: Any?) -> Double? {
+    if let value, type(of: value) == Bool.self { return nil }
+    if let value = value as? NSNumber { return value.doubleValue }
+    if let value = value as? Double { return value }
+    if let value = value as? Int { return Double(value) }
+    if let value = value as? String { return Double(value) }
+    return cursorMapperNumber(value)
+}
+
+private func cursorMapperFlag(_ value: Any?) -> Bool? {
+    if let value = value as? Bool { return value }
+    if let value = value as? NSNumber { return value.boolValue }
     return nil
 }
 
