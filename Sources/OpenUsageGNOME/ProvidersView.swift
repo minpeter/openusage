@@ -25,6 +25,7 @@ final class ProvidersView {
         root.kineticScrolling = true
 
         content.setMargins(GNOMEStyle.outerMargin)
+        group.addCSSClass(GNOMEProviderRowLayout.groupCSSClass)
         group.description = "Quotas, spend, and reset windows for every connected account."
 
         emptyPage = StatusPage(
@@ -166,11 +167,21 @@ private final class ProviderRow {
         self.onRetry = onRetry
         self.onRename = onRename
         expander = ExpanderRow(title: "")
-        expander.setSizeRequest(height: 72)
-        expander.addPrefix(ProviderIcon.make(providerID: providerID, displayName: displayName))
+        expander.addCSSClass(GNOMEProviderRowLayout.cssClass)
+        expander.titleLines = GNOMEProviderRowLayout.titleLines
+        expander.subtitleLines = GNOMEProviderRowLayout.subtitleLines
+        let prefix = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
+        prefix.valign = GTK_ALIGN_FILL
+        prefix.vexpand = true
+        let icon = ProviderIcon.make(providerID: providerID, displayName: displayName)
+        icon.valign = GTK_ALIGN_CENTER
+        icon.vexpand = true
+        prefix.append(icon)
+        expander.addPrefix(prefix)
 
         let suffix = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
         suffix.valign = GTK_ALIGN_CENTER
+        stateIcon.valign = GTK_ALIGN_CENTER
         suffix.append(stateIcon)
 
         renameEntry.title = "Provider Name"
@@ -238,23 +249,15 @@ private final class ProviderRow {
         detail.setMargins(densityMetrics.sectionSpacing)
 
         expander.title = snapshot.displayName
+        expander.titleLines = GNOMEProviderRowLayout.titleLines
+        expander.subtitleLines = GNOMEProviderRowLayout.subtitleLines
         renameEntry.text = snapshot.displayName
         menuButton.setAccessibleLabel("Actions for \(snapshot.displayName)")
-        if let error = snapshot.errorMessage {
-            let identity = [snapshot.accountLabel, snapshot.plan]
-                .compactMap { $0 }
-                .joined(separator: " · ")
-            expander.subtitle = "\(identity)\n\(collapsedError(error))"
-        } else if let warning = snapshot.warning {
-            let identity = [snapshot.accountLabel, snapshot.plan]
-                .compactMap { $0 }
-                .joined(separator: " · ")
-            expander.subtitle = "\(identity)\n\(warning)"
-        } else {
-            expander.subtitle = [snapshot.accountLabel, snapshot.plan]
-                .compactMap { $0 }
-                .joined(separator: " · ")
-        }
+        expander.subtitle = GNOMEProviderRowLayout.subtitle(
+            accountLabel: snapshot.accountLabel,
+            plan: snapshot.plan,
+            collapsedStatus: collapsedStatus(for: snapshot)
+        )
 
         if snapshot.errorMessage != nil {
             stateIcon.iconName = "dialog-error-symbolic"
@@ -283,6 +286,13 @@ private final class ProviderRow {
         if let error = snapshot.errorMessage { return error }
         if let warning = snapshot.warning { return warning }
         return "Usage up to date"
+    }
+
+    private func collapsedStatus(for snapshot: ProviderUsageSnapshot) -> String? {
+        if let error = snapshot.errorMessage {
+            return collapsedError(error)
+        }
+        return snapshot.warning
     }
 
     private func collapsedError(_ error: String) -> String {

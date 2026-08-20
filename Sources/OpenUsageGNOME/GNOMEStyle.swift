@@ -141,6 +141,7 @@ enum GNOMEStyle {
     .ou-provider-mark {
         color: @window_fg_color;
     }
+    \(GNOMEProviderRowLayout.css)
     """
 
     static func installCSS() {

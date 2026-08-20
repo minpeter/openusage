@@ -14,7 +14,7 @@ enum ProviderIcon {
             let iconURL = LinuxPricingResources.providerIconURL(for: providerID),
             let display = gdk_display_get_default()
         else {
-            return Avatar(size: size, text: displayName, showInitials: true)
+            return centeredAvatar(size: size, displayName: displayName)
         }
 
         let directory = iconURL.deletingLastPathComponent().path
@@ -33,7 +33,7 @@ enum ProviderIcon {
             GTK_TEXT_DIR_NONE,
             GTK_ICON_LOOKUP_FORCE_SYMBOLIC
         ) else {
-            return Avatar(size: size, text: displayName, showInitials: true)
+            return centeredAvatar(size: size, displayName: displayName)
         }
 
         let image = Image()
@@ -49,5 +49,11 @@ enum ProviderIcon {
         image.addCSSClass("ou-provider-mark")
         image.setAccessibleLabel("\(displayName) provider")
         return image
+    }
+
+    private static func centeredAvatar(size: Int, displayName: String) -> Widget {
+        let avatar = Avatar(size: size, text: displayName, showInitials: true)
+        avatar.valign = GTK_ALIGN_CENTER
+        return avatar
     }
 }
