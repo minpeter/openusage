@@ -1,11 +1,11 @@
 name: CI
 
 on:
-  # The Swift edition ships from `main`. The frozen Tauri edition is preserved on `tauri-legacy`.
+  # The Linux GTK4 product ships from `linux`. `main`/`upstream` are robinebers mirrors.
   push:
-    branches: [main]
+    branches: [linux]
   pull_request:
-    branches: [main]
+    branches: [linux]
 
 permissions:
   contents: read
