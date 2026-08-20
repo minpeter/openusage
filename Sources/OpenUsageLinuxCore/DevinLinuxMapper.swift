@@ -47,7 +47,9 @@ public enum DevinLinuxMapper {
     private static func quota(label: String, remaining: Double, reset: Date?, period: Int) -> UsageMetric {
         UsageMetric(
             kind: .progress, label: label, used: min(max(100 - remaining, 0), 100), limit: 100,
-            resetsAt: reset, detail: "\(period) ms period"
+            resetsAt: reset,
+            periodDurationMilliseconds: period,
+            detail: LinuxDurationFormat.period(milliseconds: period)
         )
     }
 }

@@ -42,6 +42,9 @@ struct GrokDevinPiParityTests {
         #expect(snapshot.metrics.map(\.label) == ["Weekly limit", "Pay as you go"])
         #expect(snapshot.metrics[0].used == 99)
         #expect(snapshot.metrics[0].limit == 100)
+        #expect(snapshot.metrics[0].detail == "1 week")
+        #expect(snapshot.metrics[0].periodDurationMilliseconds == 604_800_000)
+        #expect(snapshot.metrics[0].detail?.contains("ms") != true)
         #expect(snapshot.metrics[1].text == "2500 cap")
         #expect(snapshot.links == [ProviderLink(label: "Usage", url: "https://grok.com/?_s=usage")])
         #expect(snapshot.widgets.map(\.id) == [
@@ -132,6 +135,10 @@ struct GrokDevinPiParityTests {
         #expect(snapshot.accountLabel == "devin@example.com")
         #expect(snapshot.metrics.map(\.label) == ["Daily quota", "Weekly quota", "Extra usage balance"])
         #expect(snapshot.metrics.map(\.used) == [0, 60, 964.22])
+        #expect(snapshot.metrics[0].detail == "1 day")
+        #expect(snapshot.metrics[1].detail == "1 week")
+        #expect(snapshot.metrics[0].periodDurationMilliseconds == 86_400_000)
+        #expect(snapshot.metrics[1].periodDurationMilliseconds == 604_800_000)
         #expect(snapshot.links == [ProviderLink(label: "Dashboard", url: "https://app.devin.ai/settings/plans")])
         #expect(snapshot.widgets.map(\.id) == ["devin.daily", "devin.weekly", "devin.extra"])
     }

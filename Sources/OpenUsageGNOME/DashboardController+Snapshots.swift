@@ -98,13 +98,11 @@ extension DashboardController {
         let ordered = ordered(snapshots)
         let visible = visibleOrdered(snapshots)
         if renderGate.consumeProviderSettings(snapshots: ordered) {
-            var seen: Set<String> = []
-            let providers = ordered.compactMap {
-                snapshot -> (id: String, name: String)? in
-                guard seen.insert(snapshot.providerID).inserted else {
-                    return nil
+            let providers = ProviderSnapshotPresentation.uniqueProviderIDs(ordered).compactMap {
+                providerID -> (id: String, name: String)? in
+                ordered.first { $0.providerID == providerID }.map {
+                    (providerID, $0.displayName)
                 }
-                return (snapshot.providerID, snapshot.displayName)
             }
             settingsView.updateProviders(providers)
         }

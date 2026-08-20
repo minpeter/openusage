@@ -94,10 +94,16 @@ final class SettingsView {
         title: "Metric Customization",
         description: "Enable, order, reveal on demand, and pin up to two metrics per provider."
     )
+    let providersPage = PreferencesPage()
     var order: [String] = []
     var hiddenProviderIDs: Set<String> = []
     var providerNames: [String: String] = [:]
     var providerRows: [String: SwitchRow] = [:]
+    var orderRowWidgets: [Widget] = []
+    var metricHeaderRows: [Widget] = []
+    var metricProviderGroups: [String: PreferencesGroup] = [:]
+    var metricGroupRows: [String: [Widget]] = [:]
+    var metricGroupOrder: [String] = []
     var connections: [SignalConnection] = []
     var orderConnections: [SignalConnection] = []
     var metricConnections: [SignalConnection] = []
@@ -387,14 +393,16 @@ final class SettingsView {
             panelIndicatorGroup,
             displayGroup,
         ])
-        let providersPage = page(
+        configure(
+            providersPage,
             name: "providers",
             title: "Providers",
             icon: "system-users-symbolic",
             groups: [
             orderGroup,
             metricCustomizationGroup,
-        ])
+        ]
+        )
         let dataPage = page(
             name: "data",
             title: "Data",
@@ -529,11 +537,21 @@ final class SettingsView {
         groups: [Widget]
     ) -> PreferencesPage {
         let page = PreferencesPage()
+        configure(page, name: name, title: title, icon: icon, groups: groups)
+        return page
+    }
+
+    private func configure(
+        _ page: PreferencesPage,
+        name: String,
+        title: String,
+        icon: String,
+        groups: [Widget]
+    ) {
         page.name = name
         page.title = title
         page.iconName = icon
         groups.forEach(page.add)
-        return page
     }
 
     private func addAPIKeyRow(

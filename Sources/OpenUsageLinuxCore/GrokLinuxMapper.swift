@@ -33,9 +33,12 @@ public enum GrokLinuxMapper {
 
         var metrics: [UsageMetric] = []
         if periodType == "USAGE_PERIOD_TYPE_WEEKLY" {
+            let periodMilliseconds = Int((end.timeIntervalSince(start) * 1000).rounded())
             metrics.append(UsageMetric(
                 kind: .progress, label: "Weekly limit", used: usedPercent, limit: 100,
-                resetsAt: end, detail: "\(Int((end.timeIntervalSince(start) * 1000).rounded())) ms period"
+                resetsAt: end,
+                periodDurationMilliseconds: periodMilliseconds,
+                detail: LinuxDurationFormat.period(milliseconds: periodMilliseconds)
             ))
         }
         metrics.append(UsageMetric(

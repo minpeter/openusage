@@ -4,19 +4,27 @@ import OpenUsageLinuxCore
 
 // MARK: - Provider ordering
 
+enum SettingsProvidersPresentation {
+    static func showsEmptyOrderBanner(order: [String]) -> Bool {
+        order.isEmpty
+    }
+}
+
 extension SettingsView {
     func rebuildOrderRows() {
         orderConnections.forEach { $0.disconnect() }
         orderConnections.removeAll(keepingCapacity: true)
         providerRows.removeAll(keepingCapacity: true)
-        while let existing = orderGroup.getRow(0) {
-            orderGroup.remove(existing)
-        }
-        guard !order.isEmpty else {
-            orderGroup.add(ActionRow(
+        removeTrackedRows(orderRowWidgets, from: orderGroup)
+        orderRowWidgets.removeAll(keepingCapacity: true)
+
+        guard !SettingsProvidersPresentation.showsEmptyOrderBanner(order: order) else {
+            let empty = ActionRow(
                 title: "No Providers Yet",
                 subtitle: "Provider ordering appears after the first refresh."
-            ))
+            )
+            orderGroup.add(empty)
+            orderRowWidgets.append(empty)
             return
         }
         for (index, id) in order.enumerated() {
@@ -46,6 +54,7 @@ extension SettingsView {
                 onMove: { [weak self] delta in self?.move(id, by: delta) }
             ))
             orderGroup.add(row)
+            orderRowWidgets.append(row)
         }
     }
 
@@ -70,32 +79,45 @@ extension SettingsView {
     func rebuildMetricCustomizationRows() {
         metricConnections.forEach { $0.disconnect() }
         metricConnections.removeAll(keepingCapacity: true)
-        while let existing = metricCustomizationGroup.getRow(0) {
-            metricCustomizationGroup.remove(existing)
-        }
+        removeTrackedRows(metricHeaderRows, from: metricCustomizationGroup)
+        metricHeaderRows.removeAll(keepingCapacity: true)
 
         let providers = customizationProviders()
+        let visibleIDs = Set(providers.map(\.id))
+        for (id, group) in metricProviderGroups where !visibleIDs.contains(id) {
+            removeTrackedRows(metricGroupRows[id] ?? [], from: group)
+            metricGroupRows[id] = []
+            group.visible = false
+        }
+
         guard !providers.isEmpty else {
-            metricCustomizationGroup.add(ActionRow(
+            for group in metricProviderGroups.values {
+                group.visible = false
+            }
+            let empty = ActionRow(
                 title: "No Metrics Yet",
                 subtitle: "Metric controls appear after the first refresh."
-            ))
+            )
+            metricCustomizationGroup.add(empty)
+            metricHeaderRows.append(empty)
             return
         }
 
+        var nextOrder: [String] = []
         for provider in providers {
             var layout = customizationSettings.metricLayouts[provider.id] ?? .init()
             layout.reconcile(with: provider.metrics)
-            let expander = ExpanderRow(title: provider.name)
-            let pinnedCount = customizationSettings.panelMetricPins.pins(for: provider.id).count
-            expander.subtitle = "\(provider.metrics.count) metrics · \(pinnedCount) pinned"
-            expander.expanded = provider.id == providers.first?.id
-            expander.setAccessibleLabel("Customize \(provider.name) metrics")
-            expander.addPrefix(ProviderIcon.make(
-                providerID: provider.id,
-                displayName: provider.name,
-                size: 24
-            ))
+            let group = metricProviderGroups[provider.id] ?? PreferencesGroup()
+            if metricProviderGroups[provider.id] == nil {
+                metricProviderGroups[provider.id] = group
+                providersPage.add(group)
+            }
+            group.title = provider.name
+            group.description = "\(provider.metrics.count) metrics · "
+                + "\(customizationSettings.panelMetricPins.pins(for: provider.id).count) pinned"
+            group.visible = true
+            removeTrackedRows(metricGroupRows[provider.id] ?? [], from: group)
+            var rows: [Widget] = []
 
             for (index, metric) in provider.metrics.enumerated() {
                 let key = MetricPreferenceKey(metric: metric)
@@ -105,6 +127,11 @@ extension SettingsView {
                     subtitle: "\(metric.kind.rawValue.capitalized) · \(entry.section.label)"
                 )
                 enabled.active = entry.isEnabled
+                enabled.addPrefix(ProviderIcon.make(
+                    providerID: provider.id,
+                    displayName: provider.name,
+                    size: 20
+                ))
 
                 enabled.addSuffix(reorderMenu(
                     label: metric.label,
@@ -118,7 +145,8 @@ extension SettingsView {
                     guard let self, let enabled, !self.applyingSettings else { return }
                     self.onMetricEnabledChanged(provider.id, key, enabled.active)
                 })
-                expander.addRow(enabled)
+                group.add(enabled)
+                rows.append(enabled)
 
                 let visibility = ComboRow(title: "\(metric.label) Visibility")
                 visibility.setModel(StringList([
@@ -133,7 +161,8 @@ extension SettingsView {
                         visibility.selected == 0 ? .alwaysVisible : .onDemand
                     self.onMetricSectionChanged(provider.id, key, section)
                 })
-                expander.addRow(visibility)
+                group.add(visibility)
+                rows.append(visibility)
 
                 let pin = SwitchRow(
                     title: "Pin \(metric.label) to Panel",
@@ -153,16 +182,19 @@ extension SettingsView {
                         return
                     }
                 })
-                expander.addRow(pin)
+                group.add(pin)
+                rows.append(pin)
             }
-            metricCustomizationGroup.add(expander)
+            metricGroupRows[provider.id] = rows
+            nextOrder.append(provider.id)
         }
+        metricGroupOrder = nextOrder
     }
 
-    private func customizationProviders() -> [MetricCustomizationProvider] {
+    func customizationProviders() -> [MetricCustomizationProvider] {
         var providers: [MetricCustomizationProvider] = []
         var indexByID: [String: Int] = [:]
-        for snapshot in customizationSnapshots {
+        for snapshot in ProviderSnapshotPresentation.uniqueCards(customizationSnapshots) {
             let index: Int
             if let existing = indexByID[snapshot.providerID] {
                 index = existing
@@ -183,7 +215,18 @@ extension SettingsView {
         return providers.filter { !$0.metrics.isEmpty }
     }
 
-    private func reorderMenu(
+    func removeTrackedRows(_ rows: [Widget], from group: PreferencesGroup) {
+        for row in rows {
+            group.remove(row)
+        }
+        var leftover = group.getRow(0)
+        while let existing = leftover {
+            group.remove(existing)
+            leftover = group.getRow(0)
+        }
+    }
+
+    func reorderMenu(
         label: String,
         canMoveUp: Bool,
         canMoveDown: Bool,
@@ -215,7 +258,7 @@ extension SettingsView {
     }
 }
 
-private struct MetricCustomizationProvider {
+struct MetricCustomizationProvider {
     let id: String
     let name: String
     var metrics: [UsageMetric]
