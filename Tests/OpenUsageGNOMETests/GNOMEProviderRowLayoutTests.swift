@@ -32,16 +32,18 @@ struct GNOMEProviderRowLayoutTests {
         #expect(GNOMEProviderRowLayout.lineCount(subtitle) == 1)
     }
 
-    @Test("Header min-height is CSS on the expander header, not a widget request")
-    func headerHeightUsesCSS() {
-        #expect(GNOMEProviderRowLayout.headerMinHeight == 72)
-        #expect(GNOMEProviderRowLayout.headerVerticalPadding == 10)
-        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) row.header"))
-        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) row.header > box.header"))
-        #expect(GNOMEProviderRowLayout.css.contains("min-height: \(GNOMEProviderRowLayout.headerMinHeight)px"))
-        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) list.nested"))
-        #expect(GNOMEProviderRowLayout.css.contains("padding-bottom: \(GNOMEProviderRowLayout.headerVerticalPadding)px"))
+    @Test("Header follows Adwaita action-row density, not a 72px floor")
+    func headerHeightUsesCompactCSS() {
+        #expect(GNOMEProviderRowLayout.disclosureBottomPadding == 10)
         #expect(GNOMEProviderRowLayout.css.contains(".\(GNOMEProviderRowLayout.groupCSSClass) list:not(.nested)"))
+        #expect(GNOMEProviderRowLayout.css.contains("padding-top: 0"))
+        #expect(GNOMEProviderRowLayout.css.contains("padding-bottom: 0"))
+        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass).expander"))
+        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) list.nested"))
+        #expect(GNOMEProviderRowLayout.css.contains("padding-bottom: \(GNOMEProviderRowLayout.disclosureBottomPadding)px"))
+        #expect(!GNOMEProviderRowLayout.css.contains("min-height"))
+        #expect(!GNOMEProviderRowLayout.css.contains("72px"))
+        #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) row.header"))
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) > row.header"))
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass).expander {\n        min-height"))
     }

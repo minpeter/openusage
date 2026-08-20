@@ -6,18 +6,19 @@ import Foundation
 /// wrapping subtitle plus `setSizeRequest` on the whole expander makes long
 /// identities (`email · Pro 20x`) and expanded headers look tighter than a
 /// short `Pro` subtitle. Keep the collapsed header one title line + one
-/// ellipsized subtitle, and size that header with CSS — not a widget request.
+/// ellipsized subtitle so every row shares the same compact header.
+///
+/// Do not force a header `min-height` above Adwaita's action-row (~50px).
+/// A 72px floor evens rows by growing the short `Pro` header and makes
+/// every collapsed row look padded. Size comes from the one-line subtitle,
+/// not extra chrome.
 enum GNOMEProviderRowLayout {
     static let cssClass = "ou-provider-row"
     static let groupCSSClass = "ou-connected-accounts"
 
-    /// Comfortable collapsed header for title + one subtitle line.
-    /// Applied to both `row.header` and its inner `box.header` so the
-    /// prefix/title/suffix row actually grows — Adwaita otherwise leaves
-    /// a 50px content box top-aligned inside the taller row.
-    static let headerMinHeight = 72
-    /// Disclosure and boxed-list inset so first and last rows match.
-    static let headerVerticalPadding = 10
+    /// Disclosure inset so expanded content does not hug the boxed-list edge.
+    /// First and last collapsed rows stay even by zeroing the group list inset.
+    static let disclosureBottomPadding = 10
     static let titleLines = 1
     static let subtitleLines = 1
 
@@ -45,15 +46,9 @@ enum GNOMEProviderRowLayout {
     row.\(cssClass).expander {
         padding: 0;
     }
-    row.\(cssClass) row.header {
-        min-height: \(headerMinHeight)px;
-    }
-    row.\(cssClass) row.header > box.header {
-        min-height: \(headerMinHeight)px;
-    }
     row.\(cssClass) list.nested {
         padding-top: 0;
-        padding-bottom: \(headerVerticalPadding)px;
+        padding-bottom: \(disclosureBottomPadding)px;
     }
     """
 }
