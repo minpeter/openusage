@@ -37,6 +37,8 @@ final class CursorProvider: ProviderRuntime {
                 .exportingLimit("autoUsage", unit: "percent"),
             .percent(id: "cursor.api", provider: provider, title: "API Usage", metricLabel: "API usage")
                 .exportingLimit("apiUsage", unit: "percent"),
+            .percent(id: "cursor.grokBotWeekly", provider: provider, title: "Grok Bot Weekly", metricLabel: "Grok Bot weekly")
+                .exportingLimit("grokBotWeekly", unit: "percent"),
             .boundedDollars(id: "cursor.onDemand", provider: provider, title: "Extra Usage", metricLabel: "On-demand", limit: 100, valueWord: "spent")
                 .exportingLimit("onDemand", unit: "usd", source: .progressOrValue(kind: .dollars)),
             .boundedCount(id: "cursor.requests", provider: provider, title: "Requests", limit: 500,
@@ -114,11 +116,13 @@ final class CursorProvider: ProviderRuntime {
             planName: planName,
             planInfoUnavailable: planInfoUnavailable
         )
+        let sandUsage = await fetchSandUsage(accessToken: currentToken)
         if fallback.shouldFallback {
             var mapped = try await usageSummaryAndRequestResult(
                 accessToken: currentToken,
                 planName: planName,
-                unavailableMessage: fallback.message
+                unavailableMessage: fallback.message,
+                sandUsage: sandUsage
             )
             let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
             return snapshot(mapped, usageHistory: history)
@@ -129,7 +133,8 @@ final class CursorProvider: ProviderRuntime {
                 let mapped = try await requestBasedResult(
                     accessToken: currentToken,
                     planName: planName,
-                    unavailableMessage: "Cursor request-based usage data unavailable. Try again later."
+                    unavailableMessage: "Cursor request-based usage data unavailable. Try again later.",
+                    sandUsage: sandUsage
                 )
                 return snapshot(mapped)
             } catch {
@@ -143,7 +148,8 @@ final class CursorProvider: ProviderRuntime {
             usage: usage,
             planName: planName,
             creditGrants: creditGrants,
-            stripeBalanceCents: stripeBalanceCents
+            stripeBalanceCents: stripeBalanceCents,
+            sandUsage: sandUsage
         )
         let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
         return snapshot(mapped, usageHistory: history)
@@ -334,7 +340,13 @@ final class CursorProvider: ProviderRuntime {
         return body
     }
 
-    private func requestBasedResult(accessToken: String, planName: String?, unavailableMessage: String) async throws -> CursorMappedUsage {
+    private func fetchSandUsage(accessToken: String) async -> [String: Any]? {
+        await fetchOptionalJSONObject(label: "grok-bot-weekly", request: {
+            try await self.usageClient.fetchSandUsage(accessToken: accessToken)
+        })
+    }
+
+    private func requestBasedResult(accessToken: String, planName: String?, unavailableMessage: String, sandUsage: [String: Any]?) async throws -> CursorMappedUsage {
         do {
             guard let response = try await usageClient.fetchRequestBasedUsage(accessToken: accessToken),
                   (200..<300).contains(response.statusCode),
@@ -342,7 +354,7 @@ final class CursorProvider: ProviderRuntime {
             else {
                 throw CursorUsageError.requestBasedUnavailable(unavailableMessage)
             }
-            return try CursorUsageMapper.mapRequestBasedUsage(body, planName: planName, unavailableMessage: unavailableMessage)
+            return try CursorUsageMapper.mapRequestBasedUsage(body, planName: planName, unavailableMessage: unavailableMessage, sandUsage: sandUsage)
         } catch let error as CursorUsageError {
             throw error
         } catch {
@@ -353,7 +365,8 @@ final class CursorProvider: ProviderRuntime {
     private func usageSummaryAndRequestResult(
         accessToken: String,
         planName: String?,
-        unavailableMessage: String
+        unavailableMessage: String,
+        sandUsage: [String: Any]?
     ) async throws -> CursorMappedUsage {
         let summary = await fetchOptionalJSONObject(label: "usage-summary", request: {
             try await self.usageClient.fetchUsageSummary(accessToken: accessToken)
@@ -371,7 +384,8 @@ final class CursorProvider: ProviderRuntime {
             summary: summary,
             requestUsage: requestUsage,
             planName: planName,
-            unavailableMessage: unavailableMessage
+            unavailableMessage: unavailableMessage,
+            sandUsage: sandUsage
         )
     }
 

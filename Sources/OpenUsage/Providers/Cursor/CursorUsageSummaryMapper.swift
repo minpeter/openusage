@@ -35,7 +35,8 @@ enum CursorUsageSummaryMapper {
         summary: [String: Any]?,
         requestUsage: [String: Any]?,
         planName: String?,
-        unavailableMessage: String
+        unavailableMessage: String,
+        sandUsage: [String: Any]? = nil
     ) throws -> CursorMappedUsage {
         let cycle = billingCycle(summary: summary, requestUsage: requestUsage)
         var lines: [MetricLine] = []
@@ -45,6 +46,7 @@ enum CursorUsageSummaryMapper {
             appendSummaryTotal(summary, cycle: cycle, to: &lines)
         }
         appendStructuredPercentages(summary, cycle: cycle, to: &lines)
+        CursorUsageMapper.appendGrokBotWeekly(sandUsage, to: &lines)
         appendOnDemand(summary, cycle: cycle, to: &lines)
 
         guard !lines.isEmpty else {

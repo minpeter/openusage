@@ -9,9 +9,10 @@ Tracks your Cursor plan usage using the login from the Cursor app.
 | Credits | Credit balance left from grants and prepaid account balance |
 | Total Usage | Plan usage for the billing cycle (percent or dollars; included request count vs. cap on request-based Enterprise accounts) |
 | Requests | Optional copy of the included request count vs. cap for custom layouts |
-| Auto Usage | Auto-model usage percent |
-| API Usage | API usage percent |
-| Extra Usage | On-demand spend; user-scoped when available, otherwise the team aggregate; shown as a meter when Cursor returns a limit |
+| Auto Usage | Auto-model usage percent (Cursor dashboard “Cursor Models”, monthly) |
+| API Usage | API usage percent (Cursor dashboard “Other Models”, monthly) |
+| Grok Bot Weekly | Cursor dashboard Grok Bot weekly pool (used percent and weekly reset). This is not grok.com / Grok CLI Weekly, and not Cursor CSV spend for `cursor-grok-…` model slugs. Accounts without the pool, or responses that omit it, show “No data” — OpenUsage does not invent 0% |
+| Extra Usage | On-demand spend; user-scoped when available, otherwise the team aggregate; shown as a meter when Cursor returns a limit. Separate from the Grok Bot weekly included pool |
 
 When Cursor reports your plan name, OpenUsage shows it beside the provider name.
 
@@ -27,8 +28,9 @@ Today, Yesterday, Last 30 Days, and Usage Trend come from Cursor's usage export.
 
 - **"Not logged in" / token errors** — open Cursor and make sure you're signed in, then refresh.
 - **Some metrics missing** — Cursor omits fields depending on plan type; missing metrics simply show "No data".
-- **Optional lookup failed** — plan, credit-grant, prepaid-balance, and request-fallback failures stay nonfatal when primary usage is available. OpenUsage records fixed, credential-free reasons in the diagnostic log.
+- **Optional lookup failed** — plan, credit-grant, prepaid-balance, Grok Bot weekly, and request-fallback failures stay nonfatal when primary usage is available. OpenUsage records fixed, credential-free reasons in the diagnostic log.
+- **Grok Bot Weekly shows “No data”** — the Cursor dashboard Grok Bot weekly pool is missing from this account or Cursor omitted it. That is not grok.com / Grok CLI Weekly.
 
 ## Under the hood
 
-Connect RPC on `api2.cursor.sh` (dashboard usage), combined REST fallback at `cursor.com/api/usage` and `cursor.com/api/usage-summary` for Enterprise/team accounts, Stripe balance at `cursor.com/api/auth/stripe`, and the usage-events CSV export at `cursor.com/api/dashboard/export-usage-events-csv`. The fallback combines the included request allowance with structured percentages and user-scoped on-demand spend; neither REST response is treated as the whole account snapshot by itself. The primary dashboard usage request refreshes the token and retries once after a 401/403; optional endpoint failures stay nonfatal when the other fallback response is usable and are recorded in the diagnostic log. Per-day spend imputation uses exported token counts priced through the shared [model pricing](../pricing.md); Cursor-native models (`auto`, `composer-*`, …) come from its supplement layer, which maintainers sync from [Cursor models & pricing](https://cursor.com/docs/models-and-pricing.md).
+Connect RPC on `api2.cursor.sh` (dashboard usage via `GetCurrentPeriodUsage`, plus the Cursor-owned Grok Bot weekly pool via `GetSandUsageStatus`), combined REST fallback at `cursor.com/api/usage` and `cursor.com/api/usage-summary` for Enterprise/team accounts, Stripe balance at `cursor.com/api/auth/stripe`, and the usage-events CSV export at `cursor.com/api/dashboard/export-usage-events-csv`. The Grok Bot weekly meter is not on the monthly usage snapshot and is not the grok.com / Grok CLI weekly pool; OpenUsage reads it with the same Cursor session token already used for dashboard usage. The fallback combines the included request allowance with structured percentages and user-scoped on-demand spend; neither REST response is treated as the whole account snapshot by itself. The primary dashboard usage request refreshes the token and retries once after a 401/403; optional endpoint failures (including a missing Grok Bot weekly field) stay nonfatal when the other fallback response is usable and are recorded in the diagnostic log. Per-day spend imputation uses exported token counts priced through the shared [model pricing](../pricing.md); Cursor-native models (`auto`, `composer-*`, …) come from its supplement layer, which maintainers sync from [Cursor models & pricing](https://cursor.com/docs/models-and-pricing.md).

@@ -102,6 +102,28 @@ struct GNOMEMetricPresentationTests {
         #expect(GNOMEFormat.metricDetail("604800000 ms period")?.contains("ms") != true)
     }
 
+    @Test("Cursor Grok Bot weekly presents used percent and weekly reset, not Grok CLI Weekly")
+    func cursorGrokBotWeeklyPresentation() {
+        let metric = UsageMetric(
+            kind: .progress,
+            label: "Grok Bot weekly",
+            used: 13,
+            limit: 100,
+            resetsAt: Date(timeIntervalSince1970: 1_787_788_800),
+            periodDurationMilliseconds: 604_800_000,
+            detail: "percent"
+        )
+        let relative = presentation(metric, resetMode: .relative)
+        let absolute = presentation(metric, resetMode: .absolute, timeFormat: .twentyFourHour)
+
+        #expect(metric.label == "Grok Bot weekly")
+        #expect(metric.label != "Weekly limit")
+        #expect(relative.valueText == "13% used")
+        #expect(relative.resetText == "Resets in 15d 11h")
+        #expect(absolute.resetText == "Resets Aug 27 at 00:00")
+        #expect(GNOMEFormat.period(milliseconds: 604_800_000) == "1 week")
+    }
+
     @Test("GNOME settings produce renderer presentation options")
     func settingsBridge() {
         var settings = GNOMESettings()

@@ -8,6 +8,7 @@ public enum CursorLinuxClient {
     public static let planURL = URL(string: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetPlanInfo")!
     public static let refreshURL = URL(string: "https://api2.cursor.sh/oauth/token")!
     public static let creditsURL = URL(string: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCreditGrantsBalance")!
+    public static let sandUsageURL = URL(string: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetSandUsageStatus")!
     public static let requestUsageURL = URL(string: "https://cursor.com/api/usage")!
     public static let usageSummaryURL = URL(string: "https://cursor.com/api/usage-summary")!
     public static let stripeURL = URL(string: "https://cursor.com/api/auth/stripe")!
@@ -20,6 +21,7 @@ public enum CursorLinuxClient {
 
     public static func planRequest(accessToken: String) -> URLRequest { connectRequest(url: planURL, accessToken: accessToken) }
     public static func creditsRequest(accessToken: String) -> URLRequest { connectRequest(url: creditsURL, accessToken: accessToken) }
+    public static func sandUsageRequest(accessToken: String) -> URLRequest { connectRequest(url: sandUsageURL, accessToken: accessToken) }
 
     public static func refreshRequest(refreshToken: String) throws -> URLRequest {
         var request = URLRequest(url: refreshURL, timeoutInterval: 15)

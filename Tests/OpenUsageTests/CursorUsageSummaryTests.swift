@@ -44,11 +44,49 @@ final class CursorUsageSummaryMapperTests: XCTestCase {
         XCTAssertEqual(requests.limit, 750)
         XCTAssertEqual(progress(mapped.lines, "Auto usage")?.used, 0)
         XCTAssertEqual(progress(mapped.lines, "API usage")?.used, 6.25)
+        XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
 
         let onDemand = try XCTUnwrap(progress(mapped.lines, "On-demand"))
         XCTAssertEqual(onDemand.used, 0)
         XCTAssertEqual(onDemand.limit, 250)
         XCTAssertEqual(onDemand.format, .dollars)
+    }
+
+    func testEnterpriseFallbackMapsGrokBotWeeklyWithoutInventingZero() throws {
+        let mapped = try CursorUsageSummaryMapper.map(
+            summary: [
+                "individualUsage": [
+                    "plan": ["autoPercentUsed": 4, "apiPercentUsed": 8, "totalPercentUsed": 12]
+                ]
+            ],
+            requestUsage: nil,
+            planName: "Enterprise",
+            unavailableMessage: "unavailable",
+            sandUsage: [
+                "currentPeriodStart": "2026-08-20T00:00:00.000Z",
+                "nextResetTimestampUtc": "2026-08-27T00:00:00.000Z",
+                "usagePercent": 13,
+                "hasNonZeroIncludedLimit": true
+            ]
+        )
+
+        let grokBot = try XCTUnwrap(progress(mapped.lines, "Grok Bot weekly"))
+        XCTAssertEqual(grokBot.used, 13)
+        XCTAssertEqual(grokBot.limit, 100)
+        XCTAssertEqual(grokBot.resetsAt, OpenUsageISO8601.date(from: "2026-08-27T00:00:00.000Z"))
+
+        let omitted = try CursorUsageSummaryMapper.map(
+            summary: [
+                "individualUsage": [
+                    "plan": ["autoPercentUsed": 4, "apiPercentUsed": 8]
+                ]
+            ],
+            requestUsage: nil,
+            planName: "Enterprise",
+            unavailableMessage: "unavailable",
+            sandUsage: [:]
+        )
+        XCTAssertNil(omitted.lines.first { $0.label == "Grok Bot weekly" })
     }
 
     func testFallsBackToPooledTotalAndTeamOnDemandWhenIndividualBucketsAreMissing() throws {

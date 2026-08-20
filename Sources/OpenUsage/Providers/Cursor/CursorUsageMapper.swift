@@ -84,7 +84,8 @@ enum CursorUsageMapper {
         usage: [String: Any],
         planName: String?,
         creditGrants: [String: Any]?,
-        stripeBalanceCents: Double
+        stripeBalanceCents: Double,
+        sandUsage: [String: Any]? = nil
     ) throws -> CursorMappedUsage {
         let facts = CursorPlanUsageFacts(usage: usage)
         guard facts.isEnabled,
@@ -159,6 +160,8 @@ enum CursorUsageMapper {
             ))
         }
 
+        appendGrokBotWeekly(sandUsage, to: &lines)
+
         if let spendLimitUsage {
             let limit = ProviderParse.number(spendLimitUsage["individualLimit"]) ?? ProviderParse.number(spendLimitUsage["pooledLimit"]) ?? 0
             let remaining = ProviderParse.number(spendLimitUsage["individualRemaining"]) ?? ProviderParse.number(spendLimitUsage["pooledRemaining"]) ?? 0
@@ -197,7 +200,8 @@ enum CursorUsageMapper {
     static func mapRequestBasedUsage(
         _ usage: [String: Any]?,
         planName: String?,
-        unavailableMessage: String
+        unavailableMessage: String,
+        sandUsage: [String: Any]? = nil
     ) throws -> CursorMappedUsage {
         var lines: [MetricLine] = []
         if let gpt4 = usage?["gpt-4"] as? [String: Any],
@@ -215,11 +219,61 @@ enum CursorUsageMapper {
             ))
         }
 
+        appendGrokBotWeekly(sandUsage, to: &lines)
         guard !lines.isEmpty else {
             throw CursorUsageError.requestBasedUnavailable(unavailableMessage)
         }
 
         return CursorMappedUsage(plan: planLabel(planName), lines: lines)
+    }
+
+    /// Cursor dashboard Grok Bot weekly pool from `GetSandUsageStatus`.
+    /// Omit the line when Cursor leaves the pool off or omits the percent — never invent 0%.
+    static func appendGrokBotWeekly(_ raw: [String: Any]?, to lines: inout [MetricLine]) {
+        guard let line = grokBotWeeklyLine(from: raw) else { return }
+        lines.append(line)
+    }
+
+    static func grokBotWeeklyLine(from raw: [String: Any]?) -> MetricLine? {
+        guard let raw, let percent = ProviderParse.number(raw["usagePercent"]), percent.isFinite else {
+            return nil
+        }
+        if raw["hasNonZeroIncludedLimit"] as? Bool == false { return nil }
+        if raw["includedLimitZero"] as? Bool == true { return nil }
+        let start = grokBotWeeklyDate(raw["currentPeriodStart"])
+        let reset = grokBotWeeklyDate(raw["nextResetTimestampUtc"])
+        let entitled = raw["hasNonZeroIncludedLimit"] as? Bool == true || start != nil || reset != nil
+        guard entitled else { return nil }
+        return .progress(
+            label: "Grok Bot weekly",
+            used: percent,
+            limit: 100,
+            format: .percent,
+            resetsAt: reset,
+            periodDurationMs: grokBotWeeklyPeriodMs(start: start, reset: reset)
+        )
+    }
+
+    private static func grokBotWeeklyPeriodMs(start: Date?, reset: Date?) -> Int {
+        if let start, let reset, reset > start {
+            return Int((reset.timeIntervalSince(start) * 1000).rounded())
+        }
+        return 604_800_000
+    }
+
+    private static func grokBotWeeklyDate(_ value: Any?) -> Date? {
+        if let raw = value as? String {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            if let millis = Double(trimmed), millis > 1_000_000_000_000 {
+                return Date(timeIntervalSince1970: millis / 1000)
+            }
+            return OpenUsageISO8601.date(from: trimmed)
+        }
+        if let millis = ProviderParse.number(value), millis > 1_000_000_000_000 {
+            return Date(timeIntervalSince1970: millis / 1000)
+        }
+        return nil
     }
 
     static func shouldUseRequestBasedFallback(
