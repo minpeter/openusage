@@ -103,7 +103,6 @@ extension SettingsView {
             return
         }
 
-        var nextOrder: [String] = []
         for provider in providers {
             var layout = customizationSettings.metricLayouts[provider.id] ?? .init()
             layout.reconcile(with: provider.metrics)
@@ -190,9 +189,7 @@ extension SettingsView {
                 rows.append(pin)
             }
             metricGroupRows[provider.id] = rows
-            nextOrder.append(provider.id)
         }
-        metricGroupOrder = nextOrder
     }
 
     func customizationProviders() -> [MetricCustomizationProvider] {

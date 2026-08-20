@@ -103,7 +103,6 @@ final class SettingsView {
     var metricHeaderRows: [Widget] = []
     var metricProviderGroups: [String: PreferencesGroup] = [:]
     var metricGroupRows: [String: [Widget]] = [:]
-    var metricGroupOrder: [String] = []
     var connections: [SignalConnection] = []
     var orderConnections: [SignalConnection] = []
     var metricConnections: [SignalConnection] = []
