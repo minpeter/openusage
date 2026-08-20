@@ -67,6 +67,85 @@ final class CursorUsageMapperTests: XCTestCase {
         XCTAssertEqual(progress(mapped.lines, "Auto usage")?.used, 12.5)
         XCTAssertEqual(progress(mapped.lines, "API usage")?.used, 7.5)
         XCTAssertEqual(progress(mapped.lines, "On-demand")?.used, 40)
+        XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
+    }
+
+    func testMapsGrokBotWeeklyFromSandUsageStatus() throws {
+        let mapped = try CursorUsageMapper.mapUsage(
+            usage: [
+                "enabled": true,
+                "billingCycleStart": 1_770_000_000_000,
+                "billingCycleEnd": 1_772_592_000_000,
+                "planUsage": [
+                    "limit": 40_000,
+                    "totalPercentUsed": 20,
+                    "autoPercentUsed": 12.5,
+                    "apiPercentUsed": 7.5
+                ]
+            ],
+            planName: "Ultra",
+            creditGrants: nil,
+            stripeBalanceCents: 0,
+            sandUsage: [
+                "currentPeriodStart": "2026-08-20T00:00:00.000Z",
+                "nextResetTimestampUtc": "2026-08-27T00:00:00.000Z",
+                "usagePercent": 13,
+                "hasAvailableUsage": true,
+                "hasNonZeroIncludedLimit": true
+            ]
+        )
+
+        let grokBot = try XCTUnwrap(progress(mapped.lines, "Grok Bot weekly"))
+        XCTAssertEqual(grokBot.used, 13)
+        XCTAssertEqual(grokBot.limit, 100)
+        XCTAssertEqual(grokBot.resetsAt, OpenUsageISO8601.date(from: "2026-08-27T00:00:00.000Z"))
+        XCTAssertEqual(grokBot.periodDurationMs, 7 * 24 * 3_600 * 1_000)
+        XCTAssertEqual(progress(mapped.lines, "Auto usage")?.used, 12.5)
+        XCTAssertEqual(progress(mapped.lines, "API usage")?.used, 7.5)
+    }
+
+    func testOmitsGrokBotWeeklyWhenCursorOmitsThePool() throws {
+        let mapped = try CursorUsageMapper.mapUsage(
+            usage: [
+                "enabled": true,
+                "planUsage": [
+                    "limit": 40_000,
+                    "totalPercentUsed": 20
+                ]
+            ],
+            planName: "Pro",
+            creditGrants: nil,
+            stripeBalanceCents: 0,
+            sandUsage: [
+                "usagePercent": 0,
+                "hasNonZeroIncludedLimit": false,
+                "includedLimitZero": true
+            ]
+        )
+
+        XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
+        XCTAssertEqual(progress(mapped.lines, "Total usage")?.used, 20)
+    }
+
+    func testOmitsGrokBotWeeklyWhenPercentIsMissing() throws {
+        let mapped = try CursorUsageMapper.mapUsage(
+            usage: [
+                "enabled": true,
+                "planUsage": [
+                    "limit": 40_000,
+                    "totalPercentUsed": 8
+                ]
+            ],
+            planName: "Pro",
+            creditGrants: nil,
+            stripeBalanceCents: 0,
+            sandUsage: [
+                "hasNonZeroIncludedLimit": true,
+                "nextResetTimestampUtc": "2026-08-27T00:00:00.000Z"
+            ]
+        )
+
+        XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
     }
 
     func testBoundedOnDemandDoesNotLetZeroSpendMaskPositiveUsage() throws {

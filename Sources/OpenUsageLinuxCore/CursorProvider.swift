@@ -22,6 +22,7 @@ public struct CursorLinuxProvider: Sendable {
         WidgetDescriptor(id: "cursor.usage", title: "Total Usage", metricLabel: "Total usage"),
         WidgetDescriptor(id: "cursor.auto", title: "Auto Usage", metricLabel: "Auto usage"),
         WidgetDescriptor(id: "cursor.api", title: "API Usage", metricLabel: "API usage"),
+        WidgetDescriptor(id: "cursor.grokBotWeekly", title: "Grok Bot Weekly", metricLabel: "Grok Bot weekly"),
         WidgetDescriptor(id: "cursor.onDemand", title: "Extra Usage", metricLabel: "On-demand"),
         WidgetDescriptor(id: "cursor.requests", title: "Requests", metricLabel: "Requests"),
         WidgetDescriptor(id: "cursor.credits", title: "Credits", metricLabel: "Credits"),
@@ -57,16 +58,19 @@ public struct CursorLinuxProvider: Sendable {
         let planResult = try? await execute(CursorLinuxClient.planRequest(accessToken: token))
         let planBody = planResult.flatMap { (200..<300).contains($0.statusCode) ? try? cursorProviderJSON($0.data) : nil }
         let planName = (planBody?["planInfo"] as? [String: Any])?["planName"] as? String
+        let sandUsage = await optional(CursorLinuxClient.sandUsageRequest(accessToken: token))
         if CursorLinuxMapper.shouldFallback(usageBody, planName: planName, planUnavailable: planBody == nil) {
             let summary = await optional(CursorLinuxClient.usageSummaryRequest(accessToken: token))
             let requests = await optional(CursorLinuxClient.requestUsageRequest(accessToken: token))
             return try CursorLinuxMapper.mapRequestBased(summary: summary, requests: requests, planName: planName,
-                                                         accountLabel: CursorLinuxCredentialStore.accountLabel(token), now: now())
+                                                         accountLabel: CursorLinuxCredentialStore.accountLabel(token),
+                                                         sandUsage: sandUsage, now: now())
         }
         let grants = await optional(CursorLinuxClient.creditsRequest(accessToken: token))
         let stripe = await optional(CursorLinuxClient.stripeRequest(accessToken: token)).flatMap { cursorProviderNumber($0["customerBalance"]) }.flatMap { $0 < 0 ? abs($0) : 0 } ?? 0
         return try CursorLinuxMapper.map(usage: usageBody, planName: planName, creditGrants: grants,
-                                         stripeBalanceCents: stripe, accountLabel: CursorLinuxCredentialStore.accountLabel(token), now: now())
+                                         stripeBalanceCents: stripe, accountLabel: CursorLinuxCredentialStore.accountLabel(token),
+                                         sandUsage: sandUsage, now: now())
     }
 
     private func rotate(_ refresh: String) async throws -> String? {
