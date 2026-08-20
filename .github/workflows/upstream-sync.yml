@@ -1,0 +1,143 @@
+# Fast-forward the upstream/main mirrors, then open a merge PR into linux.
+#
+# This file must live only on `linux`. `main` and `upstream` are wiped to match
+# robinebers/openusage, so a copy on those refs would disappear and cron would die.
+# GitHub runs `on.schedule` only from the repository default branch (`linux`).
+name: Upstream Sync
+
+on:
+  schedule:
+    # 09:00 KST on weekdays
+    - cron: "0 0 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  mirror:
+    name: Fast-forward upstream and main
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_sha: ${{ steps.push.outputs.sha }}
+    steps:
+      - name: Fast-forward mirror refs
+        id: push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "${PWD}"
+          git init
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add robinebers https://github.com/robinebers/openusage.git
+          git fetch --no-tags robinebers main
+          UPSTREAM_SHA="$(git rev-parse robinebers/main)"
+
+          fetch_ref() {
+            local name="$1"
+            git fetch --no-tags origin "${name}:refs/remotes/origin/${name}" 2>/dev/null || true
+          }
+          fetch_ref upstream
+          fetch_ref main
+
+          require_fast_forward() {
+            local name="$1"
+            if git rev-parse --verify "origin/${name}" >/dev/null 2>&1; then
+              if ! git merge-base --is-ancestor "origin/${name}" "${UPSTREAM_SHA}"; then
+                echo "::error::origin/${name} ($(git rev-parse --short origin/${name})) is not an ancestor of robinebers/openusage main ${UPSTREAM_SHA}; refusing to force-push."
+                exit 1
+              fi
+            fi
+          }
+          require_fast_forward upstream
+          require_fast_forward main
+
+          git push origin "${UPSTREAM_SHA}:refs/heads/upstream"
+          git push origin "${UPSTREAM_SHA}:refs/heads/main"
+          echo "sha=${UPSTREAM_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "Mirrored ${UPSTREAM_SHA} to upstream and main"
+
+  integrate:
+    name: Merge upstream into linux
+    needs: mirror
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: linux
+          fetch-depth: 0
+
+      - name: Merge upstream and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_SHA: ${{ needs.mirror.outputs.upstream_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin linux upstream
+          if git merge-base --is-ancestor "${UPSTREAM_SHA}" origin/linux; then
+            echo "linux already contains ${UPSTREAM_SHA}; skip merge PR"
+            exit 0
+          fi
+
+          DATE="$(TZ=Asia/Seoul date +%Y-%m-%d)"
+          BRANCH="sync/${DATE}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${BRANCH}" origin/linux
+
+          set +e
+          git merge origin/upstream -m "Merge upstream ${UPSTREAM_SHA} into linux"
+          MERGE_STATUS=$?
+          set -e
+
+          git fetch --no-tags origin "${BRANCH}" 2>/dev/null || true
+
+          if [ "${MERGE_STATUS}" -ne 0 ]; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
+            {
+              echo "::error::Merge conflicts while integrating upstream ${UPSTREAM_SHA}"
+              echo "Conflicted files:"
+              echo "${CONFLICTS}"
+            }
+            git add -A
+            git commit -m "WIP: conflicted merge of upstream ${UPSTREAM_SHA}"
+            git push --force-with-lease origin "HEAD:refs/heads/${BRANCH}"
+            BODY="$(printf '%s\n' \
+              'Daily upstream integration into `linux` (merge, not rebase).' \
+              '' \
+              "Upstream tip: \`${UPSTREAM_SHA}\`" \
+              '' \
+              '**Merge conflicts — not auto-resolved.** Do not merge until resolved.' \
+              '' \
+              'Conflicted files:' \
+              '' \
+              "$(printf '%s\n' "${CONFLICTS}" | sed 's/^/- `/;s/$/`/')" \
+              '' \
+              'Actions will not merge this PR. Merge gate is a separate agent.')"
+            if ! gh pr view "${BRANCH}" --json number >/dev/null 2>&1; then
+              gh pr create --base linux --head "${BRANCH}" \
+                --title "sync: conflicted merge of upstream ${DATE}" \
+                --body "${BODY}"
+            fi
+            exit 1
+          fi
+
+          git push --force-with-lease origin "HEAD:refs/heads/${BRANCH}"
+          BODY="$(printf '%s\n' \
+            'Daily upstream integration into `linux` (merge, not rebase).' \
+            '' \
+            "Upstream tip: \`${UPSTREAM_SHA}\`" \
+            '' \
+            'Actions will not merge this PR. Merge gate is a separate agent (desktop clean build + QA).')"
+          if ! gh pr view "${BRANCH}" --json number >/dev/null 2>&1; then
+            gh pr create --base linux --head "${BRANCH}" \
+              --title "sync: merge upstream ${DATE}" \
+              --body "${BODY}"
+          fi
