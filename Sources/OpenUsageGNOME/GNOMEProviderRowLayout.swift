@@ -12,8 +12,11 @@ enum GNOMEProviderRowLayout {
     static let groupCSSClass = "ou-connected-accounts"
 
     /// Comfortable collapsed header for title + one subtitle line.
+    /// Applied to both `row.header` and its inner `box.header` so the
+    /// prefix/title/suffix row actually grows — Adwaita otherwise leaves
+    /// a 50px content box top-aligned inside the taller row.
     static let headerMinHeight = 72
-    /// Symmetric inset so the first and last boxed-list rows match.
+    /// Disclosure and boxed-list inset so first and last rows match.
     static let headerVerticalPadding = 10
     static let titleLines = 1
     static let subtitleLines = 1
@@ -44,8 +47,9 @@ enum GNOMEProviderRowLayout {
     }
     row.\(cssClass) row.header {
         min-height: \(headerMinHeight)px;
-        padding-top: \(headerVerticalPadding)px;
-        padding-bottom: \(headerVerticalPadding)px;
+    }
+    row.\(cssClass) row.header > box.header {
+        min-height: \(headerMinHeight)px;
     }
     row.\(cssClass) list.nested {
         padding-top: 0;
