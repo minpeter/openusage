@@ -14,6 +14,7 @@ final class ProvidersView {
     private let group = PreferencesGroup(title: "Connected Accounts")
     private let emptyPage: StatusPage
     private var rows: [String: ProviderRow] = [:]
+    private var displayedInstanceIDs: [String] = []
     private var metricPresentationSettings = GNOMEMetricPresentationSettings()
     private var onRefresh: () -> Void = {}
     private var onRenameProvider: (String, String) -> Void = { _, _ in }
@@ -79,16 +80,25 @@ final class ProvidersView {
             content.append(emptyPage)
             content.append(group)
         }
-        guard !showEmpty else { return }
+        guard !showEmpty else {
+            displayedInstanceIDs.compactMap { rows[$0] }.forEach { group.remove($0.expander) }
+            displayedInstanceIDs = []
+            rows.removeAll()
+            return
+        }
 
-        let seen = snapshots.map(\.instanceID)
+        let uniqueSnapshots = ProviderSnapshotPresentation.uniqueCards(snapshots)
+        let seen = uniqueSnapshots.map(\.instanceID)
         for (id, row) in rows where !seen.contains(id) {
             group.remove(row.expander)
             rows.removeValue(forKey: id)
         }
         var orderedRows: [ProviderRow] = []
-        for snapshot in snapshots {
+        var seenRows: Set<ObjectIdentifier> = []
+        for snapshot in uniqueSnapshots {
             let row = rows[snapshot.instanceID] ?? insertRow(for: snapshot)
+            let identity = ObjectIdentifier(row)
+            guard seenRows.insert(identity).inserted else { continue }
             orderedRows.append(row)
             row.update(
                 snapshot: snapshot,
@@ -100,22 +110,25 @@ final class ProvidersView {
                 row.expander.expanded = true
             }
         }
-        for row in orderedRows {
-            group.remove(row.expander)
-        }
-        for row in orderedRows {
-            group.add(row.expander)
+        let nextIDs = orderedRows.map(\.instanceID)
+        if displayedInstanceIDs != nextIDs {
+            displayedInstanceIDs.compactMap { rows[$0] }.forEach { group.remove($0.expander) }
+            orderedRows.forEach { group.add($0.expander) }
+            displayedInstanceIDs = nextIDs
         }
     }
 
     private func insertRow(for snapshot: ProviderUsageSnapshot) -> ProviderRow {
-        let row = ProviderRow(providerID: snapshot.providerID, displayName: snapshot.displayName) {
+        let row = ProviderRow(
+            instanceID: snapshot.instanceID,
+            providerID: snapshot.providerID,
+            displayName: snapshot.displayName
+        ) {
             [weak self] in self?.onRefresh()
         } onRename: { [weak self] name in
             self?.onRenameProvider(snapshot.providerID, name)
         }
         rows[snapshot.instanceID] = row
-        group.add(row.expander)
         return row
     }
 }
@@ -124,6 +137,7 @@ final class ProvidersView {
 /// disclosure with every metric, quick links, and stale/error annotations.
 @MainActor
 private final class ProviderRow {
+    let instanceID: String
     let expander: ExpanderRow
 
     private let stateIcon = Image()
@@ -142,11 +156,13 @@ private final class ProviderRow {
     private var connections: [SignalConnection] = []
 
     init(
+        instanceID: String,
         providerID: String,
         displayName: String,
         onRetry: @escaping @MainActor () -> Void,
         onRename: @escaping @MainActor (String) -> Void
     ) {
+        self.instanceID = instanceID
         self.onRetry = onRetry
         self.onRename = onRename
         expander = ExpanderRow(title: "")

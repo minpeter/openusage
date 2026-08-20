@@ -328,7 +328,7 @@ enum MetricViews {
         presentation: GNOMEMetricPresentation
     ) -> String? {
         let expiry = metric.expiriesAt?.first.map { "Credits expire \(GNOMEFormat.shortDay($0))" }
-        return [metric.detail, presentation.resetText, presentation.pacingText, expiry]
+        return [GNOMEFormat.metricDetail(metric.detail), presentation.resetText, presentation.pacingText, expiry]
             .compactMap { $0 }
             .joined(separator: " · ")
             .nilIfEmpty

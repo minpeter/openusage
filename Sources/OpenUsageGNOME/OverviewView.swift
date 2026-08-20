@@ -20,9 +20,10 @@ final class OverviewView {
     let spinnerBox = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let totalSpendView = TotalSpendView()
     private let urgentGroup = PreferencesGroup(title: "Most Urgent Quotas")
-    private let healthGroup = PreferencesGroup(title: "Provider Health")
+    let healthGroup = PreferencesGroup(title: "Provider Health")
     var onRefresh: () -> Void = {}
     private var urgentRows: [Widget] = []
+    var healthRows: [Widget] = []
     var metricPresentationSettings = GNOMEMetricPresentationSettings()
     var density: DensitySetting = .regular
 
@@ -83,18 +84,19 @@ final class OverviewView {
             content.remove(child)
         }
 
-        if snapshots.isEmpty {
+        let cards = ProviderSnapshotPresentation.uniqueCards(snapshots)
+        if cards.isEmpty {
             rebuildOnboarding(isRefreshing: isRefreshing)
             return
         }
 
-        totalSpendView.update(snapshots: snapshots)
+        totalSpendView.update(snapshots: cards)
 
-        let urgent = urgentQuotas(snapshots, metricLayouts: metricLayouts)
+        let urgent = urgentQuotas(cards, metricLayouts: metricLayouts)
         urgentGroup.visible = !urgent.isEmpty
         replaceUrgentRows(urgent.map(urgentRow(_:)))
 
-        replaceRows(in: healthGroup, rows: snapshots.map(healthRow(_:)))
+        replaceHealthRows(cards.map(healthRow(_:)))
 
         content.append(GNOMEStyle.pageHeader(
             title: "Overview",

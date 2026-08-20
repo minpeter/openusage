@@ -46,6 +46,7 @@ enum ProviderIcon {
         image.pixelSize = size
         image.setSizeRequest(width: size, height: size)
         image.valign = GTK_ALIGN_CENTER
+        image.addCSSClass("ou-provider-mark")
         image.setAccessibleLabel("\(displayName) provider")
         return image
     }

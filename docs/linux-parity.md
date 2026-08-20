@@ -53,7 +53,10 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Four top-level views: Overview, Providers, History, Settings.
 - The view switcher moves to the bottom edge when the header cannot contain it.
 - The full feature set remains available from 360 logical pixels wide through desktop widths.
+- Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback
+  duplicates do not appear twice, and a provider present in Settings also appears in the other views.
 - Overview and provider content uses clamped boxed lists rather than floating macOS-style panels.
+- Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods never appear.
 - Header bars contain only window-level actions; row actions live in rows or detail pages.
 - Destructive, warning, success, and error states use semantic styling plus text and icons.
 - Keyboard focus, accessible labels/descriptions, system font scaling, dark mode, and high contrast work.

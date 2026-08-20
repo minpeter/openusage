@@ -124,12 +124,9 @@ extension OverviewView {
         return message
     }
 
-    func replaceRows(in group: PreferencesGroup, rows: [Widget]) {
-        while let existing = group.getRow(0) {
-            group.remove(existing)
-        }
-        for row in rows {
-            group.add(row)
-        }
+    func replaceHealthRows(_ rows: [Widget]) {
+        healthRows.forEach(healthGroup.remove)
+        rows.forEach(healthGroup.add)
+        healthRows = rows
     }
 }

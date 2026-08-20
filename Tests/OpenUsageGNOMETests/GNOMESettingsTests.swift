@@ -136,4 +136,12 @@ struct GNOMESettingsTests {
         #expect(actual)
         #expect(unavailable)
     }
+
+    @Test("Provider order empty-state is only for an empty list")
+    func providerOrderEmptyBanner() {
+        #expect(SettingsProvidersPresentation.showsEmptyOrderBanner(order: []))
+        #expect(!SettingsProvidersPresentation.showsEmptyOrderBanner(order: [
+            "antigravity", "claude",
+        ]))
+    }
 }

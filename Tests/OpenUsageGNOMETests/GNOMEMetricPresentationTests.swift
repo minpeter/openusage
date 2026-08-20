@@ -93,6 +93,15 @@ struct GNOMEMetricPresentationTests {
         #expect(result.pacingText == "On pace · ~0% at reset")
     }
 
+    @Test("Quota captions never show a raw millisecond period")
+    func hidesRawMillisecondPeriods() {
+        #expect(GNOMEFormat.period(milliseconds: 604_800_000) == "1 week")
+        #expect(GNOMEFormat.metricDetail("604800000 ms period") == "1 week")
+        #expect(GNOMEFormat.metricDetail("86400000 ms period") == "1 day")
+        #expect(GNOMEFormat.metricDetail("From local logs") == "From local logs")
+        #expect(GNOMEFormat.metricDetail("604800000 ms period")?.contains("ms") != true)
+    }
+
     @Test("GNOME settings produce renderer presentation options")
     func settingsBridge() {
         var settings = GNOMESettings()

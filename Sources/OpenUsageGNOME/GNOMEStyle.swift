@@ -138,6 +138,9 @@ enum GNOMEStyle {
         padding-left: 4px;
         padding-right: 4px;
     }
+    .ou-provider-mark {
+        color: @window_fg_color;
+    }
     """
 
     static func installCSS() {
@@ -242,6 +245,14 @@ enum GNOMEFormat {
 
     static func percent(_ used: Double) -> String {
         "\(Int(used.rounded()))% used"
+    }
+
+    static func period(milliseconds: Int) -> String {
+        LinuxDurationFormat.period(milliseconds: milliseconds)
+    }
+
+    static func metricDetail(_ detail: String?) -> String? {
+        LinuxDurationFormat.displayDetail(detail)
     }
 }
 
