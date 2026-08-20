@@ -107,14 +107,18 @@ extension SettingsView {
         for provider in providers {
             var layout = customizationSettings.metricLayouts[provider.id] ?? .init()
             layout.reconcile(with: provider.metrics)
-            let group = metricProviderGroups[provider.id] ?? PreferencesGroup()
-            if metricProviderGroups[provider.id] == nil {
+            let subtitle = "\(provider.metrics.count) metrics · "
+                + "\(customizationSettings.panelMetricPins.pins(for: provider.id).count) pinned"
+            let group: PreferencesGroup
+            if let existing = metricProviderGroups[provider.id] {
+                group = existing
+            } else {
+                group = PreferencesGroup(title: provider.name, description: subtitle)
                 metricProviderGroups[provider.id] = group
                 providersPage.add(group)
             }
             group.title = provider.name
-            group.description = "\(provider.metrics.count) metrics · "
-                + "\(customizationSettings.panelMetricPins.pins(for: provider.id).count) pinned"
+            group.description = subtitle
             group.visible = true
             removeTrackedRows(metricGroupRows[provider.id] ?? [], from: group)
             var rows: [Widget] = []

@@ -9,6 +9,7 @@ struct LinuxDurationFormatTests {
         #expect(LinuxDurationFormat.period(milliseconds: 5 * 60 * 60 * 1_000) == "5 hours")
         #expect(LinuxDurationFormat.period(milliseconds: 86_400_000) == "1 day")
         #expect(LinuxDurationFormat.period(milliseconds: 604_800_000) == "1 week")
+        #expect(LinuxDurationFormat.period(milliseconds: 604_799_600) == "1 week")
         #expect(LinuxDurationFormat.period(milliseconds: 30 * 86_400_000) == "30 days")
     }
 

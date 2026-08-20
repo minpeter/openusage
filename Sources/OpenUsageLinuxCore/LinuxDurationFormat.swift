@@ -9,7 +9,7 @@ public enum LinuxDurationFormat {
     private static let weekMilliseconds = 7 * dayMilliseconds
 
     public static func period(milliseconds: Int) -> String {
-        let duration = max(milliseconds, 0)
+        let duration = max(((milliseconds + 500) / 1_000) * 1_000, 0)
         if duration == weekMilliseconds { return "1 week" }
         if duration == 30 * dayMilliseconds { return "30 days" }
         if duration == dayMilliseconds { return "1 day" }
