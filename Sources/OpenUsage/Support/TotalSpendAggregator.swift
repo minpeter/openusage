@@ -127,7 +127,6 @@ struct TotalSpend: Equatable {
             }
         }
 
-<<<<<<< HEAD
         let indexed = Dictionary(
             uniqueKeysWithValues: included.map {
                 ($0.slice.provider.id, $0)
@@ -136,16 +135,10 @@ struct TotalSpend: Equatable {
             included.map {
                 .init(
                     id: $0.slice.provider.id,
-                    label: $0.slice.title,
+                    label: $0.slice.provider.displayName,
                     amount: $0.display)
             })
             .compactMap { indexed[$0.id] }
-=======
-        let ranked = included.sorted { lhs, rhs in
-            if lhs.display != rhs.display { return lhs.display > rhs.display }
-            return lhs.slice.provider.displayName.localizedStandardCompare(rhs.slice.provider.displayName) == .orderedAscending
-        }
->>>>>>> origin/upstream
 
         let projected = ranked.map {
             TotalSpendProjectedSlice(provider: $0.slice.provider, displayAmount: $0.display, estimated: $0.slice.estimated)
