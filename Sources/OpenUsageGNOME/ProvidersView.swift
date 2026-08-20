@@ -170,7 +170,14 @@ private final class ProviderRow {
         expander.addCSSClass(GNOMEProviderRowLayout.cssClass)
         expander.titleLines = GNOMEProviderRowLayout.titleLines
         expander.subtitleLines = GNOMEProviderRowLayout.subtitleLines
-        expander.addPrefix(ProviderIcon.make(providerID: providerID, displayName: displayName))
+        let prefix = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
+        prefix.valign = GTK_ALIGN_FILL
+        prefix.vexpand = true
+        let icon = ProviderIcon.make(providerID: providerID, displayName: displayName)
+        icon.valign = GTK_ALIGN_CENTER
+        icon.vexpand = true
+        prefix.append(icon)
+        expander.addPrefix(prefix)
 
         let suffix = Box(orientation: GTK_ORIENTATION_HORIZONTAL, spacing: GNOMEStyle.controlSpacing)
         suffix.valign = GTK_ALIGN_CENTER
@@ -242,6 +249,8 @@ private final class ProviderRow {
         detail.setMargins(densityMetrics.sectionSpacing)
 
         expander.title = snapshot.displayName
+        expander.titleLines = GNOMEProviderRowLayout.titleLines
+        expander.subtitleLines = GNOMEProviderRowLayout.subtitleLines
         renameEntry.text = snapshot.displayName
         menuButton.setAccessibleLabel("Actions for \(snapshot.displayName)")
         expander.subtitle = GNOMEProviderRowLayout.subtitle(

@@ -36,12 +36,13 @@ struct GNOMEProviderRowLayoutTests {
     func headerHeightUsesCSS() {
         #expect(GNOMEProviderRowLayout.headerMinHeight == 72)
         #expect(GNOMEProviderRowLayout.headerVerticalPadding == 10)
-        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) > row.header"))
+        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) row.header"))
         #expect(GNOMEProviderRowLayout.css.contains("min-height: \(GNOMEProviderRowLayout.headerMinHeight)px"))
         #expect(GNOMEProviderRowLayout.css.contains("padding-top: \(GNOMEProviderRowLayout.headerVerticalPadding)px"))
         #expect(GNOMEProviderRowLayout.css.contains("padding-bottom: \(GNOMEProviderRowLayout.headerVerticalPadding)px"))
-        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) > list.nested"))
+        #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) list.nested"))
         #expect(GNOMEProviderRowLayout.css.contains(".\(GNOMEProviderRowLayout.groupCSSClass) list:not(.nested)"))
+        #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) > row.header"))
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass).expander {\n        min-height"))
     }
 }

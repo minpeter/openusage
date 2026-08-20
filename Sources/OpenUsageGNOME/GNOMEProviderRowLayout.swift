@@ -42,12 +42,12 @@ enum GNOMEProviderRowLayout {
     row.\(cssClass).expander {
         padding: 0;
     }
-    row.\(cssClass) > row.header {
+    row.\(cssClass) row.header {
         min-height: \(headerMinHeight)px;
         padding-top: \(headerVerticalPadding)px;
         padding-bottom: \(headerVerticalPadding)px;
     }
-    row.\(cssClass) > list.nested {
+    row.\(cssClass) list.nested {
         padding-top: 0;
         padding-bottom: \(headerVerticalPadding)px;
     }
