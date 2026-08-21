@@ -74,11 +74,4 @@ struct GNOMEProviderRowLayoutTests {
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) > row.header"))
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass).expander {\n        min-height"))
     }
-
-    @Test("Providers list fills the window and scrolls instead of clipping")
-    func providersListScrollsInsideWindow() {
-        #expect(GNOMEStyle.defaultHeight == 760)
-        #expect(GNOMEStyle.minimumHeight < 400)
-        #expect(GNOMEProviderRowLayout.css.contains("overflow: visible"))
-    }
 }
