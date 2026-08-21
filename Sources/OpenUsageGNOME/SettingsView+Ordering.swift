@@ -4,12 +4,6 @@ import OpenUsageLinuxCore
 
 // MARK: - Provider ordering
 
-enum SettingsProvidersPresentation {
-    static func showsEmptyOrderBanner(order: [String]) -> Bool {
-        order.isEmpty
-    }
-}
-
 extension SettingsView {
     func rebuildOrderRows() {
         orderConnections.forEach { $0.disconnect() }
@@ -58,6 +52,23 @@ extension SettingsView {
         }
     }
 
+    func applyProvidersSection() {
+        let showMetrics = SettingsProvidersPresentation.isVisible(
+            .metrics,
+            selected: providersSection
+        )
+        let showOrder = SettingsProvidersPresentation.isVisible(
+            .order,
+            selected: providersSection
+        )
+        metricCustomizationGroup.visible = showMetrics
+        orderGroup.visible = showOrder
+        let visibleIDs = Set(customizationProviders().map(\.id))
+        for (id, group) in metricProviderGroups {
+            group.visible = showMetrics && visibleIDs.contains(id)
+        }
+    }
+
     func move(_ id: String, by offset: Int) {
         guard let from = order.firstIndex(of: id) else { return }
         let to = from + offset
@@ -69,14 +80,15 @@ extension SettingsView {
 
     func shortcutRow(title: String, accelerator: String) -> Widget {
         let row = ActionRow(title: title)
-        if let label = ShortcutLabel(accelerator: accelerator) {
-            label.valign = GTK_ALIGN_CENTER
-            row.addSuffix(label)
-        }
+        let label = Label(SettingsShortcutPresentation.displayText(accelerator: accelerator))
+        label.addCSSClass(.caption)
+        label.valign = GTK_ALIGN_CENTER
+        row.addSuffix(label)
         return row
     }
 
     func rebuildMetricCustomizationRows() {
+        defer { applyProvidersSection() }
         metricConnections.forEach { $0.disconnect() }
         metricConnections.removeAll(keepingCapacity: true)
         removeTrackedRows(metricHeaderRows, from: metricCustomizationGroup)
@@ -106,8 +118,10 @@ extension SettingsView {
         for provider in providers {
             var layout = customizationSettings.metricLayouts[provider.id] ?? .init()
             layout.reconcile(with: provider.metrics)
-            let subtitle = "\(provider.metrics.count) metrics · "
-                + "\(customizationSettings.panelMetricPins.pins(for: provider.id).count) pinned"
+            let subtitle = SettingsPanelPresentation.metricProviderSubtitle(
+                metricCount: provider.metrics.count,
+                pinnedCount: customizationSettings.panelMetricPins.pins(for: provider.id).count
+            )
             let group: PreferencesGroup
             if let existing = metricProviderGroups[provider.id] {
                 group = existing
@@ -127,7 +141,7 @@ extension SettingsView {
                 guard let entry = layout.entry(for: key) else { continue }
                 let enabled = SwitchRow(
                     title: metric.label,
-                    subtitle: "\(metric.kind.rawValue.capitalized) · \(entry.section.label)"
+                    subtitle: SettingsMetricPresentation.rowSubtitle(kind: metric.kind)
                 )
                 enabled.active = entry.isEnabled
                 enabled.addPrefix(ProviderIcon.make(
@@ -167,26 +181,28 @@ extension SettingsView {
                 group.add(visibility)
                 rows.append(visibility)
 
-                let pin = SwitchRow(
-                    title: "Pin \(metric.label) to Panel",
-                    subtitle: "Up to two metrics per provider."
-                )
-                pin.sensitive = entry.isEnabled
-                pin.active = customizationSettings.panelMetricPins
-                    .pins(for: provider.id)
-                    .contains(key)
-                metricConnections.append(pin.onNotify(.active) { [weak self, weak pin] in
-                    guard let self, let pin, !self.applyingSettings else { return }
-                    let accepted = self.onPanelPinChanged(provider.id, key, pin.active)
-                    guard accepted else {
-                        self.applyingSettings = true
-                        pin.active = false
-                        self.applyingSettings = false
-                        return
-                    }
-                })
-                group.add(pin)
-                rows.append(pin)
+                if SettingsPanelPresentation.showsPanelControls {
+                    let pin = SwitchRow(
+                        title: "Pin \(metric.label) to Panel",
+                        subtitle: "Up to two metrics per provider."
+                    )
+                    pin.sensitive = entry.isEnabled
+                    pin.active = customizationSettings.panelMetricPins
+                        .pins(for: provider.id)
+                        .contains(key)
+                    metricConnections.append(pin.onNotify(.active) { [weak self, weak pin] in
+                        guard let self, let pin, !self.applyingSettings else { return }
+                        let accepted = self.onPanelPinChanged(provider.id, key, pin.active)
+                        guard accepted else {
+                            self.applyingSettings = true
+                            pin.active = false
+                            self.applyingSettings = false
+                            return
+                        }
+                    })
+                    group.add(pin)
+                    rows.append(pin)
+                }
             }
             metricGroupRows[provider.id] = rows
         }

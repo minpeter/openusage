@@ -46,7 +46,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 | Sparkle | Flatpak or package-manager updates | No application-managed privileged updater |
 | iCloud sync | Export/import plus optional user-selected sync directory | Settings and snapshots round-trip without Apple services |
 | Share screenshot | PNG image clipboard with inline copy feedback | Matches the macOS copy action using GTK's native `GdkClipboard` texture support |
-| Hide during screen share | Disabled with a documented GNOME Wayland limitation | No false privacy claim; public compositor APIs are re-evaluated when available |
+| Hide during screen share | Hidden: no GNOME/Wayland capture-exclusion API | No disabled stub row; public compositor APIs are re-evaluated when available |
 
 ## GNOME Experience
 
@@ -60,7 +60,9 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Header bars contain only window-level actions; row actions live in rows or detail pages.
 - Destructive, warning, success, and error states use semantic styling plus text and icons.
 - Keyboard focus, accessible labels/descriptions, system font scaling, dark mode, and high contrast work.
-- The panel indicator defaults to the most urgent healthy quota; Settings can switch it to icon-only.
+- The StatusNotifierItem label, when a watcher is present, defaults to the most
+  urgent healthy quota. Settings does not advertise Pin-to-Panel or other
+  panel-only controls on GNOME, where there is no menu-bar extra surface.
 - Animations respect reduced-motion preferences and never gate data availability.
 
 ## Efficiency Budgets

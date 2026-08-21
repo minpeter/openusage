@@ -84,7 +84,7 @@ public struct LinuxSettings: Codable, Equatable, Sendable {
     public var refreshInterval: LinuxRefreshInterval
     public var appearance: LinuxAppearance
     public var launchAtLogin: Bool
-    /// Default-on anonymous analytics preference. Missing values from older schema-v1 files remain on.
+    /// Default-off anonymous analytics preference. An explicit stored true stays on.
     public var analyticsEnabled: Bool
 
     public init(
@@ -93,7 +93,7 @@ public struct LinuxSettings: Codable, Equatable, Sendable {
         refreshInterval: LinuxRefreshInterval = .fiveMinutes,
         appearance: LinuxAppearance = .system,
         launchAtLogin: Bool = false,
-        analyticsEnabled: Bool = true
+        analyticsEnabled: Bool = false
     ) {
         schemaVersion = Self.currentSchemaVersion
         self.providerOrder = Self.uniqued(providerOrder)
@@ -121,7 +121,7 @@ public struct LinuxSettings: Codable, Equatable, Sendable {
         refreshInterval = try values.decodeIfPresent(LinuxRefreshInterval.self, forKey: .refreshInterval) ?? .fiveMinutes
         appearance = try values.decodeIfPresent(LinuxAppearance.self, forKey: .appearance) ?? .system
         launchAtLogin = try values.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
-        analyticsEnabled = try values.decodeIfPresent(Bool.self, forKey: .analyticsEnabled) ?? true
+        analyticsEnabled = try values.decodeIfPresent(Bool.self, forKey: .analyticsEnabled) ?? false
     }
 
     public static func decode(_ data: Data) throws -> LinuxSettings {

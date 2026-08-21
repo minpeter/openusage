@@ -4,15 +4,15 @@ import Testing
 
 @Suite("Linux anonymous analytics")
 struct LinuxAnalyticsTests {
-    @Test("Legacy settings default analytics on and persist an opt-out")
-    func analyticsPreferenceIsBackwardCompatible() throws {
-        let legacy = try LinuxSettings.decode(Data(#"{"schemaVersion":1}"#.utf8))
-        #expect(legacy.analyticsEnabled)
+    @Test("Unset analytics stay off and an explicit opt-in persists")
+    func analyticsPreferenceDefaultsOffAndPersistsOptIn() throws {
+        let unset = try LinuxSettings.decode(Data(#"{"schemaVersion":1}"#.utf8))
+        #expect(!unset.analyticsEnabled)
 
-        var optedOut = legacy
-        optedOut.analyticsEnabled = false
-        let decoded = try LinuxSettings.decode(JSONEncoder().encode(optedOut))
-        #expect(!decoded.analyticsEnabled)
+        var optedIn = unset
+        optedIn.analyticsEnabled = true
+        let decoded = try LinuxSettings.decode(JSONEncoder().encode(optedIn))
+        #expect(decoded.analyticsEnabled)
     }
 
     @Test("Opt-out performs no network or identity storage work")

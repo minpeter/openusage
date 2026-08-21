@@ -64,7 +64,7 @@ immediately: which account is connected, how much of each limit is used, and whe
   Do not repeat the selected period in a second group.
 - Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports them.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
-- Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
+- Panel indicator: StatusNotifierItem still defaults to the most urgent quota when a tray host exists. Settings hides Pin-to-Panel and other panel-only controls on GNOME.
 - Summary surface: a single card with the current total, ranked provider comparison bars, and one export action.
   Provider values remain readable text; a single provider never produces a meaningless 100-percent chart.
 

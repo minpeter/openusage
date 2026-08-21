@@ -47,7 +47,7 @@ exists and the observable verification succeeds against the current release buil
 | CLI parity | Linux CLI executable | help, success, JSON and bad-input QA | Native edge paths plus packaged help/JSON passed |
 | Export/import/share | `UsageExportService.swift` and UI action | JSON round-trip, CSV contract, default opener | Core tests and AT-SPI JSON action passed |
 | Update delivery | `LinuxUpdateDelivery.swift`, Flatpak | no privileged self-update; package-manager guidance | Full Flatpak build passed |
-| Analytics preference | settings and HTTP analytics adapter | opt-in/out persistence with no PII | Five privacy tests and UI wiring passed |
+| Analytics preference | settings and HTTP analytics adapter | default-off opt-in; persistence with no PII | Privacy tests and UI wiring passed |
 
 ## GNOME Experience
 
