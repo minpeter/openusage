@@ -67,6 +67,7 @@ struct GNOMEProviderRowLayoutTests {
         #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass).expander"))
         #expect(GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) list.nested"))
         #expect(GNOMEProviderRowLayout.css.contains("padding-bottom: \(GNOMEProviderRowLayout.disclosureBottomPadding)px"))
+        #expect(GNOMEProviderRowLayout.css.contains("overflow: visible"))
         #expect(!GNOMEProviderRowLayout.css.contains("min-height"))
         #expect(!GNOMEProviderRowLayout.css.contains("72px"))
         #expect(!GNOMEProviderRowLayout.css.contains("row.\(GNOMEProviderRowLayout.cssClass) row.header"))

@@ -21,7 +21,7 @@ final class ProvidersView {
 
     init() {
         root = ScrolledWindow()
-        root.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
+        GNOMEProviderRowLayout.configureScrolling(root)
         root.kineticScrolling = true
 
         content.setMargins(GNOMEStyle.outerMargin)
@@ -337,7 +337,7 @@ private final class ProviderRow {
         let displayedMetrics =
             reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .alwaysVisible)
             + reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .onDemand)
-        for metric in displayedMetrics {
+        for metric in displayedMetrics where GNOMEValuesCopy.shouldDisplay(metric) {
             detail.append(MetricViews.widget(
                 for: metric,
                 providerName: snapshot.displayName,
