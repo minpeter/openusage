@@ -61,7 +61,8 @@ public enum CursorSpendingPools {
     }
 
     public static func remapLayoutIDs(_ ids: [String]) -> [String] {
-        uniqued(ids.map(remapLayoutID))
+        let remapped: [String] = ids.map(remapLayoutID)
+        return uniqued(remapped)
     }
 
     public static func remapLayoutLabel(_ label: String) -> String {
