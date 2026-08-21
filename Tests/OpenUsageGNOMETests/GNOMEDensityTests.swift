@@ -29,7 +29,10 @@ struct GNOMEDensityTests {
         #expect(DashboardController.pageOrder.map(\.name) == [
             "overview",
             "providers",
-            "history",
+        ])
+        #expect(DashboardController.pageOrder.map(\.title) == [
+            "Overview",
+            "Providers",
         ])
     }
 }

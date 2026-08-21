@@ -225,7 +225,6 @@ final class SettingsView {
         shortcutsGroup.add(shortcutRow(title: "Refresh Usage", accelerator: "<Control>r"))
         shortcutsGroup.add(shortcutRow(title: "Show Overview", accelerator: "<Control>1"))
         shortcutsGroup.add(shortcutRow(title: "Show Providers", accelerator: "<Control>2"))
-        shortcutsGroup.add(shortcutRow(title: "Show History", accelerator: "<Control>3"))
         shortcutsGroup.add(shortcutRow(title: "Preferences", accelerator: "<Control>comma"))
         shortcutsGroup.add(shortcutRow(title: "Quit", accelerator: "<Control>q"))
 

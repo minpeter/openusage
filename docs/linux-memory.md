@@ -35,11 +35,11 @@ xvfb-run -a dbus-run-session -- bash -euc '
   trap "kill $pid 2>/dev/null || true" EXIT
   window=$(xdotool search --sync --onlyvisible --name OpenUsage | head -n 1)
   for cycle in $(seq 1 25); do
-    for key in 1 2 3 4; do xdotool key --window "$window" ctrl+$key; done
+    for key in 1 2; do xdotool key --window "$window" ctrl+$key; done
   done
   awk "/^Pss:/ {print \"before\", \$2}" "/proc/$pid/smaps_rollup"
   for cycle in $(seq 1 25); do
-    for key in 1 2 3 4; do xdotool key --window "$window" ctrl+$key; done
+    for key in 1 2; do xdotool key --window "$window" ctrl+$key; done
   done
   awk "/^Pss:/ {print \"after\", \$2}" "/proc/$pid/smaps_rollup"
 '

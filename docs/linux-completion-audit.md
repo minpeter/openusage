@@ -53,11 +53,11 @@ exists and the observable verification succeeds against the current release buil
 
 | Requirement | Artifact | Required evidence | Status |
 |---|---|---|---|
-| Adaptive four-view shell | GNOME UI sources | 360, 720 and 1024 pixel screenshots | Wide and 360px narrow captures passed |
+| Adaptive two-view shell | GNOME UI sources | 360, 720 and 1024 pixel screenshots | Wide and 360px narrow captures passed |
 | Provider identity | shared upstream SVG marks and `ProviderIcon.swift` | all-provider 24/28px light/dark gallery, fallback and package checks | 10 marks normalized; two independent reviewers passed |
 | Native overview | overview renderer | populated spend/quota visual QA | Populated spend, filter, quotas and health captured |
 | Provider details | provider detail renderer | every metric kind, link and account visible | Expanded account metrics and links captured |
-| History charts | chart renderer | bounded Cairo chart plus accessible description | Light and high-contrast charts captured |
+| Usage Trend charts | chart renderer on provider rows | bounded Cairo chart plus accessible description | Light and high-contrast charts captured |
 | Native settings | settings renderer | persisted controls exercise real services | Appearance, refresh, visibility/order, startup, API and privacy wired |
 | Onboarding and errors | status/onboarding renderer | missing auth, expired auth, partial failure QA | Fixture and live missing-auth states exercised |
 | Accessibility | widget semantics | keyboard traversal and accessibility inspection | AT-SPI smoke passed: 187 nodes, 13 controls, 4 named progress bars |
