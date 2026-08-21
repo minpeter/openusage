@@ -78,7 +78,7 @@ struct SettingsPresentationTests {
 
     @Test("Settings dialog close policy ignores scroll, backdrop, and tab switches")
     func dialogClosePolicy() {
-        #expect(SettingsDialogClosePolicy.usesFloatingPresentation)
+        #expect(!SettingsDialogClosePolicy.usesFloatingPresentation)
         #expect(SettingsDialogClosePolicy.allowsClose(from: .headerCloseButton))
         #expect(SettingsDialogClosePolicy.allowsClose(from: .escape))
         #expect(SettingsDialogClosePolicy.allowsClose(from: .explicitClose))

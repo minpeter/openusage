@@ -438,9 +438,6 @@ final class SettingsView {
         dialog.searchEnabled = true
         dialog.contentWidth = 760
         dialog.contentHeight = 680
-        if SettingsDialogClosePolicy.usesFloatingPresentation {
-            dialog.presentationMode = .floating
-        }
         applyProvidersSection()
         connections.append(dialog.onMap { [weak self] in
             guard let self else { return }
