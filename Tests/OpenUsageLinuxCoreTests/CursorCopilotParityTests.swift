@@ -70,15 +70,16 @@ struct CursorCopilotParityTests {
 
         #expect(snapshot.plan == "Pro Plan")
         #expect(snapshot.accountLabel == "user_abc123")
-        #expect(snapshot.metrics.map(\.label) == ["Credits", "Total usage", "Auto usage", "API usage", "On-demand"])
-        #expect(snapshot.metrics.map(\.used) == [17268.15, 20, 12.5, 7.5, 40])
+        #expect(snapshot.metrics.map(\.label) == ["Credits", "Cursor Models", "Other Models", "On-demand"])
+        #expect(snapshot.metrics.map(\.used) == [17268.15, 20, 7.5, 40])
         #expect(snapshot.metrics.last?.limit == 50)
         #expect(snapshot.metrics.contains { $0.label == "Grok Bot weekly" } == false)
+        #expect(snapshot.metrics.contains { $0.label == "Auto usage" } == false)
         #expect(snapshot.links == CursorLinuxProvider.links)
         #expect(snapshot.widgets.map(\.id) == [
-            "cursor.usage", "cursor.auto", "cursor.api", "cursor.grokBotWeekly", "cursor.onDemand",
-            "cursor.requests", "cursor.credits", "cursor.usageTrend", "cursor.today", "cursor.yesterday",
-            "cursor.last30",
+            "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.onDemand",
+            "cursor.requests", "cursor.credits", "cursor.usage", "cursor.usageTrend", "cursor.today",
+            "cursor.yesterday", "cursor.last30",
         ])
     }
 
@@ -87,14 +88,14 @@ struct CursorCopilotParityTests {
         let snapshot = try CursorLinuxMapper.mapRequestBased(
             summary: object("""
             {"membershipType":"enterprise","billingCycleStart":"2026-02-01T00:00:00Z","billingCycleEnd":"2026-03-01T00:00:00Z",
-             "individualUsage":{"plan":{"autoPercentUsed":12,"apiPercentUsed":7},"onDemand":{"enabled":true,"used":1250,"limit":5000}}}
+             "individualUsage":{"plan":{"totalPercentUsed":9,"autoPercentUsed":12,"apiPercentUsed":7},"onDemand":{"enabled":true,"used":1250,"limit":5000}}}
             """),
             requests: object(#"{"gpt-4":{"numRequests":39,"maxRequestUsage":500}}"#),
             planName: "Enterprise",
             accountLabel: "user_abc123"
         )
 
-        #expect(snapshot.metrics.map(\.label) == ["Total usage", "Requests", "Auto usage", "API usage", "On-demand"])
+        #expect(snapshot.metrics.map(\.label) == ["Total usage", "Requests", "Cursor Models", "Other Models", "On-demand"])
         #expect(snapshot.metrics[0].used == 39)
         #expect(snapshot.metrics[0].limit == 500)
         #expect(snapshot.metrics.last?.used == 12.5)

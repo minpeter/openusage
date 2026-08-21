@@ -63,9 +63,10 @@ final class CursorUsageMapperTests: XCTestCase {
 
         XCTAssertEqual(mapped.plan, "Pro Plan")
         XCTAssertEqual(try XCTUnwrap(dollarValue(mapped.lines, "Credits")), 17268.15, accuracy: 0.001)
-        XCTAssertEqual(progress(mapped.lines, "Total usage")?.used, 20)
-        XCTAssertEqual(progress(mapped.lines, "Auto usage")?.used, 12.5)
-        XCTAssertEqual(progress(mapped.lines, "API usage")?.used, 7.5)
+        XCTAssertEqual(progress(mapped.lines, "Cursor Models")?.used, 20)
+        XCTAssertNil(mapped.lines.first { $0.label == "Auto usage" })
+        XCTAssertNil(mapped.lines.first { $0.label == "Total usage" })
+        XCTAssertEqual(progress(mapped.lines, "Other Models")?.used, 7.5)
         XCTAssertEqual(progress(mapped.lines, "On-demand")?.used, 40)
         XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
     }
@@ -100,8 +101,9 @@ final class CursorUsageMapperTests: XCTestCase {
         XCTAssertEqual(grokBot.limit, 100)
         XCTAssertEqual(grokBot.resetsAt, OpenUsageISO8601.date(from: "2026-08-27T00:00:00.000Z"))
         XCTAssertEqual(grokBot.periodDurationMs, 7 * 24 * 3_600 * 1_000)
-        XCTAssertEqual(progress(mapped.lines, "Auto usage")?.used, 12.5)
-        XCTAssertEqual(progress(mapped.lines, "API usage")?.used, 7.5)
+        XCTAssertEqual(progress(mapped.lines, "Cursor Models")?.used, 20)
+        XCTAssertNil(mapped.lines.first { $0.label == "Auto usage" })
+        XCTAssertEqual(progress(mapped.lines, "Other Models")?.used, 7.5)
     }
 
     func testOmitsGrokBotWeeklyWhenCursorOmitsThePool() throws {
@@ -124,7 +126,7 @@ final class CursorUsageMapperTests: XCTestCase {
         )
 
         XCTAssertNil(mapped.lines.first { $0.label == "Grok Bot weekly" })
-        XCTAssertEqual(progress(mapped.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(mapped.lines, "Cursor Models")?.used, 20)
     }
 
     func testOmitsGrokBotWeeklyWhenPercentIsMissing() throws {
@@ -316,9 +318,9 @@ final class CursorProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.plan, "Pro Plan")
         XCTAssertEqual(dollarValue(snapshot.lines, "Credits") ?? -1, 500)
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
-        XCTAssertEqual(progress(snapshot.lines, "Auto usage")?.used, 12.5)
-        XCTAssertEqual(progress(snapshot.lines, "API usage")?.used, 7.5)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
+        XCTAssertNil(snapshot.lines.first { $0.label == "Auto usage" })
+        XCTAssertEqual(progress(snapshot.lines, "Other Models")?.used, 7.5)
         XCTAssertEqual(progress(snapshot.lines, "On-demand")?.used, 40)
     }
 }

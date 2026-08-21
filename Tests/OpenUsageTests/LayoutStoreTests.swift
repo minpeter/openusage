@@ -655,9 +655,9 @@ final class LayoutStoreTests: XCTestCase {
         ])
         // Cursor's spend tiles + usage trend are enabled, so they trail the live meters in declaration order.
         XCTAssertEqual(store.orderedSupportedMetrics(for: "cursor").map(\.id), [
-            "cursor.usage", "cursor.auto", "cursor.api", "cursor.grokBotWeekly", "cursor.onDemand",
-            "cursor.requests", "cursor.credits", "cursor.trend", "cursor.today", "cursor.yesterday",
-            "cursor.last30"
+            "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.onDemand",
+            "cursor.requests", "cursor.credits", "cursor.usage", "cursor.trend", "cursor.today",
+            "cursor.yesterday", "cursor.last30"
         ])
     }
 
@@ -680,7 +680,7 @@ final class LayoutStoreTests: XCTestCase {
             "grok.weekly", "grok.trend",
             "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
             // Cursor spend tiles + usage trend are enabled, joining its live meters in the default layout.
-            "cursor.usage", "cursor.auto", "cursor.api", "cursor.grokBotWeekly", "cursor.trend",
+            "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.trend",
             "cursor.onDemand", "cursor.today", "cursor.yesterday", "cursor.last30"
         ]))
         XCTAssertFalse(store.isMetricEnabled("claude.sonnet"))
@@ -713,7 +713,7 @@ final class LayoutStoreTests: XCTestCase {
         // Cursor spend tiles + usage trend are enabled: the trend joins the primary rows, and the
         // today/yesterday/last30 rows sit below the caret alongside the other secondary metrics.
         XCTAssertEqual(primaryByProvider["cursor"], [
-            "cursor.usage", "cursor.auto", "cursor.api", "cursor.grokBotWeekly", "cursor.trend"
+            "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.trend"
         ])
         XCTAssertEqual(expandedByProvider["cursor"], [
             "cursor.onDemand", "cursor.requests", "cursor.credits",

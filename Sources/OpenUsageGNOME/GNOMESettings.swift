@@ -99,9 +99,13 @@ struct MetricPreferenceKey: Codable, Equatable, Hashable, Sendable {
     let kind: String
     let label: String
 
+    init(kind: String, label: String) {
+        self.kind = kind
+        self.label = label
+    }
+
     init(metric: UsageMetric) {
-        kind = metric.kind.rawValue
-        label = metric.label
+        self.init(kind: metric.kind.rawValue, label: metric.label)
     }
 }
 
@@ -130,7 +134,20 @@ struct ProviderMetricLayout: Codable, Equatable, Sendable {
         self.entries = entries
     }
 
+    mutating func remapCursorSpendingLabels() {
+        var knownKeys: Set<MetricPreferenceKey> = []
+        entries = entries.compactMap { entry in
+            let remapped = MetricPreferenceKey(
+                kind: entry.key.kind,
+                label: CursorSpendingPools.remapLayoutLabel(entry.key.label)
+            )
+            guard knownKeys.insert(remapped).inserted else { return nil }
+            return MetricLayoutEntry(key: remapped, isEnabled: entry.isEnabled, section: entry.section)
+        }
+    }
+
     mutating func reconcile(with metrics: [UsageMetric]) {
+        remapCursorSpendingLabels()
         var knownKeys: Set<MetricPreferenceKey> = []
         entries = entries.filter { knownKeys.insert($0.key).inserted }
 
@@ -243,6 +260,20 @@ struct PanelMetricPins: Codable, Equatable, Sendable {
         }
     }
 
+    mutating func remapCursorSpendingLabels() {
+        guard let pins = values["cursor"] else { return }
+        values = Self.normalized(
+            values.merging([
+                "cursor": pins.map { key in
+                    MetricPreferenceKey(
+                        kind: key.kind,
+                        label: CursorSpendingPools.remapLayoutLabel(key.label)
+                    )
+                }
+            ]) { _, new in new }
+        )
+    }
+
     private static func normalized(
         _ values: [String: [MetricPreferenceKey]]
     ) -> [String: [MetricPreferenceKey]] {
@@ -347,6 +378,7 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             PanelMetricPins.self,
             forKey: .panelMetricPins
         ) ?? .init()
+        CursorGNOMELayoutMigration.migrate(layouts: &metricLayouts, pins: &panelMetricPins)
         providerRenames = try values.decodeIfPresent(
             [String: String].self,
             forKey: .providerRenames
@@ -431,6 +463,19 @@ struct GNOMESettings: Codable, Equatable, Sendable {
             result.append(host)
         }
         return result
+    }
+}
+
+enum CursorGNOMELayoutMigration {
+    static func migrate(
+        layouts: inout [String: ProviderMetricLayout],
+        pins: inout PanelMetricPins
+    ) {
+        if var layout = layouts["cursor"] {
+            layout.remapCursorSpendingLabels()
+            layouts["cursor"] = layout
+        }
+        pins.remapCursorSpendingLabels()
     }
 }
 

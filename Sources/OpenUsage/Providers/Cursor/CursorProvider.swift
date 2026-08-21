@@ -31,12 +31,27 @@ final class CursorProvider: ProviderRuntime {
 
     var widgetDescriptors: [WidgetDescriptor] {
         [
-            .percent(id: "cursor.usage", provider: provider, title: "Total Usage", metricLabel: "Total usage")
+            .percent(
+                id: CursorSpendingPools.cursorModelsWidgetID,
+                provider: provider,
+                title: "Cursor Models",
+                metricLabel: CursorSpendingPools.cursorModelsLabel
+            )
+                .exportingLimit("cursorModels", unit: "percent"),
+            .percent(
+                id: CursorSpendingPools.otherModelsWidgetID,
+                provider: provider,
+                title: "Other Models",
+                metricLabel: CursorSpendingPools.otherModelsLabel
+            )
+                .exportingLimit("otherModels", unit: "percent"),
+            .percent(
+                id: CursorSpendingPools.legacyTotalWidgetID,
+                provider: provider,
+                title: "Total Usage",
+                metricLabel: CursorSpendingPools.totalUsageLabel
+            )
                 .exportingLimit("totalUsage", unit: "percent"),
-            .percent(id: "cursor.auto", provider: provider, title: "Auto Usage", metricLabel: "Auto usage")
-                .exportingLimit("autoUsage", unit: "percent"),
-            .percent(id: "cursor.api", provider: provider, title: "API Usage", metricLabel: "API usage")
-                .exportingLimit("apiUsage", unit: "percent"),
             .percent(id: "cursor.grokBotWeekly", provider: provider, title: "Grok Bot Weekly", metricLabel: "Grok Bot weekly")
                 .exportingLimit("grokBotWeekly", unit: "percent"),
             .boundedDollars(id: "cursor.onDemand", provider: provider, title: "Extra Usage", metricLabel: "On-demand", limit: 100, valueWord: "spent")
@@ -117,12 +132,16 @@ final class CursorProvider: ProviderRuntime {
             planInfoUnavailable: planInfoUnavailable
         )
         let sandUsage = await fetchSandUsage(accessToken: currentToken)
+        let usageSummary = await fetchOptionalJSONObject(label: "usage-summary", request: {
+            try await self.usageClient.fetchUsageSummary(accessToken: currentToken)
+        })
         if fallback.shouldFallback {
             var mapped = try await usageSummaryAndRequestResult(
                 accessToken: currentToken,
                 planName: planName,
                 unavailableMessage: fallback.message,
-                sandUsage: sandUsage
+                sandUsage: sandUsage,
+                usageSummary: usageSummary
             )
             let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
             return snapshot(mapped, usageHistory: history)
@@ -149,7 +168,8 @@ final class CursorProvider: ProviderRuntime {
             planName: planName,
             creditGrants: creditGrants,
             stripeBalanceCents: stripeBalanceCents,
-            sandUsage: sandUsage
+            sandUsage: sandUsage,
+            usageSummary: usageSummary
         )
         let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
         return snapshot(mapped, usageHistory: history)
@@ -366,9 +386,10 @@ final class CursorProvider: ProviderRuntime {
         accessToken: String,
         planName: String?,
         unavailableMessage: String,
-        sandUsage: [String: Any]?
+        sandUsage: [String: Any]?,
+        usageSummary: [String: Any]?
     ) async throws -> CursorMappedUsage {
-        let summary = await fetchOptionalJSONObject(label: "usage-summary", request: {
+        let summary = usageSummary ?? await fetchOptionalJSONObject(label: "usage-summary", request: {
             try await self.usageClient.fetchUsageSummary(accessToken: accessToken)
         })
         if let summary, !CursorUsageSummaryMapper.hasUsableSummaryPayload(summary) {

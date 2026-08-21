@@ -74,6 +74,35 @@ struct GNOMEMetricLayoutTests {
         #expect(layout.displayedMetrics(from: metrics, in: .onDemand).map(\.label) == ["Weekly"])
     }
 
+    @Test("Persisted Auto/API/Total labels migrate to Cursor Models and Other Models")
+    func migratesCursorSpendingLabels() throws {
+        let auto = MetricPreferenceKey(kind: "progress", label: "Auto usage")
+        let api = MetricPreferenceKey(kind: "progress", label: "API usage")
+        let total = MetricPreferenceKey(kind: "progress", label: "Total usage")
+        var settings = GNOMESettings()
+        settings.metricLayouts["cursor"] = ProviderMetricLayout(entries: [
+            .init(key: auto, isEnabled: true, section: .alwaysVisible),
+            .init(key: api, isEnabled: true, section: .alwaysVisible),
+            .init(key: total, isEnabled: false, section: .onDemand),
+        ])
+        _ = settings.panelMetricPins.pin(auto, for: "cursor")
+        _ = settings.panelMetricPins.pin(api, for: "cursor")
+
+        let decoded = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+        let layout = try #require(decoded.metricLayouts["cursor"])
+        #expect(layout.entries.map(\.key.label) == ["Cursor Models", "Other Models"])
+        #expect(layout.entry(for: MetricPreferenceKey(kind: "progress", label: "Cursor Models"))?.isEnabled == true)
+        #expect(layout.entry(for: MetricPreferenceKey(kind: "progress", label: "Other Models"))?.isEnabled == true)
+        #expect(decoded.panelMetricPins.pins(for: "cursor").map(\.label) == [
+            "Cursor Models", "Other Models",
+        ])
+        #expect(layout.entries.contains { $0.key.label == "Auto usage" } == false)
+        #expect(layout.entries.contains { $0.key.label == "Total usage" } == false)
+    }
+
     @Test("Provider metric layouts survive GNOME settings round trip")
     func settingsRoundTrip() throws {
         let weekly = MetricPreferenceKey(metric: metric("Weekly"))

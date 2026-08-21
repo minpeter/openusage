@@ -89,6 +89,43 @@ struct LinuxUsageAPIContractTests {
         #expect(providers["new-adapter@one"] != nil)
     }
 
+    @Test("Cursor /v1/limits uses Cursor Models and Other Models keys")
+    func cursorSpendingPoolLimitKeys() throws {
+        let usage = try #require(JSONSerialization.jsonObject(with: Data(
+            #"{"enabled":true,"planUsage":{"limit":40000,"totalPercentUsed":1}}"#.utf8
+        )) as? [String: Any])
+        let snapshot = try CursorLinuxMapper.map(
+            usage: usage,
+            planName: "Ultra",
+            creditGrants: nil,
+            stripeBalanceCents: 0,
+            accountLabel: nil,
+            now: date
+        )
+        let response = LinuxUsageAPI.respond(
+            method: "GET",
+            path: "/v1/limits",
+            state: LinuxUsageAPIState(
+                knownProviderIDs: ["cursor"],
+                snapshots: [snapshot],
+                generatedAt: date
+            )
+        )
+        let root = try #require(
+            JSONSerialization.jsonObject(with: try #require(response.body)) as? [String: Any]
+        )
+        let providers = try #require(root["providers"] as? [String: Any])
+        let cursor = try #require(providers["cursor"] as? [String: Any])
+        let resources = try #require(cursor["resources"] as? [String: Any])
+        #expect(Set(resources.keys) == ["cursorModels", "otherModels"])
+        #expect((resources["cursorModels"] as? [String: Any])?["used"] as? Double == 1)
+        #expect((resources["otherModels"] as? [String: Any])?["used"] as? Double == 0)
+        #expect(resources["auto"] == nil)
+        #expect(resources["api"] == nil)
+        #expect(resources["totalUsage"] == nil)
+        #expect(resources["usage"] == nil)
+    }
+
     @Test("Port is configurable by environment and command line")
     func configurablePort() throws {
         #expect(try LinuxAPIArguments.parse([], environment: ["OPENUSAGE_PORT": "7000"]).port == 7000)

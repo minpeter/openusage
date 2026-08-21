@@ -338,7 +338,7 @@ final class CursorSpendProviderTests: XCTestCase {
         XCTAssertTrue(http.requests.contains { $0.url.absoluteString.contains("export-usage-events-csv") },
                       "Cursor refresh must download the usage CSV for spend metrics")
         // Live quota meter survives; spend tiles + trend are present.
-        XCTAssertTrue(snapshot.lines.contains { $0.label == "Total usage" })
+        XCTAssertTrue(snapshot.lines.contains { $0.label == "Cursor Models" })
         for label in ["Today", "Yesterday", "Last 30 Days", "Usage Trend"] {
             XCTAssertNotNil(snapshot.lines.first { $0.label == label }, "\(label) line must be present")
         }

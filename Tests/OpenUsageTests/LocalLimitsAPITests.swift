@@ -257,7 +257,7 @@ final class LocalLimitsAPITests: XCTestCase {
         let expected: [String: Set<String>] = [
             "claude": ["session", "weekly", "sonnet", "fable", "extraUsage"],
             "codex": ["session", "weekly", "spark", "sparkWeekly", "credits", "creditValue", "rateLimitResets"],
-            "cursor": ["totalUsage", "autoUsage", "apiUsage", "grokBotWeekly", "onDemand", "requests", "credits"],
+            "cursor": ["cursorModels", "otherModels", "totalUsage", "grokBotWeekly", "onDemand", "requests", "credits"],
             "antigravity": ["geminiSession", "geminiWeekly", "nonGeminiSession", "nonGeminiWeekly"],
             "copilot": ["premiumCredits", "extraUsage", "orgCredits", "orgSpend", "chat", "completions"],
             "devin": ["daily", "weekly", "extraUsageBalance"],

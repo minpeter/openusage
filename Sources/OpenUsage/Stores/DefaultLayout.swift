@@ -15,7 +15,7 @@ enum DefaultLayout {
         "codex.session", "codex.weekly", "codex.spark", "codex.sparkWeekly", "codex.trend",
         "codex.credits", "codex.rateLimitResets", "codex.today", "codex.yesterday", "codex.last30",
 
-        "cursor.usage", "cursor.auto", "cursor.api", "cursor.grokBotWeekly", "cursor.trend",
+        "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.trend",
         "cursor.onDemand", "cursor.today", "cursor.yesterday", "cursor.last30",
 
         "copilot.premium", "copilot.extra", "copilot.orgCredits", "copilot.orgSpend",
@@ -62,7 +62,7 @@ enum DefaultLayout {
         "antigravity.geminiPro", "antigravity.geminiWeekly",
         "claude.session", "claude.weekly",
         "codex.session", "codex.weekly",
-        "cursor.auto", "cursor.api",
+        "cursor.cursorModels", "cursor.otherModels",
         "copilot.premium",
         "openrouter.credits",
         "zai.session", "zai.weekly"
