@@ -50,8 +50,8 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 
 ## GNOME Experience
 
-- Two top-level views: Overview and Providers. Settings opens as a floating dialog, not a tab,
-  so scrolling Preferences does not swipe-dismiss it.
+- Two top-level views: Overview and Providers. Settings opens as a dialog, not a tab.
+  Close is the header close button or Escape.
 - The view switcher moves to the bottom edge when the header cannot contain it.
 - The full feature set remains available from 360 logical pixels wide through desktop widths.
 - Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback

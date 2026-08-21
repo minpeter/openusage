@@ -438,10 +438,6 @@ final class SettingsView {
         dialog.searchEnabled = true
         dialog.contentWidth = 760
         dialog.contentHeight = 680
-        if SettingsDialogClosePolicy.usesFloatingPresentation {
-            // swift-adwaita 1.1.0 imports the closed C enum, not a `.floating` helper.
-            dialog.presentationMode = .ADW_DIALOG_FLOATING
-        }
         applyProvidersSection()
         connections.append(dialog.onMap { [weak self] in
             guard let self else { return }
