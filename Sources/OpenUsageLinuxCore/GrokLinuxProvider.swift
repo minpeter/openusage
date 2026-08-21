@@ -29,6 +29,7 @@ public struct GrokLinuxProvider: Sendable {
     public static let links = [ProviderLink(label: "Usage", url: "https://grok.com/?_s=usage")]
     public static let widgetDescriptors = [
         WidgetDescriptor(id: "grok.weekly", title: "Weekly", metricLabel: "Weekly limit"),
+        WidgetDescriptor(id: GrokRemainingResets.widgetID, title: GrokRemainingResets.metricLabel, metricLabel: GrokRemainingResets.metricLabel),
         WidgetDescriptor(id: "grok.payAsYouGo", title: "Extra Usage", metricLabel: "Pay as you go"),
         WidgetDescriptor(id: "grok.trend", title: "Usage Trend", metricLabel: "Usage Trend"),
         WidgetDescriptor(id: "grok.today", title: "Today", metricLabel: "Today"),
@@ -74,7 +75,16 @@ public struct GrokLinuxProvider: Sendable {
                     return grokTrimmed(object["subscription_tier_display"] as? String)
                 }
                 let local = (try? scanner.scan(now: now)) ?? []
-                return try GrokLinuxMapper.mapCredits(data: result.data, auth: auth, plan: plan, localMetrics: local, now: now)
+                let resets = try? await client.remainingResets(accessToken: auth.accessToken)
+                return try GrokLinuxMapper.mapCredits(
+                    data: result.data,
+                    auth: auth,
+                    plan: plan,
+                    remainingResets: resets?.data,
+                    remainingResetsStatus: resets?.statusCode ?? 0,
+                    localMetrics: local,
+                    now: now
+                )
             } catch {
                 lastError = error
             }

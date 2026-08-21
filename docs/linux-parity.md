@@ -30,6 +30,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Provider and account totals remain separately addressable.
 - Trend data is bounded to 31 daily points per provider series.
 - Codex reset-credit count and expiry information is visible when available.
+- Grok usage-limit reset count and expiry information is visible when the dedicated `GetRemainingResets` payload is available.
 
 ## Application Behavior
 

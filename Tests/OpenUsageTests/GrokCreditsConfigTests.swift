@@ -97,6 +97,62 @@ final class GrokCreditsConfigMapperTests: XCTestCase {
         XCTAssertEqual(colorHex, "#a3a3a3")
     }
 
+    func testMapsUsageLimitResetsFromDedicatedResponse() throws {
+        let now = Date(timeIntervalSince1970: 1_786_536_000)
+        let mapped = try GrokUsageMapper.mapCreditsConfig(
+            HTTPResponse(statusCode: 200, headers: [:], body: GrokCreditsFixtures.capturedResponseBody),
+            remainingResets: HTTPResponse(
+                statusCode: 200,
+                headers: [:],
+                body: GrokRemainingResetsFixtures.oneAvailableToken
+            ),
+            now: now
+        )
+        guard case .values(_, let vals, _, let expiriesAt, _, _)? =
+                mapped.lines.first(where: { $0.label == GrokRemainingResets.metricLabel }) else {
+            return XCTFail("expected a Usage Limit Resets values line")
+        }
+        XCTAssertEqual(vals, [MetricValue(number: 1, kind: .count, label: "available")])
+        XCTAssertEqual(expiriesAt, [Date(timeIntervalSince1970: 1_789_238_940)])
+        XCTAssertEqual(mapped.lines.map(\.label).prefix(3), [
+            "Weekly limit", GrokRemainingResets.metricLabel, "Pay as you go"
+        ])
+    }
+
+    func testMapsZeroUsageLimitResets() throws {
+        let mapped = try GrokUsageMapper.mapCreditsConfig(
+            HTTPResponse(statusCode: 200, headers: [:], body: GrokCreditsFixtures.capturedResponseBody),
+            remainingResets: HTTPResponse(
+                statusCode: 200,
+                headers: [:],
+                body: GrokRemainingResets.emptyRequest
+            )
+        )
+        guard case .values(_, let vals, _, let expiriesAt, _, _)? =
+                mapped.lines.first(where: { $0.label == GrokRemainingResets.metricLabel }) else {
+            return XCTFail("expected a Usage Limit Resets values line at 0")
+        }
+        XCTAssertEqual(vals, [MetricValue(number: 0, kind: .count, label: "available")])
+        XCTAssertTrue(expiriesAt.isEmpty)
+    }
+
+    func testMissingUsageLimitResetsOmitsTheRow() throws {
+        let mapped = try GrokUsageMapper.mapCreditsConfig(HTTPResponse(
+            statusCode: 200, headers: [:], body: GrokCreditsFixtures.capturedResponseBody
+        ))
+        XCTAssertNil(mapped.lines.first(where: { $0.label == GrokRemainingResets.metricLabel }))
+        XCTAssertNotNil(mapped.lines.first(where: { $0.label == "Weekly limit" }))
+        XCTAssertNotNil(mapped.lines.first(where: { $0.label == "Pay as you go" }))
+    }
+
+    func testFailedUsageLimitResetsFetchOmitsTheRow() throws {
+        let mapped = try GrokUsageMapper.mapCreditsConfig(
+            HTTPResponse(statusCode: 200, headers: [:], body: GrokCreditsFixtures.capturedResponseBody),
+            remainingResets: HTTPResponse(statusCode: 404, headers: [:], body: Data())
+        )
+        XCTAssertNil(mapped.lines.first(where: { $0.label == GrokRemainingResets.metricLabel }))
+    }
+
     func testMapsEnabledPayAsYouGoCap() throws {
         let mapped = try GrokUsageMapper.mapCreditsConfig(HTTPResponse(
             statusCode: 200, headers: [:], body: GrokCreditsFixtures.responseBody(onDemandCap: 2500)

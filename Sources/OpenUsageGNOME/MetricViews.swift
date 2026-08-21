@@ -335,15 +335,17 @@ enum MetricViews {
     }
 
     private static func formatValue(_ value: UsageValue) -> String {
-        let number = value.label.isEmpty ? "" : "\(value.label) "
         switch value.unit {
         case .dollars:
-            return number + GNOMEFormat.currency(value.value)
+            let prefix = value.label.isEmpty ? "" : "\(value.label) "
+            return prefix + GNOMEFormat.currency(value.value)
         case .tokens, .count:
-            // Avoid "tokens 1,234 tokens" when the label already names the unit.
-            let label = value.label.lowercased() == "tokens" ? "" : number
-            let suffix = value.unit == .tokens ? " tokens" : ""
-            return label + GNOMEFormat.tokens(value.value) + suffix
+            // Number then unit, matching Mac `MetricFormatter` ("2 available", "1.2M tokens").
+            let formatted = GNOMEFormat.tokens(value.value)
+            if value.unit == .tokens {
+                return formatted + " tokens"
+            }
+            return value.label.isEmpty ? formatted : "\(formatted) \(value.label)"
         case .credits:
             return GNOMEFormat.tokens(value.value) + " credits"
         case .percent:

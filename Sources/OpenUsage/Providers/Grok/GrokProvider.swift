@@ -1,4 +1,5 @@
 import Foundation
+import OpenUsageCore
 
 @MainActor
 final class GrokProvider: ProviderRuntime {
@@ -35,6 +36,15 @@ final class GrokProvider: ProviderRuntime {
         [
             .percent(id: "grok.weekly", provider: provider, title: "Weekly", metricLabel: "Weekly limit")
                 .exportingLimit("weekly", unit: "percent"),
+            .values(
+                id: GrokRemainingResets.widgetID,
+                provider: provider,
+                title: GrokRemainingResets.metricLabel,
+                metricLabel: GrokRemainingResets.metricLabel,
+                traySuffix: "resets",
+                showsResetExpiries: true
+            )
+            .exportingLimit("usageLimitResets", kind: .balance, unit: "resets", source: .value(kind: .count, label: "available")),
             .badge(id: "grok.payAsYouGo", provider: provider, title: "Extra Usage", metricLabel: "Pay as you go"),
             .usageTrend(provider: provider)
                 .exportingHistory(
@@ -89,7 +99,12 @@ final class GrokProvider: ProviderRuntime {
         // `?format=credits` — the call the Grok CLI itself makes. This is the provider's primary
         // remote fetch; a failure here fails the provider like any other usage call.
         let creditsResponse = try await fetchCreditsConfigWithRetry(accessToken: accessToken, state: &state)
-        var mapped = try GrokUsageMapper.mapCreditsConfig(creditsResponse)
+        let remainingResets = await fetchRemainingResetsBestEffort(accessToken: state.token)
+        var mapped = try GrokUsageMapper.mapCreditsConfig(
+            creditsResponse,
+            remainingResets: remainingResets,
+            now: now()
+        )
 
         let plan = await fetchPlanName(accessToken: state.token)
 
@@ -203,6 +218,20 @@ final class GrokProvider: ProviderRuntime {
             return tokenExpiry
         }
         return now().addingTimeInterval(60 * 60)
+    }
+
+    /// Dedicated usage-limit reset tokens. Best-effort: a transport or HTTP failure
+    /// omits the row rather than failing Weekly / Pay as you go.
+    private func fetchRemainingResetsBestEffort(accessToken: String) async -> HTTPResponse? {
+        do {
+            return try await usageClient.fetchRemainingResets(accessToken: accessToken)
+        } catch {
+            AppLog.warn(
+                LogTag.plugin("grok"),
+                "usage-limit reset fetch failed; omitting the row: \(error.localizedDescription)"
+            )
+            return nil
+        }
     }
 
     private func fetchPlanName(accessToken: String) async -> String? {

@@ -1,4 +1,5 @@
 import Foundation
+import OpenUsageCore
 
 struct GrokRefreshResponse: Decodable, Hashable, Sendable {
     var accessToken: String
@@ -42,6 +43,11 @@ struct GrokUsageClient: Sendable {
     /// the CLI's stability guarantees, auth headers, and token-refresh path.
     static let creditsConfigURL = URL(string: "https://cli-chat-proxy.grok.com/v1/billing?format=credits")!
 
+    /// On-demand usage-limit reset tokens (the Settings → Usage "Reset Available" card).
+    /// grok.com `ConsumerUiSvc/GetRemainingResets`, authenticated with the same CLI OIDC
+    /// bearer as billing. Best-effort: the provider tolerates a failure here.
+    static let remainingResetsURL = GrokRemainingResets.url
+
     var httpClient: HTTPClient
 
     init(httpClient: HTTPClient = URLSessionHTTPClient()) {
@@ -77,6 +83,23 @@ struct GrokUsageClient: Sendable {
             method: "GET",
             url: Self.settingsURL,
             headers: authHeaders(accessToken: accessToken),
+            timeout: 10
+        ))
+    }
+
+    /// Dedicated reset-token list. Empty protobuf framed as one uncompressed grpc-web
+    /// data frame — the same request grok.com Settings → Usage sends.
+    func fetchRemainingResets(accessToken: String) async throws -> HTTPResponse {
+        var headers = authHeaders(accessToken: accessToken)
+        headers["Content-Type"] = "application/grpc-web+proto"
+        headers["X-Grpc-Web"] = "1"
+        headers["Accept"] = "application/grpc-web+proto"
+        headers["Origin"] = "https://grok.com"
+        return try await httpClient.send(HTTPRequest(
+            method: "POST",
+            url: Self.remainingResetsURL,
+            headers: headers,
+            body: GrokRemainingResets.emptyRequest,
             timeout: 10
         ))
     }

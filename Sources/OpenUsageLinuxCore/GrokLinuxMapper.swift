@@ -5,6 +5,8 @@ public enum GrokLinuxMapper {
         data: Data,
         auth: GrokCredential,
         plan: String? = nil,
+        remainingResets: Data? = nil,
+        remainingResetsStatus: Int = 200,
         localMetrics: [UsageMetric] = [],
         now: Date = Date()
     ) throws -> ProviderUsageSnapshot {
@@ -39,6 +41,20 @@ public enum GrokLinuxMapper {
                 resetsAt: end,
                 periodDurationMilliseconds: periodMilliseconds,
                 detail: LinuxDurationFormat.period(milliseconds: periodMilliseconds)
+            ))
+        }
+        if let remainingResets,
+           let resets = GrokRemainingResets.snapshot(
+            httpStatus: remainingResetsStatus,
+            body: remainingResets,
+            now: now
+           ) {
+            metrics.append(UsageMetric(
+                kind: .values,
+                label: GrokRemainingResets.metricLabel,
+                used: Double(resets.availableCount),
+                values: [UsageValue(label: "available", value: Double(resets.availableCount), unit: .count)],
+                expiriesAt: resets.availableExpiries
             ))
         }
         metrics.append(UsageMetric(

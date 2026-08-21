@@ -650,7 +650,7 @@ final class LayoutStoreTests: XCTestCase {
             "devin.daily", "devin.weekly", "devin.extra"
         ])
         XCTAssertEqual(store.orderedSupportedMetrics(for: "grok").map(\.id), [
-            "grok.weekly", "grok.payAsYouGo",
+            "grok.weekly", "grok.usageLimitResets", "grok.payAsYouGo",
             "grok.trend", "grok.today", "grok.yesterday", "grok.last30"
         ])
         // Cursor's spend tiles + usage trend are enabled, so they trail the live meters in declaration order.
@@ -677,7 +677,7 @@ final class LayoutStoreTests: XCTestCase {
             "codex.session", "codex.weekly", "codex.spark", "codex.sparkWeekly", "codex.trend",
             "codex.credits", "codex.rateLimitResets", "codex.today", "codex.yesterday", "codex.last30",
             "devin.daily", "devin.weekly", "devin.extra",
-            "grok.weekly", "grok.trend",
+            "grok.weekly", "grok.usageLimitResets", "grok.trend",
             "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30",
             // Cursor spend tiles + usage trend are enabled, joining its live meters in the default layout.
             "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.trend",
@@ -706,7 +706,7 @@ final class LayoutStoreTests: XCTestCase {
         ])
         XCTAssertEqual(primaryByProvider["devin"], ["devin.daily", "devin.weekly"])
         XCTAssertEqual(expandedByProvider["devin"], ["devin.extra"])
-        XCTAssertEqual(primaryByProvider["grok"], ["grok.weekly", "grok.trend"])
+        XCTAssertEqual(primaryByProvider["grok"], ["grok.weekly", "grok.usageLimitResets", "grok.trend"])
         XCTAssertEqual(expandedByProvider["grok"], [
             "grok.payAsYouGo", "grok.today", "grok.yesterday", "grok.last30"
         ])
