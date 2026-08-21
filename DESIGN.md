@@ -46,7 +46,8 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Page titles use libadwaita's compact title role; card titles and summary statistics use the quieter heading role
   so hierarchy comes from placement and spacing rather than several competing display sizes.
 - Preferences opens from the application menu in a native `AdwPreferencesDialog`; it is not a peer content
-  destination. Its General, Display, Providers, and Data pages keep unrelated controls out of one continuous wall.
+  destination. The dialog uses floating presentation so content scroll does not swipe-dismiss it.
+  Its General, Display, Providers, and Data pages keep unrelated controls out of one continuous wall.
   Controls on one page must not unexpectedly change controls on another.
 - Providers are ordered by the user's persisted order, then account label.
 - Each quota row contains label, percentage or value, progress bar, and reset copy.
