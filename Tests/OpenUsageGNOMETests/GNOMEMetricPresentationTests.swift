@@ -134,11 +134,11 @@ struct GNOMEMetricPresentationTests {
         #expect(GNOMEFormat.metricDetail(models.detail) == "Includes Cursor Grok and Composer")
     }
 
-    @Test("Cursor Grok Bot weekly presents used percent and weekly reset, not Grok CLI Weekly")
+    @Test("Cursor Grok Bot Weekly presents used percent and weekly reset, not Grok CLI Weekly")
     func cursorGrokBotWeeklyPresentation() {
         let metric = UsageMetric(
             kind: .progress,
-            label: "Grok Bot weekly",
+            label: "Grok Bot Weekly",
             used: 13,
             limit: 100,
             resetsAt: Date(timeIntervalSince1970: 1_787_788_800),
@@ -148,12 +148,35 @@ struct GNOMEMetricPresentationTests {
         let relative = presentation(metric, resetMode: .relative)
         let absolute = presentation(metric, resetMode: .absolute, timeFormat: .twentyFourHour)
 
-        #expect(metric.label == "Grok Bot weekly")
+        #expect(metric.label == "Grok Bot Weekly")
         #expect(metric.label != "Weekly limit")
         #expect(relative.valueText == "13% used")
         #expect(relative.resetText == "Resets in 15d 11h")
         #expect(absolute.resetText == "Resets Aug 27 at 00:00")
         #expect(GNOMEFormat.period(milliseconds: 604_800_000) == "1 week")
+        #expect(GNOMEFormat.metricDetail(metric.detail) == nil)
+        #expect(GNOMEFormat.metricDetail(metric.detail)?.contains("percent") != true)
+    }
+
+    @Test("Overview copy mentions spend only when a Total Spend card can show")
+    func overviewCopyFollowsSpendCard() {
+        #expect(
+            GNOMEPageCopy.overviewDescription(hasSpend: true)
+                == "Your spend, quota pressure, and provider health at a glance."
+        )
+        #expect(
+            GNOMEPageCopy.overviewDescription(hasSpend: false)
+                == "Your quota pressure and provider health at a glance."
+        )
+        #expect(!GNOMEPageCopy.providersGroupDescription.lowercased().contains("spend"))
+    }
+
+    @Test("Disabled badges use a muted color instead of success green")
+    func disabledBadgeIsNotSuccess() {
+        #expect(GNOMEBadgeStyle.semanticClass(for: "Disabled") == .dimLabel)
+        #expect(GNOMEBadgeStyle.semanticClass(for: "Unavailable") == .dimLabel)
+        #expect(GNOMEBadgeStyle.semanticClass(for: "100 cap") == .success)
+        #expect(GNOMEBadgeStyle.semanticClass(for: "Error") == .error)
     }
 
     @Test("GNOME settings produce renderer presentation options")

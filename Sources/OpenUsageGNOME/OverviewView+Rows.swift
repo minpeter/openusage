@@ -78,8 +78,7 @@ extension OverviewView {
         } else if let warning = snapshot.warning {
             row.subtitle = warning
         } else {
-            row.subtitle = snapshot.accountLabel
-                ?? GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
+            row.subtitle = GNOMEFormat.relativeRefresh(snapshot.refreshedAt)
         }
 
         let trailing = Box(

@@ -12,7 +12,8 @@ struct GNOMEProviderRowLayoutTests {
         )
 
         #expect(short == "Pro")
-        #expect(long == "kali2005611@gmail.com · Pro 20x")
+        #expect(long == "Pro 20x")
+        #expect(!long.contains("@"))
         #expect(GNOMEProviderRowLayout.lineCount(short) == 1)
         #expect(GNOMEProviderRowLayout.lineCount(long) == 1)
         #expect(GNOMEProviderRowLayout.subtitleLines == 1)
@@ -27,9 +28,34 @@ struct GNOMEProviderRowLayoutTests {
             collapsedStatus: "HTTP 401 · Check credentials"
         )
 
-        #expect(subtitle == "dev@example.com · Plus · HTTP 401 · Check credentials")
+        #expect(subtitle == "Plus · HTTP 401 · Check credentials")
+        #expect(!subtitle.contains("@"))
         #expect(!subtitle.contains("\n"))
         #expect(GNOMEProviderRowLayout.lineCount(subtitle) == 1)
+    }
+
+    @Test("Provider rows never show a raw user id or full email")
+    func hidesRawIdentity() {
+        #expect(
+            GNOMEProviderRowLayout.subtitle(
+                accountLabel: "user_01KZZDNQW6KCTH4M3KJMNQWTTC",
+                plan: "Ultra"
+            ) == "Ultra"
+        )
+        #expect(
+            GNOMEProviderRowLayout.subtitle(
+                accountLabel: "user_01KZZDNQW6KCTH4M3KJMNQWTTC",
+                plan: nil
+            ).isEmpty
+        )
+        #expect(
+            GNOMEProviderRowLayout.subtitle(
+                accountLabel: "kali2005611@gmail.com",
+                plan: nil
+            ) == "k***@gmail.com"
+        )
+        #expect(GNOMEProviderRowLayout.displayIdentity("user_01KZZDNQW6KCTH4M3KJMNQWTTC") == nil)
+        #expect(GNOMEProviderRowLayout.maskEmail("kali2005611@gmail.com") == "k***@gmail.com")
     }
 
     @Test("Header follows Adwaita action-row density, not a 72px floor")
