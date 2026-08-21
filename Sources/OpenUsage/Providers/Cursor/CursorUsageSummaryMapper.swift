@@ -14,7 +14,9 @@ enum CursorUsageSummaryMapper {
         let individual = summary["individualUsage"] as? [String: Any]
         let team = summary["teamUsage"] as? [String: Any]
         let plan = individual?["plan"] as? [String: Any]
-        if ["totalPercentUsed", "autoPercentUsed", "apiPercentUsed"].contains(where: {
+        if CursorSpendingPools.cursorModelsPercent(planUsage: nil, summaryPlan: plan) != nil
+            || CursorSpendingPools.otherModelsPercent(planUsage: nil, summaryPlan: plan, planName: nil) != nil
+            || ["totalPercentUsed", "autoPercentUsed", "apiPercentUsed"].contains(where: {
             ProviderParse.number(plan?[$0]) != nil
         }) {
             return true
@@ -45,7 +47,7 @@ enum CursorUsageSummaryMapper {
         if !hasRequests {
             appendSummaryTotal(summary, cycle: cycle, to: &lines)
         }
-        appendStructuredPercentages(summary, cycle: cycle, to: &lines)
+        appendStructuredPercentages(summary, planName: planName, cycle: cycle, to: &lines)
         CursorUsageMapper.appendGrokBotWeekly(sandUsage, to: &lines)
         appendOnDemand(summary, cycle: cycle, to: &lines)
 
@@ -79,7 +81,7 @@ enum CursorUsageSummaryMapper {
                 ?? ProviderParse.number(requests["numRequestsTotal"])
                 ?? 0
         )
-        for label in ["Total usage", "Requests"] {
+        for label in [CursorSpendingPools.totalUsageLabel, "Requests"] {
             lines.append(.progress(
                 label: label,
                 used: used,
@@ -104,46 +106,38 @@ enum CursorUsageSummaryMapper {
         let limitType = (summary?["limitType"] as? String)?.lowercased()
 
         if limitType == "team", let pooled = dollarMeter(team?["pooled"]) {
-            appendDollarProgress(pooled, label: "Total usage", cycle: cycle, to: &lines)
+            appendDollarProgress(pooled, label: CursorSpendingPools.totalUsageLabel, cycle: cycle, to: &lines)
             return
         }
-        if let percent = ProviderParse.number((individual?["plan"] as? [String: Any])?["totalPercentUsed"]) {
-            lines.append(.progress(
-                label: "Total usage",
-                used: percent,
-                limit: 100,
-                format: .percent,
-                resetsAt: cycle.resetsAt,
-                periodDurationMs: cycle.periodDurationMs
-            ))
+        if CursorSpendingPools.cursorModelsPercent(
+            planUsage: nil,
+            summaryPlan: individual?["plan"] as? [String: Any]
+        ) != nil {
             return
         }
         if let overall = dollarMeter(individual?["overall"]) {
-            appendDollarProgress(overall, label: "Total usage", cycle: cycle, to: &lines)
+            appendDollarProgress(overall, label: CursorSpendingPools.totalUsageLabel, cycle: cycle, to: &lines)
             return
         }
         if let pooled = dollarMeter(team?["pooled"]) {
-            appendDollarProgress(pooled, label: "Total usage", cycle: cycle, to: &lines)
+            appendDollarProgress(pooled, label: CursorSpendingPools.totalUsageLabel, cycle: cycle, to: &lines)
         }
     }
 
     private static func appendStructuredPercentages(
         _ summary: [String: Any]?,
+        planName: String?,
         cycle: BillingCycle,
         to lines: inout [MetricLine]
     ) {
-        let plan = ((summary?["individualUsage"] as? [String: Any])?["plan"] as? [String: Any])
-        for (key, label) in [("autoPercentUsed", "Auto usage"), ("apiPercentUsed", "API usage")] {
-            guard let percent = ProviderParse.number(plan?[key]) else { continue }
-            lines.append(.progress(
-                label: label,
-                used: percent,
-                limit: 100,
-                format: .percent,
-                resetsAt: cycle.resetsAt,
-                periodDurationMs: cycle.periodDurationMs
-            ))
-        }
+        CursorUsageMapper.appendSpendingPools(
+            planUsage: nil,
+            summaryPlan: CursorSpendingPools.summaryPlan(summary),
+            planName: planName ?? (summary?["membershipType"] as? String),
+            computedPercent: nil,
+            cycle: (cycle.resetsAt, cycle.periodDurationMs),
+            to: &lines
+        )
     }
 
     /// The dashboard's headline On-Demand card is user-scoped. Only use the organization aggregate

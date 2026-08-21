@@ -41,8 +41,9 @@ struct CursorGrokBotWeeklyTests {
         #expect(metric.resetsAt == reset)
         #expect(metric.periodDurationMilliseconds == 7 * 24 * 3_600 * 1_000)
         #expect(metric.detail == "percent")
-        #expect(snapshot.metrics.map(\.label).contains("Auto usage"))
-        #expect(snapshot.metrics.map(\.label).contains("API usage"))
+        #expect(snapshot.metrics.map(\.label).contains("Cursor Models"))
+        #expect(snapshot.metrics.map(\.label).contains("Other Models"))
+        #expect(snapshot.metrics.map(\.label).contains("Auto usage") == false)
         #expect(snapshot.widgets.contains { $0.id == "cursor.grokBotWeekly" && $0.title == "Grok Bot Weekly" })
     }
 
@@ -63,7 +64,7 @@ struct CursorGrokBotWeeklyTests {
         )
 
         #expect(snapshot.metrics.contains { $0.label == "Grok Bot weekly" } == false)
-        #expect(snapshot.metrics.map(\.label) == ["Total usage", "Auto usage", "API usage"])
+        #expect(snapshot.metrics.map(\.label) == ["Cursor Models", "Other Models"])
     }
 
     @Test("Zero-limit sand payload does not invent a 0% Grok Bot weekly tile")
@@ -84,7 +85,7 @@ struct CursorGrokBotWeeklyTests {
         )
 
         #expect(snapshot.metrics.contains { $0.label == "Grok Bot weekly" } == false)
-        #expect(snapshot.metrics.contains { $0.label == "Total usage" })
+        #expect(snapshot.metrics.contains { $0.label == "Cursor Models" })
     }
 
     @Test("Entitled 0% week is real data, not omitted")
@@ -107,7 +108,7 @@ struct CursorGrokBotWeeklyTests {
         let snapshot = try CursorLinuxMapper.mapRequestBased(
             summary: object("""
             {"membershipType":"enterprise","billingCycleStart":"2026-02-01T00:00:00Z","billingCycleEnd":"2026-03-01T00:00:00Z",
-             "individualUsage":{"plan":{"autoPercentUsed":12,"apiPercentUsed":7}}}
+             "individualUsage":{"plan":{"totalPercentUsed":9,"autoPercentUsed":12,"apiPercentUsed":7}}}
             """),
             requests: object(#"{"gpt-4":{"numRequests":39,"maxRequestUsage":500}}"#),
             planName: "Enterprise",
@@ -123,7 +124,7 @@ struct CursorGrokBotWeeklyTests {
         )
 
         #expect(snapshot.metrics.map(\.label) == [
-            "Total usage", "Requests", "Auto usage", "API usage", "Grok Bot weekly",
+            "Total usage", "Requests", "Cursor Models", "Other Models", "Grok Bot weekly",
         ])
         let metric = try #require(snapshot.metrics.last)
         #expect(metric.used == 13)
@@ -173,7 +174,7 @@ struct CursorGrokBotWeeklyTests {
             ])
         ).refresh()
         #expect(omitted.metrics.contains { $0.label == "Grok Bot weekly" } == false)
-        #expect(omitted.metrics.contains { $0.label == "Total usage" })
+        #expect(omitted.metrics.contains { $0.label == "Cursor Models" })
     }
 }
 

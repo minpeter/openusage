@@ -36,7 +36,9 @@ account totals omitted:
    and keep the optional `Requests` meter for backwards compatibility.
 3. Prefer user-scoped on-demand usage over the team aggregate; use the team
    bucket only when the user bucket is unavailable.
-4. Map structured Auto/API percentages from `individualUsage.plan`.
+4. Map structured Cursor Models / Other Models percentages from
+   `individualUsage.plan` (`totalPercentUsed` / `apiPercentUsed` or newer
+   dedicated fields). Do not label them Auto/API.
 5. Fall back to the known pooled/overall usage-summary variants when request
    counts are unavailable.
 6. Append Cursor usage-history rows after fallback mapping, as on the normal
@@ -45,8 +47,9 @@ account totals omitted:
 
 ## Acceptance checks
 
-- A live-shaped Enterprise fixture renders included request usage, Auto/API
-  percentages, and the individual on-demand dollar cap together.
+- A live-shaped Enterprise fixture renders included request usage, Cursor
+  Models / Other Models percentages, and the individual on-demand dollar cap
+  together.
 - The team on-demand aggregate does not replace a valid individual cap.
 - A pooled usage-summary fixture still maps to Total Usage.
 - Request-only Enterprise responses retain the previous Requests output while

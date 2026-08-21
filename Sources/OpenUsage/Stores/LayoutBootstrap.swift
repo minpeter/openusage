@@ -36,7 +36,10 @@ enum LayoutBootstrap {
         defaults: LayoutDefaultSet
     ) -> LayoutInitialState {
         let hasStoredLayout = persistence.hasStoredLayout
-        let savedPlaced = persistence.loadPlaced()?.filter { registry.descriptor(id: $0.descriptorID) != nil }
+        let savedPlaced: [PlacedWidget]? = persistence.loadPlaced().map { (placed: [PlacedWidget]) -> [PlacedWidget] in
+            let remappedIDs: [String] = CursorSpendingPools.remapLayoutIDs(placed.map(\.descriptorID))
+            return remappedIDs.map { PlacedWidget(descriptorID: $0) }
+        }?.filter { registry.descriptor(id: $0.descriptorID) != nil }
         let startingPlaced = savedPlaced ?? defaults.metricIDs
             .filter { registry.descriptor(id: $0) != nil }
             .map { PlacedWidget(descriptorID: $0) }
@@ -49,14 +52,21 @@ enum LayoutBootstrap {
         )
 
         let providerOrder = persistence.loadProviderOrder() ?? registry.providers.map(\.id)
-        let metricOrderByProvider = persistence.loadMetricOrder().map {
-            LayoutOrdering.normalizedMetricOrder($0, registry: registry)
+        let metricOrderByProvider = persistence.loadMetricOrder().map { (order: [String: [String]]) -> [String: [String]] in
+            LayoutOrdering.normalizedMetricOrder(
+                order.mapValues { (ids: [String]) -> [String] in
+                    CursorSpendingPools.remapLayoutIDs(ids)
+                },
+                registry: registry
+            )
         } ?? LayoutOrdering.defaultMetricOrder(registry: registry)
 
         // An existing value — including an empty array from a user who unpinned everything — wins.
+        let remappedPins: [String] = CursorSpendingPools.remapLayoutIDs(
+            persistence.loadPins() ?? defaults.pinnedMetricIDs
+        )
         let pinnedMetricIDs = Set(
-            (persistence.loadPins() ?? defaults.pinnedMetricIDs)
-                .filter { registry.descriptor(id: $0) != nil }
+            remappedPins.filter { registry.descriptor(id: $0) != nil }
         )
 
         // Expanded membership is a fresh-install default only. Existing layouts that predate the feature
@@ -64,7 +74,10 @@ enum LayoutBootstrap {
         var shouldPersistExpanded = false
         var expandedMetricIDs: Set<String>
         if let savedExpanded = persistence.loadExpandedMetrics() {
-            expandedMetricIDs = Set(savedExpanded.filter { registry.descriptor(id: $0) != nil })
+            let remappedExpanded: [String] = CursorSpendingPools.remapLayoutIDs(savedExpanded)
+            expandedMetricIDs = Set(
+                remappedExpanded.filter { registry.descriptor(id: $0) != nil }
+            )
         } else if hasStoredLayout {
             expandedMetricIDs = []
         } else {
@@ -138,7 +151,8 @@ enum LayoutBootstrap {
         let seededDefaults: Set<String>
         var shouldPersistSeededDefaults = false
         if let saved = persistence.loadSeededDefaults() {
-            seededDefaults = Set(LayoutOrdering.knownMetricIDs(saved, registry: registry))
+            let remapped: [String] = CursorSpendingPools.remapLayoutIDs(saved)
+            seededDefaults = Set(LayoutOrdering.knownMetricIDs(remapped, registry: registry))
             shouldPersistSeededDefaults = seededDefaults != Set(saved)
         } else if hasStoredLayout {
             seededDefaults = Set(LayoutOrdering.knownMetricIDs(defaults.migrationBaselineMetricIDs, registry: registry))

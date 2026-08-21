@@ -13,13 +13,15 @@ public enum CursorLinuxMapper {
         stripeBalanceCents: Double,
         accountLabel: String?,
         sandUsage: [String: Any]? = nil,
+        usageSummary: [String: Any]? = nil,
         now: Date = Date()
     ) throws -> ProviderUsageSnapshot {
         guard usage["enabled"] as? Bool != false,
               let planUsage = usage["planUsage"] as? [String: Any]
         else { throw CursorLinuxError.noActiveSubscription }
         let limit = cursorMapperNumber(planUsage["limit"])
-        let totalPercent = cursorMapperNumber(planUsage["totalPercentUsed"])
+        let totalPercent = CursorSpendingPools.cursorModelsPercent(planUsage: planUsage)
+            ?? cursorMapperNumber(planUsage["totalPercentUsed"])
         guard limit != nil || totalPercent != nil else { throw CursorLinuxError.totalUsageLimitMissing }
 
         var metrics: [UsageMetric] = []
@@ -32,20 +34,30 @@ public enum CursorLinuxMapper {
         let isTeam = normalizedPlan == "team"
             || (spend?["limitType"] as? String)?.lowercased() == "team"
             || (cursorMapperNumber(spend?["pooledLimit"]) ?? 0) > 0
+        let summaryPlan = CursorSpendingPools.summaryPlan(usageSummary)
         if isTeam {
             guard let limit else {
                 throw CursorLinuxError.requestBasedUnavailable("Cursor request-based usage data unavailable. Try again later.")
             }
-            metrics.append(UsageMetric(kind: .progress, label: "Total usage", used: usedCents / 100, limit: limit / 100, resetsAt: cycle.reset, detail: "dollars"))
-        } else {
-            let computed = limit.flatMap { $0 > 0 ? usedCents / $0 * 100 : nil } ?? 0
-            metrics.append(UsageMetric(kind: .progress, label: "Total usage", used: totalPercent ?? computed, limit: 100, resetsAt: cycle.reset, detail: "percent"))
+            metrics.append(UsageMetric(
+                kind: .progress,
+                label: CursorSpendingPools.totalUsageLabel,
+                used: usedCents / 100,
+                limit: limit / 100,
+                resetsAt: cycle.reset,
+                periodDurationMilliseconds: cycle.duration,
+                detail: "dollars",
+                periodDurationMs: cycle.duration
+            ))
         }
-        for (key, label) in [("autoPercentUsed", "Auto usage"), ("apiPercentUsed", "API usage")] {
-            if let value = cursorMapperNumber(planUsage[key]) {
-                metrics.append(UsageMetric(kind: .progress, label: label, used: value, limit: 100, resetsAt: cycle.reset, detail: "percent"))
-            }
-        }
+        appendSpendingPools(
+            planUsage: planUsage,
+            summaryPlan: summaryPlan,
+            planName: planName,
+            computedPercent: isTeam ? nil : (totalPercent ?? (limit.flatMap { $0 > 0 ? usedCents / $0 * 100 : nil } ?? 0)),
+            cycle: cycle,
+            to: &metrics
+        )
         appendGrokBotWeekly(sandUsage, to: &metrics)
         if let spend {
             let spendLimit = cursorMapperNumber(spend["individualLimit"]) ?? cursorMapperNumber(spend["pooledLimit"]) ?? 0
@@ -74,20 +86,22 @@ public enum CursorLinuxMapper {
         var metrics: [UsageMetric] = []
         if let bucket = requests?["gpt-4"] as? [String: Any], let limit = cursorMapperNumber(bucket["maxRequestUsage"]), limit > 0 {
             let used = max(0, cursorMapperNumber(bucket["numRequests"]) ?? cursorMapperNumber(bucket["numRequestsTotal"]) ?? 0)
-            for label in ["Total usage", "Requests"] {
+            for label in [CursorSpendingPools.totalUsageLabel, "Requests"] {
                 metrics.append(UsageMetric(kind: .progress, label: label, used: used, limit: limit, resetsAt: cycle.reset, detail: "requests"))
             }
         } else {
-            appendSummaryTotal(summary, cycle: cycle.reset, to: &metrics)
+            appendSummaryTotal(summary, cycle: cycle, to: &metrics)
         }
-        let individual = summary?["individualUsage"] as? [String: Any]
-        let plan = individual?["plan"] as? [String: Any]
-        for (key, label) in [("autoPercentUsed", "Auto usage"), ("apiPercentUsed", "API usage")] {
-            if let value = cursorMapperNumber(plan?[key]) {
-                metrics.append(UsageMetric(kind: .progress, label: label, used: value, limit: 100, resetsAt: cycle.reset, detail: "percent"))
-            }
-        }
+        appendSpendingPools(
+            planUsage: nil,
+            summaryPlan: CursorSpendingPools.summaryPlan(summary),
+            planName: planName ?? (summary?["membershipType"] as? String),
+            computedPercent: nil,
+            cycle: cycle,
+            to: &metrics
+        )
         appendGrokBotWeekly(sandUsage, to: &metrics)
+        let individual = summary?["individualUsage"] as? [String: Any]
         let team = summary?["teamUsage"] as? [String: Any]
         if !appendOnDemand(individual?["onDemand"], reset: cycle.reset, to: &metrics) {
             _ = appendOnDemand(team?["onDemand"], reset: cycle.reset, to: &metrics)
@@ -105,7 +119,8 @@ public enum CursorLinuxMapper {
         let spend = usage["spendLimitUsage"] as? [String: Any]
         let teamShape = (spend?["limitType"] as? String)?.lowercased() == "team" || (cursorMapperNumber(spend?["pooledLimit"]) ?? 0) > 0
         return (unusable && (normalized == "enterprise" || normalized == "team"))
-            || (unusable && normalized.isEmpty && planUnavailable && cursorMapperNumber(planUsage?["totalPercentUsed"]) == nil)
+            || (unusable && normalized.isEmpty && planUnavailable
+                && CursorSpendingPools.cursorModelsPercent(planUsage: planUsage) == nil)
             || (teamShape && missingLimit)
     }
 
@@ -156,15 +171,67 @@ public enum CursorLinuxMapper {
         if total > 0 { metrics.append(UsageMetric(kind: .value, label: "Credits", used: max(0, total - used) / 100, detail: "dollars")) }
     }
 
-    private static func appendSummaryTotal(_ summary: [String: Any]?, cycle: Date?, to metrics: inout [UsageMetric]) {
+    private static func appendSpendingPools(
+        planUsage: [String: Any]?,
+        summaryPlan: [String: Any]?,
+        planName: String?,
+        computedPercent: Double?,
+        cycle: (reset: Date?, duration: Int),
+        to metrics: inout [UsageMetric]
+    ) {
+        if !metrics.contains(where: { $0.label == CursorSpendingPools.cursorModelsLabel }) {
+            let percent = CursorSpendingPools.cursorModelsPercent(planUsage: planUsage, summaryPlan: summaryPlan)
+                ?? computedPercent
+            if let percent {
+                metrics.append(UsageMetric(
+                    kind: .progress,
+                    label: CursorSpendingPools.cursorModelsLabel,
+                    used: percent,
+                    limit: 100,
+                    resetsAt: cycle.reset,
+                    periodDurationMilliseconds: cycle.duration,
+                    detail: CursorSpendingPools.cursorModelsDetail,
+                    periodDurationMs: cycle.duration
+                ))
+            }
+        }
+        if !metrics.contains(where: { $0.label == CursorSpendingPools.otherModelsLabel }),
+           let percent = CursorSpendingPools.otherModelsPercent(
+            planUsage: planUsage,
+            summaryPlan: summaryPlan,
+            planName: planName
+           )
+        {
+            metrics.append(UsageMetric(
+                kind: .progress,
+                label: CursorSpendingPools.otherModelsLabel,
+                used: percent,
+                limit: 100,
+                resetsAt: cycle.reset,
+                periodDurationMilliseconds: cycle.duration,
+                periodDurationMs: cycle.duration
+            ))
+        }
+    }
+
+    private static func appendSummaryTotal(
+        _ summary: [String: Any]?,
+        cycle: (reset: Date?, duration: Int),
+        to metrics: inout [UsageMetric]
+    ) {
         let individual = summary?["individualUsage"] as? [String: Any]
         let team = summary?["teamUsage"] as? [String: Any]
-        if (summary?["limitType"] as? String)?.lowercased() == "team", appendDollar(team?["pooled"], label: "Total usage", reset: cycle, to: &metrics) { return }
-        if let percent = cursorMapperNumber((individual?["plan"] as? [String: Any])?["totalPercentUsed"]) {
-            metrics.append(UsageMetric(kind: .progress, label: "Total usage", used: percent, limit: 100, resetsAt: cycle, detail: "percent")); return
+        if (summary?["limitType"] as? String)?.lowercased() == "team",
+           appendDollar(team?["pooled"], label: CursorSpendingPools.totalUsageLabel, reset: cycle.reset, to: &metrics)
+        { return }
+        if CursorSpendingPools.cursorModelsPercent(
+            planUsage: nil,
+            summaryPlan: individual?["plan"] as? [String: Any]
+        ) != nil {
+            return
         }
-        if appendDollar(individual?["overall"], label: "Total usage", reset: cycle, to: &metrics) { return }
-        _ = appendDollar(team?["pooled"], label: "Total usage", reset: cycle, to: &metrics)
+        if appendDollar(individual?["overall"], label: CursorSpendingPools.totalUsageLabel, reset: cycle.reset, to: &metrics) { return }
+        _ = appendDollar(team?["pooled"], label: CursorSpendingPools.totalUsageLabel, reset: cycle.reset, to: &metrics)
     }
 
     private static func appendOnDemand(_ raw: Any?, reset: Date?, to metrics: inout [UsageMetric]) -> Bool {

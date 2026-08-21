@@ -102,6 +102,38 @@ struct GNOMEMetricPresentationTests {
         #expect(GNOMEFormat.metricDetail("604800000 ms period")?.contains("ms") != true)
     }
 
+    @Test("Cursor Models and Other Models present Spending percents including a real 0%")
+    func cursorSpendingPoolsPresentation() {
+        let models = UsageMetric(
+            kind: .progress,
+            label: "Cursor Models",
+            used: 1,
+            limit: 100,
+            resetsAt: Date(timeIntervalSince1970: 1_772_592_000),
+            periodDurationMilliseconds: 2_592_000_000,
+            detail: "Includes Cursor Grok and Composer"
+        )
+        let other = UsageMetric(
+            kind: .progress,
+            label: "Other Models",
+            used: 0,
+            limit: 100,
+            resetsAt: Date(timeIntervalSince1970: 1_772_592_000),
+            periodDurationMilliseconds: 2_592_000_000
+        )
+        let modelsPresentation = presentation(models)
+        let otherPresentation = presentation(other)
+
+        #expect(models.label == "Cursor Models")
+        #expect(models.label != "Auto usage")
+        #expect(models.label != "Total usage")
+        #expect(other.label == "Other Models")
+        #expect(other.label != "API usage")
+        #expect(modelsPresentation.valueText == "1% used")
+        #expect(otherPresentation.valueText == "0% used")
+        #expect(GNOMEFormat.metricDetail(models.detail) == "Includes Cursor Grok and Composer")
+    }
+
     @Test("Cursor Grok Bot weekly presents used percent and weekly reset, not Grok CLI Weekly")
     func cursorGrokBotWeeklyPresentation() {
         let metric = UsageMetric(

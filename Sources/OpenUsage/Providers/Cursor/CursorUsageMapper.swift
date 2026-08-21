@@ -16,7 +16,7 @@ struct CursorPlanUsageFacts {
     let hasPlanUsage: Bool
     /// `planUsage.limit`, when numeric.
     let limit: Double?
-    /// `planUsage.totalPercentUsed`, when numeric.
+    /// First-party Cursor Models percent (`totalPercentUsed` or a newer dedicated field).
     let totalPercentUsed: Double?
     /// `spendLimitUsage.limitType`, lowercased.
     let spendLimitType: String?
@@ -28,7 +28,7 @@ struct CursorPlanUsageFacts {
         let planUsage = usage["planUsage"] as? [String: Any]
         hasPlanUsage = planUsage != nil
         limit = planUsage.flatMap { ProviderParse.number($0["limit"]) }
-        totalPercentUsed = planUsage.flatMap { ProviderParse.number($0["totalPercentUsed"]) }
+        totalPercentUsed = planUsage.flatMap { CursorSpendingPools.cursorModelsPercent(planUsage: $0) }
         let spendLimitUsage = usage["spendLimitUsage"] as? [String: Any]
         spendLimitType = (spendLimitUsage?["limitType"] as? String)?.lowercased()
         pooledLimit = ProviderParse.number(spendLimitUsage?["pooledLimit"]) ?? 0
@@ -85,7 +85,8 @@ enum CursorUsageMapper {
         planName: String?,
         creditGrants: [String: Any]?,
         stripeBalanceCents: Double,
-        sandUsage: [String: Any]? = nil
+        sandUsage: [String: Any]? = nil,
+        usageSummary: [String: Any]? = nil
     ) throws -> CursorMappedUsage {
         let facts = CursorPlanUsageFacts(usage: usage)
         guard facts.isEnabled,
@@ -120,45 +121,23 @@ enum CursorUsageMapper {
                 throw CursorUsageError.requestBasedUnavailable("Cursor request-based usage data unavailable. Try again later.")
             }
             lines.append(.progress(
-                label: "Total usage",
+                label: CursorSpendingPools.totalUsageLabel,
                 used: ProviderParse.centsToDollars(planUsedCents),
                 limit: ProviderParse.centsToDollars(limitCents),
                 format: .dollars,
                 resetsAt: cycle.resetsAt,
                 periodDurationMs: cycle.periodDurationMs
             ))
-        } else {
-            lines.append(.progress(
-                label: "Total usage",
-                used: totalUsagePercent,
-                limit: 100,
-                format: .percent,
-                resetsAt: cycle.resetsAt,
-                periodDurationMs: cycle.periodDurationMs
-            ))
         }
 
-        if let autoPercentUsed = ProviderParse.number(planUsage["autoPercentUsed"]) {
-            lines.append(.progress(
-                label: "Auto usage",
-                used: autoPercentUsed,
-                limit: 100,
-                format: .percent,
-                resetsAt: cycle.resetsAt,
-                periodDurationMs: cycle.periodDurationMs
-            ))
-        }
-
-        if let apiPercentUsed = ProviderParse.number(planUsage["apiPercentUsed"]) {
-            lines.append(.progress(
-                label: "API usage",
-                used: apiPercentUsed,
-                limit: 100,
-                format: .percent,
-                resetsAt: cycle.resetsAt,
-                periodDurationMs: cycle.periodDurationMs
-            ))
-        }
+        appendSpendingPools(
+            planUsage: planUsage,
+            summaryPlan: CursorSpendingPools.summaryPlan(usageSummary),
+            planName: planName,
+            computedPercent: isTeamAccount ? nil : totalUsagePercent,
+            cycle: cycle,
+            to: &lines
+        )
 
         appendGrokBotWeekly(sandUsage, to: &lines)
 
@@ -436,6 +415,46 @@ enum CursorUsageMapper {
             let isTrivial = list.count == 1 && list[0].model == model
             return ModelUsageEntry(model: model, totalTokens: tokens, costUSD: costUSD,
                                    variants: isTrivial ? nil : list)
+        }
+    }
+
+    static func appendSpendingPools(
+        planUsage: [String: Any]?,
+        summaryPlan: [String: Any]?,
+        planName: String?,
+        computedPercent: Double?,
+        cycle: (resetsAt: Date?, periodDurationMs: Int),
+        to lines: inout [MetricLine]
+    ) {
+        if !lines.contains(where: { $0.label == CursorSpendingPools.cursorModelsLabel }) {
+            let percent = CursorSpendingPools.cursorModelsPercent(planUsage: planUsage, summaryPlan: summaryPlan)
+                ?? computedPercent
+            if let percent {
+                lines.append(.progress(
+                    label: CursorSpendingPools.cursorModelsLabel,
+                    used: percent,
+                    limit: 100,
+                    format: .percent,
+                    resetsAt: cycle.resetsAt,
+                    periodDurationMs: cycle.periodDurationMs
+                ))
+            }
+        }
+        if !lines.contains(where: { $0.label == CursorSpendingPools.otherModelsLabel }),
+           let percent = CursorSpendingPools.otherModelsPercent(
+            planUsage: planUsage,
+            summaryPlan: summaryPlan,
+            planName: planName
+           )
+        {
+            lines.append(.progress(
+                label: CursorSpendingPools.otherModelsLabel,
+                used: percent,
+                limit: 100,
+                format: .percent,
+                resetsAt: cycle.resetsAt,
+                periodDurationMs: cycle.periodDurationMs
+            ))
         }
     }
 

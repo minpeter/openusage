@@ -22,7 +22,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
 
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.errorCategory)
         XCTAssertTrue(logs.contains("optional plan response contained invalid plan metadata"), logs)
         XCTAssertTrue(logs.contains("optional credit-grants request returned HTTP 503"), logs)
@@ -44,7 +44,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
 
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.errorCategory)
         XCTAssertTrue(logs.contains("optional plan request failed"), logs)
         XCTAssertTrue(logs.contains("optional credit-grants request failed"), logs)
@@ -100,7 +100,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
 
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.errorCategory)
         XCTAssertTrue(logs.contains("optional prepaid-balance response contained invalid balance metadata"), logs)
     }
