@@ -360,8 +360,14 @@ final class GrokProviderTests: XCTestCase {
         scanner: GrokLogUsageScanner? = nil,
         now: Date = OpenUsageISO8601.date(from: "2026-06-18T12:00:00.000Z")!
     ) -> GrokProvider {
+        // Auth must stay valid for the test clock. The dedicated-reset fixture is dated
+        // 2026-08-13; a hardcoded 2026-07-01 expiry made refresh() return an expired-auth
+        // snapshot and drop Weekly, PAYG, and Usage Limit Resets.
+        let expiresAt = OpenUsageISO8601.string(from: now.addingTimeInterval(14 * 24 * 60 * 60))
         let files = FakeFiles([
-            GrokAuthStore.authPath: #"{"https://auth.x.ai::client":{"key":"token","refresh_token":"refresh","expires_at":"2026-07-01T00:00:00.000Z"}}"#
+            GrokAuthStore.authPath: """
+            {"https://auth.x.ai::client":{"key":"token","refresh_token":"refresh","expires_at":"\(expiresAt)"}}
+            """
         ])
         return GrokProvider(
             authStore: GrokAuthStore(files: files, now: { now }),
