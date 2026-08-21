@@ -124,8 +124,10 @@ enum SettingsShortcutPresentation {
 }
 
 enum SettingsDialogClosePolicy {
-    /// Floating presentation avoids bottom-sheet swipe-to-dismiss from scrolling.
-    static let usesFloatingPresentation = true
+    /// Forced floating presentation is off: pinned swift-adwaita 1.1.0 and the
+    /// Factory libadwaita binding have no `AdwDialogPresentationMode.floating`.
+    /// Close remains the header close button or Escape.
+    static let usesFloatingPresentation = false
 
     enum CloseSource: String, Sendable {
         case headerCloseButton
