@@ -37,10 +37,11 @@ sources rather than notifying unrelated clients.
 
 ## Product Behavior
 
-- The Linux setting is visible but disabled, with the limitation stated in the
-  Settings view.
+- Settings does not show Hide From Screen Share. The control is a macOS
+  menu-bar feature, and GNOME/Wayland has no equivalent capture-exclusion API.
 - OpenUsage does not poll private GNOME Shell state or infer capture from
   PipeWire processes; either approach would be incomplete and produce false
   security claims.
 - If GNOME or the XDG portal later ships a public global capture-state signal or
-  capture-exclusion protocol, the disabled row is the integration point.
+  capture-exclusion protocol, that API is the integration point for a working
+  Linux control.

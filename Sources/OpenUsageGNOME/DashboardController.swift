@@ -57,7 +57,7 @@ final class DashboardController {
         let loadedSettings = settingsStore.load()
         settings = loadedSettings
         persistedSettings = loadedSettings
-        analyticsClient = LinuxAnalyticsClient(enabled: settings.analyticsEnabled ?? true)
+        analyticsClient = LinuxAnalyticsClient(enabled: settings.effectiveAnalyticsEnabled)
         let paths = LinuxPaths()
         let executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
         launchAtLoginService = LinuxLaunchAtLoginService(

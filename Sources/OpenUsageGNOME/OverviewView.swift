@@ -19,7 +19,7 @@ final class OverviewView {
     )
     let spinnerBox = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let totalSpendView = TotalSpendView()
-    private let urgentGroup = PreferencesGroup(title: "Most Urgent Quotas")
+    private let urgentGroup = PreferencesGroup(title: UsageUrgencyCopy.mostUrgent)
     let healthGroup = PreferencesGroup(title: "Provider Health")
     var onRefresh: () -> Void = {}
     private var urgentRows: [Widget] = []
@@ -91,6 +91,7 @@ final class OverviewView {
         }
 
         totalSpendView.update(snapshots: cards)
+        let hasSpend = !TotalSpendAnalytics.records(from: cards).isEmpty
 
         let urgent = urgentQuotas(cards, metricLayouts: metricLayouts)
         urgentGroup.visible = !urgent.isEmpty
@@ -100,7 +101,7 @@ final class OverviewView {
 
         content.append(GNOMEStyle.pageHeader(
             title: "Overview",
-            description: "Your spend, quota pressure, and provider health at a glance."
+            description: GNOMEPageCopy.overviewDescription(hasSpend: hasSpend)
         ))
         content.append(totalSpendView.root)
         content.append(urgentGroup)

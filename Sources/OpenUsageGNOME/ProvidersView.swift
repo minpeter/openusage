@@ -21,12 +21,12 @@ final class ProvidersView {
 
     init() {
         root = ScrolledWindow()
-        root.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
+        GNOMEProviderRowLayout.configureScrolling(root)
         root.kineticScrolling = true
 
         content.setMargins(GNOMEStyle.outerMargin)
         group.addCSSClass(GNOMEProviderRowLayout.groupCSSClass)
-        group.description = "Quotas, spend, and reset windows for every connected account."
+        group.description = GNOMEPageCopy.providersGroupDescription
 
         emptyPage = StatusPage(
             title: "No Providers Connected",
@@ -337,7 +337,7 @@ private final class ProviderRow {
         let displayedMetrics =
             reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .alwaysVisible)
             + reconciledLayout.displayedMetrics(from: snapshot.metrics, in: .onDemand)
-        for metric in displayedMetrics {
+        for metric in displayedMetrics where GNOMEValuesCopy.shouldDisplay(metric) {
             detail.append(MetricViews.widget(
                 for: metric,
                 providerName: snapshot.displayName,
@@ -389,7 +389,9 @@ private final class ProviderRow {
 
     private func linkRow(_ link: ProviderLink) -> Widget {
         let row = ActionRow(title: link.label)
-        row.subtitle = link.url
+        if let host = link.displayHost {
+            row.subtitle = host
+        }
         row.addSuffix(Image(iconName: "adw-external-link-symbolic"))
         row.setAccessibleLabel("Open \(link.label) in the browser")
         connections.append(row.onActivated {

@@ -30,13 +30,27 @@ public enum LinuxDurationFormat {
         return duration == 1 ? "1 millisecond" : "\(duration) milliseconds"
     }
 
+    private static let hiddenUnitTokens: Set<String> = [
+        "percent", "dollars", "requests", "credits", "searches", "tokens", "count",
+    ]
+
     /// Replaces a leftover `"<n> ms period"` payload with human-readable copy.
+    /// Raw unit enum names (`percent`, `dollars`) and color hex payloads stay hidden.
     public static func displayDetail(_ detail: String?) -> String? {
         guard let detail, !detail.isEmpty else { return nil }
         if let milliseconds = rawMillisecondPeriod(detail) {
             return period(milliseconds: milliseconds)
         }
+        let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hiddenUnitTokens.contains(trimmed.lowercased()) { return nil }
+        if isColorHex(trimmed) { return nil }
         return detail
+    }
+
+    private static func isColorHex(_ detail: String) -> Bool {
+        guard detail.hasPrefix("#") else { return false }
+        let hex = detail.dropFirst()
+        return (hex.count == 3 || hex.count == 6) && hex.allSatisfy(\.isHexDigit)
     }
 
     public static func containsRawMillisecondPeriod(_ text: String) -> Bool {

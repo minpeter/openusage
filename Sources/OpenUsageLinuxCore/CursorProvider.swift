@@ -29,7 +29,7 @@ public struct CursorLinuxProvider: Sendable {
             title: "Other Models",
             metricLabel: CursorSpendingPools.otherModelsLabel
         ),
-        WidgetDescriptor(id: "cursor.grokBotWeekly", title: "Grok Bot Weekly", metricLabel: "Grok Bot weekly"),
+        WidgetDescriptor(id: "cursor.grokBotWeekly", title: "Grok Bot Weekly", metricLabel: CursorSpendingPools.grokBotWeeklyLabel),
         WidgetDescriptor(id: "cursor.onDemand", title: "Extra Usage", metricLabel: "On-demand"),
         WidgetDescriptor(id: "cursor.requests", title: "Requests", metricLabel: "Requests"),
         WidgetDescriptor(id: "cursor.credits", title: "Credits", metricLabel: "Credits"),

@@ -120,8 +120,8 @@ struct CursorSpendingPoolsTests {
             """)
         )
 
-        #expect(snapshot.metrics.map(\.label) == ["Cursor Models", "Other Models", "Grok Bot weekly"])
-        #expect(snapshot.metrics.first { $0.label == "Grok Bot weekly" }?.used == 13)
+        #expect(snapshot.metrics.map(\.label) == ["Cursor Models", "Other Models", "Grok Bot Weekly"])
+        #expect(snapshot.metrics.first { $0.label == "Grok Bot Weekly" }?.used == 13)
     }
 
     @Test("Refresh uses usage-summary Other Models 0% for Ultra")

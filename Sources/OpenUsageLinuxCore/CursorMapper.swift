@@ -147,7 +147,7 @@ public enum CursorLinuxMapper {
         let period = grokBotWeeklyPeriodMs(start: start, reset: reset)
         return UsageMetric(
             kind: .progress,
-            label: "Grok Bot weekly",
+            label: CursorSpendingPools.grokBotWeeklyLabel,
             used: percent,
             limit: 100,
             resetsAt: reset,

@@ -46,7 +46,8 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Page titles use libadwaita's compact title role; card titles and summary statistics use the quieter heading role
   so hierarchy comes from placement and spacing rather than several competing display sizes.
 - Preferences opens from the application menu in a native `AdwPreferencesDialog`; it is not a peer content
-  destination. Its General, Display, Providers, and Data pages keep unrelated controls out of one continuous wall.
+  destination. Close the dialog with the header close button or Escape.
+  Its General, Display, Providers, and Data pages keep unrelated controls out of one continuous wall.
   Controls on one page must not unexpectedly change controls on another.
 - Providers are ordered by the user's persisted order, then account label.
 - Each quota row contains label, percentage or value, progress bar, and reset copy.
@@ -62,9 +63,9 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Empty state: actionable login instruction from the provider adapter.
 - Overview: one spend summary surface with period and metric controls, then urgent quotas and provider health.
   Do not repeat the selected period in a second group.
-- Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports them.
+- Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports real daily points. The list scrolls inside the window so expanded cards are not clipped.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
-- Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
+- Panel indicator: StatusNotifierItem still defaults to the most urgent quota when a tray host exists. Settings hides Pin-to-Panel and other panel-only controls on GNOME.
 - Summary surface: a single card with the current total, ranked provider comparison bars, and one export action.
   Provider values remain readable text; a single provider never produces a meaningless 100-percent chart.
 

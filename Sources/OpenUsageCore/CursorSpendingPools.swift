@@ -9,6 +9,7 @@ import Foundation
 public enum CursorSpendingPools {
     public static let cursorModelsLabel = "Cursor Models"
     public static let otherModelsLabel = "Other Models"
+    public static let grokBotWeeklyLabel = "Grok Bot Weekly"
     public static let totalUsageLabel = "Total usage"
     public static let cursorModelsDetail = "Includes Cursor Grok and Composer"
 
@@ -30,6 +31,7 @@ public enum CursorSpendingPools {
         "Auto usage": cursorModelsLabel,
         "Total usage": cursorModelsLabel,
         "API usage": otherModelsLabel,
+        "Grok Bot weekly": grokBotWeeklyLabel,
     ]
 
     private static let cursorModelsPercentKeys = [

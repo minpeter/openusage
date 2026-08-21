@@ -47,21 +47,29 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 | Sparkle | Flatpak or package-manager updates | No application-managed privileged updater |
 | iCloud sync | Export/import plus optional user-selected sync directory | Settings and snapshots round-trip without Apple services |
 | Share screenshot | PNG image clipboard with inline copy feedback | Matches the macOS copy action using GTK's native `GdkClipboard` texture support |
-| Hide during screen share | Disabled with a documented GNOME Wayland limitation | No false privacy claim; public compositor APIs are re-evaluated when available |
+| Hide during screen share | Hidden: no GNOME/Wayland capture-exclusion API | No disabled stub row; public compositor APIs are re-evaluated when available |
 
 ## GNOME Experience
 
 - Two top-level views: Overview and Providers. Settings opens as a dialog, not a tab.
+  Close is the header close button or Escape.
 - The view switcher moves to the bottom edge when the header cannot contain it.
 - The full feature set remains available from 360 logical pixels wide through desktop widths.
 - Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback
   duplicates do not appear twice, and a provider present in Settings also appears in the other views.
 - Overview and provider content uses clamped boxed lists rather than floating macOS-style panels.
-- Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods never appear.
+- The Providers list scrolls inside the window so an expanded account's last metric and link rows stay reachable.
+- Codex Credits and Rate Limit Resets use human copy: one credits line, and a count or "—" rather than an internal key such as `available`.
+- Usage Trend charts appear on an expanded provider card only when local logs produced real daily points. Empty chart chrome is omitted.
+- Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods and raw unit tokens (`percent`) never appear.
+- Provider Health and Connected Accounts rows show plan/tier and freshness, never a raw `user_…` id or a full email.
+- Antigravity's official `3p-*` quota pool is labeled Third-Party / Third-Party Weekly so it is not confused with the Claude provider. Session and Weekly stay the Gemini windows.
 - Header bars contain only window-level actions; row actions live in rows or detail pages.
 - Destructive, warning, success, and error states use semantic styling plus text and icons.
 - Keyboard focus, accessible labels/descriptions, system font scaling, dark mode, and high contrast work.
-- The panel indicator defaults to the most urgent healthy quota; Settings can switch it to icon-only.
+- The StatusNotifierItem label, when a watcher is present, defaults to the most
+  urgent healthy quota. Settings does not advertise Pin-to-Panel or other
+  panel-only controls on GNOME, where there is no menu-bar extra surface.
 - Animations respect reduced-motion preferences and never gate data availability.
 
 ## Efficiency Budgets
