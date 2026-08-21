@@ -111,9 +111,8 @@ struct LinuxUsageAPIContractTests {
                 generatedAt: date
             )
         )
-        let root = try #require(
-            JSONSerialization.jsonObject(with: try #require(response.body)) as? [String: Any]
-        )
+        let body = try #require(response.body)
+        let root = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
         let providers = try #require(root["providers"] as? [String: Any])
         let cursor = try #require(providers["cursor"] as? [String: Any])
         let resources = try #require(cursor["resources"] as? [String: Any])
