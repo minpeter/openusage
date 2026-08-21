@@ -56,6 +56,9 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback
   duplicates do not appear twice, and a provider present in Settings also appears in the other views.
 - Overview and provider content uses clamped boxed lists rather than floating macOS-style panels.
+- The Providers list scrolls inside the window so an expanded account's last metric and link rows stay reachable.
+- Codex Credits and Rate Limit Resets use human copy: one credits line, and a count or "—" rather than an internal key such as `available`.
+- Usage Trend charts appear on an expanded provider card only when local logs produced real daily points. Empty chart chrome is omitted.
 - Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods and raw unit tokens (`percent`) never appear.
 - Provider Health and Connected Accounts rows show plan/tier and freshness, never a raw `user_…` id or a full email.
 - Antigravity's official `3p-*` quota pool is labeled Third-Party / Third-Party Weekly so it is not confused with the Claude provider. Session and Weekly stay the Gemini windows.

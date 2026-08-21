@@ -1,3 +1,4 @@
+import Adwaita
 import Foundation
 
 /// Layout contract for Providers → Connected Accounts rows.
@@ -21,6 +22,16 @@ enum GNOMEProviderRowLayout {
     static let disclosureBottomPadding = 10
     static let titleLines = 1
     static let subtitleLines = 1
+
+    /// Providers content must fill the window and scroll when an expander
+    /// grows. Without `vexpand`, GtkScrolledWindow requests the child's
+    /// natural height and the window clips the last metric/link rows.
+    @MainActor
+    static func configureScrolling(_ window: ScrolledWindow) {
+        window.vexpand = true
+        window.hexpand = true
+        window.setPolicy(horizontal: GTK_POLICY_NEVER, vertical: GTK_POLICY_AUTOMATIC)
+    }
 
     /// Plan/tier, and an optional collapsed status, as a single subtitle line.
     /// Prefer plan only. Raw `user_…` ids never appear. A lone email is masked
@@ -97,6 +108,7 @@ enum GNOMEProviderRowLayout {
     row.\(cssClass) list.nested {
         padding-top: 0;
         padding-bottom: \(disclosureBottomPadding)px;
+        overflow: visible;
     }
     """
 }

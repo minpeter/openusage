@@ -62,7 +62,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Empty state: actionable login instruction from the provider adapter.
 - Overview: one spend summary surface with period and metric controls, then urgent quotas and provider health.
   Do not repeat the selected period in a second group.
-- Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports them.
+- Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports real daily points. The list scrolls inside the window so expanded cards are not clipped.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
 - Panel indicator: StatusNotifierItem still defaults to the most urgent quota when a tray host exists. Settings hides Pin-to-Panel and other panel-only controls on GNOME.
 - Summary surface: a single card with the current total, ranked provider comparison bars, and one export action.

@@ -70,6 +70,9 @@ enum MetricViews {
         case .badge:
             return badge(metric)
         case .chart:
+            guard GNOMEValuesCopy.shouldDisplay(metric) else {
+                return Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
+            }
             return chart(metric, providerName: providerName, presentation: presentation)
         case .text:
             return text(metric)
@@ -109,7 +112,7 @@ enum MetricViews {
             box.append(bar)
         }
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -137,7 +140,7 @@ enum MetricViews {
         heading.append(valueLabel)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -156,8 +159,7 @@ enum MetricViews {
         label.wrap = true
         heading.append(label)
 
-        let parts = (metric.values ?? []).map(formatValue(_:))
-        let primary = Label(parts.isEmpty ? primaryValue(metric) : parts.joined(separator: " · "))
+        let primary = Label(GNOMEValuesCopy.primary(for: metric))
         primary.xalign = 1
         primary.wrap = true
         primary.justify = GTK_JUSTIFY_RIGHT
@@ -166,7 +168,7 @@ enum MetricViews {
         heading.append(primary)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         let breakdown = GNOMEModelBreakdown(values: metric.values ?? [])
@@ -228,7 +230,7 @@ enum MetricViews {
             box.append(values)
         }
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -312,31 +314,4 @@ enum MetricViews {
         return GNOMEFormat.currency(metric.used)
     }
 
-    private static func secondaryCopy(
-        _ metric: UsageMetric,
-        presentation: GNOMEMetricPresentation
-    ) -> String? {
-        let expiry = metric.expiriesAt?.first.map { "Credits expire \(GNOMEFormat.shortDay($0))" }
-        return [GNOMEFormat.metricDetail(metric.detail), presentation.resetText, presentation.pacingText, expiry]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-            .nilIfEmpty
-    }
-
-    private static func formatValue(_ value: UsageValue) -> String {
-        let number = value.label.isEmpty ? "" : "\(value.label) "
-        switch value.unit {
-        case .dollars:
-            return number + GNOMEFormat.currency(value.value)
-        case .tokens, .count:
-            // Avoid "tokens 1,234 tokens" when the label already names the unit.
-            let label = value.label.lowercased() == "tokens" ? "" : number
-            let suffix = value.unit == .tokens ? " tokens" : ""
-            return label + GNOMEFormat.tokens(value.value) + suffix
-        case .credits:
-            return GNOMEFormat.tokens(value.value) + " credits"
-        case .percent:
-            return "\(Int(value.value.rounded()))%"
-        }
-    }
 }
