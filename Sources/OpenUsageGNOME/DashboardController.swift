@@ -2,11 +2,12 @@ import Adwaita
 import Foundation
 import OpenUsageLinuxCore
 
-/// Owns the adaptive GNOME shell: a four-view ViewStack driven by a header
+/// Owns the adaptive GNOME shell: a two-view ViewStack driven by a header
 /// ViewSwitcher that collapses into a bottom ViewSwitcherBar at narrow
 /// widths, window-level refresh in the header, and one persistent widget
-/// tree per view that updates in place. Shell construction, settings wiring,
-/// and the snapshot pipeline live in DashboardController+*.swift.
+/// tree per view that updates in place. Settings stay a dialog, not a tab.
+/// Shell construction, settings wiring, and the snapshot pipeline live in
+/// DashboardController+*.swift.
 @MainActor
 final class DashboardController {
     let application: Application
@@ -19,7 +20,6 @@ final class DashboardController {
 
     let overview = OverviewView()
     let providersView = ProvidersView()
-    let historyView = HistoryView()
     let settingsView: SettingsView
 
     let repository = LinuxUsageRepository()
@@ -50,7 +50,6 @@ final class DashboardController {
     static let pageOrder: [(name: String, title: String, icon: String)] = [
         ("overview", "Overview", "view-grid-symbolic"),
         ("providers", "Providers", "view-list-symbolic"),
-        ("history", "History", "document-open-recent-symbolic"),
     ]
 
     init(application: Application) {

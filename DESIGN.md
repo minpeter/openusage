@@ -29,7 +29,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Prefer direct-value analytics over decorative charts:
   - Total Spend leads with the selected total and ranked provider progress bars; a single provider never produces
     a meaningless 100-percent donut.
-  - History uses subtle grid lines, a daily-average guide, muted historical bars, and a stronger latest bar.
+  - Usage Trend uses subtle grid lines, a daily-average guide, muted historical bars, and a stronger latest bar.
   - Total, daily average, and peak stay visible above each trend while every point remains available in the
     accessible disclosure.
 
@@ -38,7 +38,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Default window: 900 by 760 logical pixels, resizable down to 360 by 294.
 - `AdwHeaderBar`: adaptive view switcher and window-level refresh/menu actions. Usage values belong in the
   overview, not in a competing header pill.
-- Three primary content views: Overview, Providers, and History.
+- Two primary content views: Overview and Providers.
 - `AdwViewSwitcher` is centered in the header at wide widths and moves to `AdwViewSwitcherBar` at narrow widths.
 - Vertical scrolling content uses 24-pixel outer margins and 16-pixel section spacing at default density.
 - Content is clamped to 840 logical pixels to preserve readable density on wide windows.
@@ -62,8 +62,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 - Empty state: actionable login instruction from the provider adapter.
 - Overview: one spend summary surface with period and metric controls, then urgent quotas and provider health.
   Do not repeat the selected period in a second group.
-- Providers: boxed provider/account rows with disclosure into complete metric details.
-- History: bounded daily charts and a provider/account legend.
+- Providers: boxed provider/account rows with disclosure into complete metric details, including Usage Trend charts when a provider reports them.
 - Settings: native preferences groups for providers, ordering, refresh, appearance, startup, shortcuts, API, and privacy.
 - Panel indicator setting: a native combo row defaults to the most urgent quota and can switch to icon-only.
 - Summary surface: a single card with the current total, ranked provider comparison bars, and one export action.
@@ -90,7 +89,7 @@ immediately: which account is connected, how much of each limit is used, and whe
 
 ## 7. Responsive Behavior
 
-- At 360 pixels, metric labels and values wrap instead of clipping and all four views remain available.
+- At 360 pixels, metric labels and values wrap instead of clipping and both views remain available.
 - At narrow widths, provider details use a single navigation stack rather than side-by-side panes.
 - Above 900 pixels, provider navigation may use an adaptive split view while content remains clamped.
 - Scrolling belongs to the content area; the header remains fixed.

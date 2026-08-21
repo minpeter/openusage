@@ -50,7 +50,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 
 ## GNOME Experience
 
-- Four top-level views: Overview, Providers, History, Settings.
+- Two top-level views: Overview and Providers. Settings opens as a dialog, not a tab.
 - The view switcher moves to the bottom edge when the header cannot contain it.
 - The full feature set remains available from 360 logical pixels wide through desktop widths.
 - Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback
@@ -65,7 +65,7 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 
 ## Efficiency Budgets
 
-- Idle PSS: no more than 128 MiB under the reproducible Cairo/Xvfb release gate after all four GTK
+- Idle PSS: no more than 128 MiB under the reproducible Cairo/Xvfb release gate after both GTK
   views have been warmed. Native compositor measurements are recorded separately because driver and
   portal PSS varies by desktop.
 - Refresh growth: no more than 10 MiB over settled idle for all enabled providers.

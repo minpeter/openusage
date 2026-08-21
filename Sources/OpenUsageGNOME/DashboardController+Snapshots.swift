@@ -141,7 +141,6 @@ extension DashboardController {
             density: settings.density,
             metricLayouts: settings.metricLayouts
         )
-        historyView.update(snapshots: visible)
         updateTrayUsage(visible)
         settingsView.updateMetricCustomization(visible)
     }

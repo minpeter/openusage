@@ -35,7 +35,7 @@ extension DashboardController {
         menuButton.setAccessibleLabel("Main menu")
         header.packEnd(menuButton)
 
-        let views: [Widget] = [overview.root, providersView.root, historyView.root]
+        let views: [Widget] = [overview.root, providersView.root]
         for (page, view) in zip(Self.pageOrder, views) {
             stack.addTitledWithIcon(view, name: page.name, title: page.title, iconName: page.icon)
         }
@@ -182,7 +182,7 @@ extension DashboardController {
         let narrow = Breakpoint.maxWidth(GNOMEStyle.narrowBreakpointWidth, unit: .px)
         narrow.addSetter(switcherBar, property: .custom("reveal"), value: true)
         narrow.addSetter(headerSwitcher, property: .visible, value: false)
-        for page in [overview.root, providersView.root, historyView.root] {
+        for page in [overview.root, providersView.root] {
             narrow.addSetter(
                 page,
                 property: .custom("margin-bottom"),
@@ -192,7 +192,6 @@ extension DashboardController {
         let narrowContents = [
             overview.content,
             providersView.content,
-            historyView.content,
         ]
         for content in narrowContents {
             narrow.addSetter(
