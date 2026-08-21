@@ -70,6 +70,9 @@ enum MetricViews {
         case .badge:
             return badge(metric)
         case .chart:
+            guard GNOMEValuesCopy.shouldDisplay(metric) else {
+                return Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: 0)
+            }
             return chart(metric, providerName: providerName, presentation: presentation)
         case .text:
             return text(metric)
@@ -109,7 +112,7 @@ enum MetricViews {
             box.append(bar)
         }
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -137,7 +140,7 @@ enum MetricViews {
         heading.append(valueLabel)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -156,8 +159,7 @@ enum MetricViews {
         label.wrap = true
         heading.append(label)
 
-        let parts = (metric.values ?? []).map(formatValue(_:))
-        let primary = Label(parts.isEmpty ? primaryValue(metric) : parts.joined(separator: " · "))
+        let primary = Label(GNOMEValuesCopy.primary(for: metric))
         primary.xalign = 1
         primary.wrap = true
         primary.justify = GTK_JUSTIFY_RIGHT
@@ -166,7 +168,7 @@ enum MetricViews {
         heading.append(primary)
         box.append(heading)
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         let breakdown = GNOMEModelBreakdown(values: metric.values ?? [])
@@ -190,21 +192,10 @@ enum MetricViews {
         let text = metric.text ?? primaryValue(metric)
         let pill = Label(text)
         pill.addCSSClass("ou-pill")
-        pill.addCSSClass(badgeClass(for: text))
+        pill.addCSSClass(GNOMEBadgeStyle.semanticClass(for: text))
         pill.valign = GTK_ALIGN_CENTER
         row.append(pill)
         return row
-    }
-
-    private static func badgeClass(for text: String) -> CSSClass {
-        let lowered = text.lowercased()
-        if lowered.contains("error") || lowered.contains("down") || lowered.contains("fail") {
-            return .error
-        }
-        if lowered.contains("limit") || lowered.contains("warn") || lowered.contains("degraded") {
-            return .warning
-        }
-        return .success
     }
 
     // MARK: - Chart: single Cairo area with accessible tabular copy
@@ -239,7 +230,7 @@ enum MetricViews {
             box.append(values)
         }
 
-        if let caption = secondaryCopy(metric, presentation: presentation) {
+        if let caption = GNOMEValuesCopy.caption(for: metric, presentation: presentation) {
             box.append(captionLabel(caption))
         }
         return box
@@ -323,33 +314,4 @@ enum MetricViews {
         return GNOMEFormat.currency(metric.used)
     }
 
-    private static func secondaryCopy(
-        _ metric: UsageMetric,
-        presentation: GNOMEMetricPresentation
-    ) -> String? {
-        let expiry = metric.expiriesAt?.first.map { "Credits expire \(GNOMEFormat.shortDay($0))" }
-        return [GNOMEFormat.metricDetail(metric.detail), presentation.resetText, presentation.pacingText, expiry]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-            .nilIfEmpty
-    }
-
-    private static func formatValue(_ value: UsageValue) -> String {
-        switch value.unit {
-        case .dollars:
-            let prefix = value.label.isEmpty ? "" : "\(value.label) "
-            return prefix + GNOMEFormat.currency(value.value)
-        case .tokens, .count:
-            // Number then unit, matching Mac `MetricFormatter` ("2 available", "1.2M tokens").
-            let formatted = GNOMEFormat.tokens(value.value)
-            if value.unit == .tokens {
-                return formatted + " tokens"
-            }
-            return value.label.isEmpty ? formatted : "\(formatted) \(value.label)"
-        case .credits:
-            return GNOMEFormat.tokens(value.value) + " credits"
-        case .percent:
-            return "\(Int(value.value.rounded()))%"
-        }
-    }
 }
