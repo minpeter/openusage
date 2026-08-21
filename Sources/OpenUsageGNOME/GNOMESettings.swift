@@ -135,11 +135,19 @@ struct ProviderMetricLayout: Codable, Equatable, Sendable {
     }
 
     mutating func remapCursorSpendingLabels() {
+        remapLabels(CursorSpendingPools.remapLayoutLabel)
+    }
+
+    mutating func remapAntigravityLabels() {
+        remapLabels(AntigravityLinuxMetrics.remapLayoutLabel)
+    }
+
+    mutating func remapLabels(_ remap: (String) -> String) {
         var knownKeys: Set<MetricPreferenceKey> = []
         entries = entries.compactMap { entry in
             let remapped = MetricPreferenceKey(
                 kind: entry.key.kind,
-                label: CursorSpendingPools.remapLayoutLabel(entry.key.label)
+                label: remap(entry.key.label)
             )
             guard knownKeys.insert(remapped).inserted else { return nil }
             return MetricLayoutEntry(key: remapped, isEnabled: entry.isEnabled, section: entry.section)
@@ -148,6 +156,7 @@ struct ProviderMetricLayout: Codable, Equatable, Sendable {
 
     mutating func reconcile(with metrics: [UsageMetric]) {
         remapCursorSpendingLabels()
+        remapAntigravityLabels()
         var knownKeys: Set<MetricPreferenceKey> = []
         entries = entries.filter { knownKeys.insert($0.key).inserted }
 
@@ -261,13 +270,21 @@ struct PanelMetricPins: Codable, Equatable, Sendable {
     }
 
     mutating func remapCursorSpendingLabels() {
-        guard let pins = values["cursor"] else { return }
+        remapLabels(for: "cursor", remap: CursorSpendingPools.remapLayoutLabel)
+    }
+
+    mutating func remapAntigravityLabels() {
+        remapLabels(for: "antigravity", remap: AntigravityLinuxMetrics.remapLayoutLabel)
+    }
+
+    private mutating func remapLabels(for providerID: String, remap: (String) -> String) {
+        guard let pins = values[providerID] else { return }
         values = Self.normalized(
             values.merging([
-                "cursor": pins.map { key in
+                providerID: pins.map { key in
                     MetricPreferenceKey(
                         kind: key.kind,
-                        label: CursorSpendingPools.remapLayoutLabel(key.label)
+                        label: remap(key.label)
                     )
                 }
             ]) { _, new in new }
@@ -479,7 +496,12 @@ enum CursorGNOMELayoutMigration {
             layout.remapCursorSpendingLabels()
             layouts["cursor"] = layout
         }
+        if var layout = layouts["antigravity"] {
+            layout.remapAntigravityLabels()
+            layouts["antigravity"] = layout
+        }
         pins.remapCursorSpendingLabels()
+        pins.remapAntigravityLabels()
     }
 }
 

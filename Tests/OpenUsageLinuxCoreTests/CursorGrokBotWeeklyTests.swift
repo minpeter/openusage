@@ -34,7 +34,7 @@ struct CursorGrokBotWeeklyTests {
             """)
         )
 
-        let metric = try #require(snapshot.metrics.first { $0.label == "Grok Bot weekly" })
+        let metric = try #require(snapshot.metrics.first { $0.label == "Grok Bot Weekly" })
         #expect(metric.kind == .progress)
         #expect(metric.used == 13)
         #expect(metric.limit == 100)
@@ -63,7 +63,7 @@ struct CursorGrokBotWeeklyTests {
             sandUsage: nil
         )
 
-        #expect(snapshot.metrics.contains { $0.label == "Grok Bot weekly" } == false)
+        #expect(snapshot.metrics.contains { $0.label == "Grok Bot Weekly" } == false)
         #expect(snapshot.metrics.map(\.label) == ["Cursor Models", "Other Models"])
     }
 
@@ -84,7 +84,7 @@ struct CursorGrokBotWeeklyTests {
             """)
         )
 
-        #expect(snapshot.metrics.contains { $0.label == "Grok Bot weekly" } == false)
+        #expect(snapshot.metrics.contains { $0.label == "Grok Bot Weekly" } == false)
         #expect(snapshot.metrics.contains { $0.label == "Cursor Models" })
     }
 
@@ -100,7 +100,7 @@ struct CursorGrokBotWeeklyTests {
         """)))
         #expect(metric.used == 0)
         #expect(metric.limit == 100)
-        #expect(metric.label == "Grok Bot weekly")
+        #expect(metric.label == "Grok Bot Weekly")
     }
 
     @Test("Request-based fallback still attaches the weekly Grok Bot pool")
@@ -124,7 +124,7 @@ struct CursorGrokBotWeeklyTests {
         )
 
         #expect(snapshot.metrics.map(\.label) == [
-            "Total usage", "Requests", "Cursor Models", "Other Models", "Grok Bot weekly",
+            "Total usage", "Requests", "Cursor Models", "Other Models", "Grok Bot Weekly",
         ])
         let metric = try #require(snapshot.metrics.last)
         #expect(metric.used == 13)
@@ -162,7 +162,7 @@ struct CursorGrokBotWeeklyTests {
                 "GetCreditGrantsBalance": HTTPResult(data: Data(#"{"hasCreditGrants":false}"#.utf8), statusCode: 200),
             ])
         ).refresh()
-        #expect(present.metrics.contains { $0.label == "Grok Bot weekly" && $0.used == 13 })
+        #expect(present.metrics.contains { $0.label == "Grok Bot Weekly" && $0.used == 13 })
 
         let omitted = try await CursorLinuxProvider(
             credentials: credentials,
@@ -173,7 +173,7 @@ struct CursorGrokBotWeeklyTests {
                 "GetCreditGrantsBalance": HTTPResult(data: Data(#"{"hasCreditGrants":false}"#.utf8), statusCode: 200),
             ])
         ).refresh()
-        #expect(omitted.metrics.contains { $0.label == "Grok Bot weekly" } == false)
+        #expect(omitted.metrics.contains { $0.label == "Grok Bot Weekly" } == false)
         #expect(omitted.metrics.contains { $0.label == "Cursor Models" })
     }
 }

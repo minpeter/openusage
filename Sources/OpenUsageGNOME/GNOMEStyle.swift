@@ -189,6 +189,39 @@ enum GNOMETypographyRole: Sendable {
 }
 
 /// Shared copy builders so every view formats values identically.
+enum GNOMEPageCopy {
+    static let providersGroupDescription =
+        "Quotas and reset windows for every connected account."
+
+    static func overviewDescription(hasSpend: Bool) -> String {
+        hasSpend
+            ? "Your spend, quota pressure, and provider health at a glance."
+            : "Your quota pressure and provider health at a glance."
+    }
+}
+
+/// Badge color follows the value, not a default success green.
+enum GNOMEBadgeStyle {
+    static func semanticClass(for text: String) -> CSSClass {
+        let lowered = text.lowercased()
+        if lowered.contains("error") || lowered.contains("down") || lowered.contains("fail") {
+            return .error
+        }
+        if lowered.contains("disabled")
+            || lowered.contains("unavailable")
+            || lowered.contains("inactive")
+            || lowered == "off"
+        {
+            return .dimLabel
+        }
+        if lowered.contains("limit") || lowered.contains("warn") || lowered.contains("degraded") {
+            return .warning
+        }
+        return .success
+    }
+}
+
+/// Shared copy builders so every view formats values identically.
 enum GNOMEFormat {
 
     static func relativeReset(_ date: Date, now: Date = Date()) -> String {

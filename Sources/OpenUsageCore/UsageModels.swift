@@ -107,6 +107,12 @@ public struct ProviderLink: Codable, Equatable, Sendable {
         }
         return parsed
     }
+
+    /// Short host for link-row subtitles (`status.cursor.com`), never the raw URL.
+    public var displayHost: String? {
+        guard let host = safeURL?.host, !host.isEmpty else { return nil }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
 }
 
 public struct WidgetDescriptor: Codable, Equatable, Sendable {
