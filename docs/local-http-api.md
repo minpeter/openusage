@@ -111,7 +111,7 @@ personal `credits_used`. OpenCode `session`, `weekly`, and `monthly` are `percen
 | Antigravity | `geminiSession`, `geminiWeekly`, `nonGeminiSession`, `nonGeminiWeekly` |
 | Copilot | `premiumCredits`, `extraUsage`, `orgCredits`, `orgSpend`, `chat`, `completions` |
 | Devin | `daily`, `weekly`, `extraUsageBalance` |
-| Grok | `weekly` |
+| Grok | `weekly`, `usageLimitResets` |
 | OpenCode | `session`, `weekly`, `monthly` |
 | OpenRouter | `credits`, `balance`, `keyLimit` |
 | Z.ai | `session`, `weekly`, `webSearches` |

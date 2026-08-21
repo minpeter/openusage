@@ -48,9 +48,62 @@ struct GrokDevinPiParityTests {
         #expect(snapshot.metrics[1].text == "2500 cap")
         #expect(snapshot.links == [ProviderLink(label: "Usage", url: "https://grok.com/?_s=usage")])
         #expect(snapshot.widgets.map(\.id) == [
-            "grok.weekly", "grok.payAsYouGo", "grok.trend",
+            "grok.weekly", "grok.usageLimitResets", "grok.payAsYouGo", "grok.trend",
             "grok.today", "grok.yesterday", "grok.last30",
         ])
+    }
+
+    @Test("Grok usage-limit resets map 0, N, and a missing field")
+    func grokUsageLimitResets() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authURL = root.appendingPathComponent(".grok/auth.json")
+        try write(
+            """
+            {"https://auth.x.ai::client":{"key":"access-token","refresh_token":"refresh-token",\
+            "id_token":"\(jwt(email: "grok@example.com"))","expires_at":"2026-08-01T00:00:00Z"}}
+            """,
+            to: authURL
+        )
+        let auth = try #require(try GrokLinuxCredentialStore(environment: ["HOME": root.path]).loadCandidates().first)
+        let billing = Data("""
+        {"config":{"creditUsagePercent":5.0,"currentPeriod":{
+          "type":"USAGE_PERIOD_TYPE_WEEKLY",
+          "start":"2026-06-30T21:36:52.140114+00:00",
+          "end":"2026-07-07T21:36:52.140114+00:00"}}}
+        """.utf8)
+        let liveResets = Data([
+            0x00, 0x00, 0x00, 0x00, 0x23,
+            0x52, 0x21, 0x52, 0x0D, 0x72, 0x65, 0x73, 0x74, 0x6F, 0x6B, 0x5F,
+            0x76, 0x70, 0x59, 0x44, 0x71, 0x6F,
+            0xA2, 0x01, 0x06, 0x08, 0x9C, 0x80, 0xF3, 0xD3, 0x06,
+            0xF2, 0x01, 0x06, 0x08, 0x9C, 0xBD, 0x96, 0xD5, 0x06,
+            0x80, 0x00, 0x00, 0x00, 0x0F,
+            0x67, 0x72, 0x70, 0x63, 0x2D, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x3A, 0x30, 0x0D, 0x0A
+        ])
+        let now = Date(timeIntervalSince1970: 1_786_536_000)
+
+        let withOne = try GrokLinuxMapper.mapCredits(
+            data: billing, auth: auth, remainingResets: liveResets, now: now
+        )
+        let reset = try #require(withOne.metrics.first { $0.label == GrokRemainingResets.metricLabel })
+        #expect(reset.used == 1)
+        #expect(reset.values == [UsageValue(label: "available", value: 1, unit: .count)])
+        #expect(reset.expiriesAt == [Date(timeIntervalSince1970: 1_789_238_940)])
+        #expect(withOne.metrics.map(\.label).prefix(3) == [
+            "Weekly limit", GrokRemainingResets.metricLabel, "Pay as you go"
+        ])
+
+        let withZero = try GrokLinuxMapper.mapCredits(
+            data: billing, auth: auth, remainingResets: GrokRemainingResets.emptyRequest, now: now
+        )
+        let zero = try #require(withZero.metrics.first { $0.label == GrokRemainingResets.metricLabel })
+        #expect(zero.used == 0)
+        #expect(zero.expiriesAt?.isEmpty != false)
+
+        let missing = try GrokLinuxMapper.mapCredits(data: billing, auth: auth, now: now)
+        #expect(missing.metrics.contains { $0.label == GrokRemainingResets.metricLabel } == false)
+        #expect(missing.metrics.map(\.label) == ["Weekly limit", "Pay as you go"])
     }
 
     @Test("Grok local log contributes every spend metric and a bounded trend")

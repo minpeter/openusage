@@ -133,6 +133,51 @@ final class GrokProviderTests: XCTestCase {
         XCTAssertEqual(progress(snapshot.lines, "Weekly limit")?.used, 99)
     }
 
+    func testUsageLimitResetsComeFromDedicatedFetch() async {
+        let now = OpenUsageISO8601.date(from: "2026-08-13T12:00:00.000Z")!
+        let httpClient = RecordingHTTPClient { request in
+            if request.url == GrokUsageClient.remainingResetsURL {
+                XCTAssertEqual(request.method, "POST")
+                XCTAssertEqual(request.body, GrokRemainingResets.emptyRequest)
+                XCTAssertEqual(request.headers["Authorization"], "Bearer token")
+                XCTAssertEqual(request.headers["Content-Type"], "application/grpc-web+proto")
+                XCTAssertEqual(request.headers["X-Grpc-Web"], "1")
+                XCTAssertEqual(request.headers["X-XAI-Token-Auth"], GrokUsageClient.tokenAuthHeader)
+                return HTTPResponse(
+                    statusCode: 200,
+                    headers: [:],
+                    body: GrokRemainingResetsFixtures.oneAvailableToken
+                )
+            }
+            return Self.defaultRoutes(request)
+        }
+        let provider = makeProvider(httpClient: httpClient, now: now)
+
+        let snapshot = await provider.refresh()
+
+        XCTAssertEqual(values(snapshot.lines, GrokRemainingResets.metricLabel),
+                       [MetricValue(number: 1, kind: .count, label: "available")])
+        XCTAssertEqual(progress(snapshot.lines, "Weekly limit")?.used, 99)
+        XCTAssertEqual(badge(snapshot.lines, "Pay as you go")?.text, "Disabled")
+    }
+
+    func testUsageLimitResetsFetchFailureLeavesWeeklyAndPayAsYouGo() async {
+        let httpClient = RecordingHTTPClient { request in
+            if request.url == GrokUsageClient.remainingResetsURL {
+                throw URLError(.timedOut)
+            }
+            return Self.defaultRoutes(request)
+        }
+        let provider = makeProvider(httpClient: httpClient)
+
+        let snapshot = await provider.refresh()
+
+        XCTAssertNil(snapshot.errorCategory)
+        XCTAssertNil(values(snapshot.lines, GrokRemainingResets.metricLabel))
+        XCTAssertEqual(progress(snapshot.lines, "Weekly limit")?.used, 99)
+        XCTAssertEqual(badge(snapshot.lines, "Pay as you go")?.text, "Disabled")
+    }
+
     func testWeeklyMeterAndPayAsYouGoComeFromCreditsConfig() async {
         let httpClient = RecordingHTTPClient { request in
             if request.url == GrokUsageClient.creditsConfigURL {
@@ -316,7 +361,7 @@ final class GrokProviderTests: XCTestCase {
         now: Date = OpenUsageISO8601.date(from: "2026-06-18T12:00:00.000Z")!
     ) -> GrokProvider {
         let files = FakeFiles([
-            GrokAuthStore.authPath: #"{"https://auth.x.ai::client":{"key":"token","refresh_token":"refresh","expires_at":"2026-07-01T00:00:00.000Z"}}"#
+            GrokAuthStore.authPath: #"{"https://auth.x.ai::client":{"key":"token","refresh_token":"refresh","expires_at":"2026-12-01T00:00:00.000Z"}}"#
         ])
         return GrokProvider(
             authStore: GrokAuthStore(files: files, now: { now }),

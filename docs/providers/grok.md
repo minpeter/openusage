@@ -7,6 +7,7 @@ Tracks Grok Build credit usage using the login from the Grok CLI.
 | Metric | Meaning |
 |---|---|
 | Weekly | The shared weekly pool's usage percent (the limit Grok's unified billing enforces), with the weekly reset countdown |
+| Usage Limit Resets | On-demand reset tokens from grok.com Settings → Usage ("Reset Available"), shown as a count (e.g. `2 available`). Zero is shown when the dedicated call succeeds with no tokens. Hover the value on Mac for each token's expiry; Linux uses the same expiry detail path as Codex resets. This is not the weekly pool countdown. |
 | Extra Usage | Pay-as-you-go cap as a status (e.g. `2500 cap` or `Disabled`) |
 | Today / Yesterday / Last 30 Days | Local cost and tokens estimated from the Grok CLI log |
 
@@ -31,3 +32,5 @@ Today / Yesterday / Last 30 Days are computed **locally** from the Grok CLI's lo
 ## Under the hood
 
 `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` for the weekly pool and pay-as-you-go cap — the exact call the Grok CLI itself makes — and `…/v1/settings` for the plan name; token refresh via `auth.x.ai`. A 401/403 triggers one token refresh and retry.
+
+Usage Limit Resets come from a best-effort `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/GetRemainingResets` (grpc-web, empty request) using the same Grok CLI OIDC bearer as billing — the RPC behind grok.com Settings → Usage. Each token carries `token_id`, `validity_start`, and `validity_end`. A failed or unparseable call omits the row and does not fail Weekly / Pay as you go. A successful empty list reads `0 available`. The weekly `currentPeriod.end` countdown is never reused as a fake reset-rights count. Extra Usage Credits / Auto Top Up stay on their own rows.

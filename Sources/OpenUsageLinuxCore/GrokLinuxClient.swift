@@ -6,6 +6,7 @@ import FoundationNetworking
 public struct GrokLinuxClient: Sendable {
     public static let creditsURL = URL(string: "https://cli-chat-proxy.grok.com/v1/billing?format=credits")!
     public static let settingsURL = URL(string: "https://cli-chat-proxy.grok.com/v1/settings")!
+    public static let remainingResetsURL = GrokRemainingResets.url
     public static let refreshURL = URL(string: "https://auth.x.ai/oauth2/token")!
     private let transport: any HTTPTransport
 
@@ -17,6 +18,18 @@ public struct GrokLinuxClient: Sendable {
 
     public func settings(accessToken: String) async throws -> HTTPResult {
         try await transport.execute(authenticatedRequest(url: Self.settingsURL, token: accessToken))
+    }
+
+    /// Dedicated usage-limit reset tokens. Same CLI bearer as billing; empty grpc-web frame.
+    public func remainingResets(accessToken: String) async throws -> HTTPResult {
+        var request = authenticatedRequest(url: Self.remainingResetsURL, token: accessToken)
+        request.httpMethod = "POST"
+        request.httpBody = GrokRemainingResets.emptyRequest
+        request.setValue("application/grpc-web+proto", forHTTPHeaderField: "Content-Type")
+        request.setValue("1", forHTTPHeaderField: "X-Grpc-Web")
+        request.setValue("application/grpc-web+proto", forHTTPHeaderField: "Accept")
+        request.setValue("https://grok.com", forHTTPHeaderField: "Origin")
+        return try await transport.execute(request)
     }
 
     public func refresh(refreshToken: String, clientID: String) async throws -> HTTPResult {

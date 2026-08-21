@@ -12,6 +12,9 @@ enum GNOMEValuesCopy {
         if isRateLimitResets(metric) {
             return rateLimitResetsPrimary(metric, values: values, now: now)
         }
+        if isUsageLimitResets(metric) {
+            return usageLimitResetsPrimary(metric, values: values)
+        }
         if let credits = creditsPair(values) {
             if credits.dollars == 0 && credits.count == 0 {
                 return GNOMEFormat.currency(0)
@@ -74,6 +77,15 @@ enum GNOMEValuesCopy {
         return n == 1 ? "1 reset" : "\(GNOMEFormat.tokens(Double(n))) resets"
     }
 
+    private static func usageLimitResetsPrimary(
+        _ metric: UsageMetric,
+        values: [UsageValue]
+    ) -> String {
+        let count = values.first?.value ?? metric.used
+        let n = max(0, Int(count.rounded(.down)))
+        return "\(GNOMEFormat.tokens(Double(n))) available"
+    }
+
     private static func soonestExpiryText(_ metric: UsageMetric, now: Date) -> String? {
         guard isRateLimitResets(metric), let expiry = metric.expiriesAt?.first else {
             return nil
@@ -111,6 +123,10 @@ enum GNOMEValuesCopy {
 
     private static func isRateLimitResets(_ metric: UsageMetric) -> Bool {
         metric.label == "Rate Limit Resets"
+    }
+
+    private static func isUsageLimitResets(_ metric: UsageMetric) -> Bool {
+        metric.label == GrokRemainingResets.metricLabel
     }
 
     private static func creditsPair(_ values: [UsageValue]) -> (dollars: Double, count: Double)? {
