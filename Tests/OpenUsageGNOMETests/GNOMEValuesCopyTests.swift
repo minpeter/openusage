@@ -86,6 +86,32 @@ struct GNOMEValuesCopyTests {
         #expect(!GNOMEValuesCopy.primary(for: some).contains("available"))
     }
 
+    @Test("Usage Limit Resets formats as N available, not a bare number")
+    func usageLimitResetsKeepsAvailableCopy() {
+        let none = UsageMetric(
+            kind: .values,
+            label: GrokRemainingResets.metricLabel,
+            used: 0,
+            values: [UsageValue(label: "available", value: 0, unit: .count)]
+        )
+        let some = UsageMetric(
+            kind: .values,
+            label: GrokRemainingResets.metricLabel,
+            used: 1,
+            values: [UsageValue(label: "available", value: 1, unit: .count)]
+        )
+        let rateNone = UsageMetric(
+            kind: .values,
+            label: "Rate Limit Resets",
+            used: 0,
+            values: [UsageValue(label: "available", value: 0, unit: .count)]
+        )
+
+        #expect(GNOMEValuesCopy.primary(for: none) == "0 available")
+        #expect(GNOMEValuesCopy.primary(for: some) == "1 available")
+        #expect(GNOMEValuesCopy.primary(for: rateNone, now: now) == "—")
+    }
+
     @Test("Generic count labels stay human and spend rows stay joined")
     func genericCountsAndSpend() {
         #expect(GNOMEValuesCopy.formatValue(UsageValue(label: "credits", value: 0, unit: .count)) == "0 credits")
