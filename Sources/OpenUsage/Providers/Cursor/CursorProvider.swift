@@ -45,13 +45,6 @@ final class CursorProvider: ProviderRuntime {
                 metricLabel: CursorSpendingPools.otherModelsLabel
             )
                 .exportingLimit("otherModels", unit: "percent"),
-            .percent(
-                id: CursorSpendingPools.legacyTotalWidgetID,
-                provider: provider,
-                title: "Total Usage",
-                metricLabel: CursorSpendingPools.totalUsageLabel
-            )
-                .exportingLimit("totalUsage", unit: "percent"),
             .percent(id: "cursor.grokBotWeekly", provider: provider, title: "Grok Bot Weekly", metricLabel: "Grok Bot weekly")
                 .exportingLimit("grokBotWeekly", unit: "percent"),
             .boundedDollars(id: "cursor.onDemand", provider: provider, title: "Extra Usage", metricLabel: "On-demand", limit: 100, valueWord: "spent")
@@ -61,6 +54,13 @@ final class CursorProvider: ProviderRuntime {
                 .exportingLimit("requests", unit: "requests"),
             .dollarBalance(id: "cursor.credits", provider: provider, title: "Credits", valueWord: "left")
                 .exportingLimit("credits", kind: .balance, unit: "usd", source: .value(kind: .dollars)),
+            .percent(
+                id: CursorSpendingPools.legacyTotalWidgetID,
+                provider: provider,
+                title: "Total Usage",
+                metricLabel: CursorSpendingPools.totalUsageLabel
+            )
+                .exportingLimit("totalUsage", unit: "percent"),
             .usageTrend(provider: provider)
                 .exportingHistory(
                     scope: .accountWide,

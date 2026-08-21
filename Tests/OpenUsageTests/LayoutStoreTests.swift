@@ -89,15 +89,15 @@ final class LayoutStoreTests: XCTestCase {
 
     func testUndoReversesPinAndUnpin() {
         let store = makeStore("UndoPin")
-        // cursor.usage is enabled by default but not pinned (cursor's default pins aren't in the mock).
-        XCTAssertTrue(store.isMetricEnabled("cursor.usage"))
-        XCTAssertFalse(store.isPinned("cursor.usage"))
+        // cursor.today is enabled by default but not pinned (cursor's default pins aren't in the mock).
+        XCTAssertTrue(store.isMetricEnabled("cursor.today"))
+        XCTAssertFalse(store.isPinned("cursor.today"))
 
         // Pin, then undo → back to unpinned.
-        store.setPinned(true, for: "cursor.usage")
-        XCTAssertTrue(store.isPinned("cursor.usage"))
+        store.setPinned(true, for: "cursor.today")
+        XCTAssertTrue(store.isPinned("cursor.today"))
         XCTAssertTrue(store.undo())
-        XCTAssertFalse(store.isPinned("cursor.usage"), "undo reverses a pin")
+        XCTAssertFalse(store.isPinned("cursor.today"), "undo reverses a pin")
 
         // Unpin a default-pinned metric, then undo → back to pinned.
         XCTAssertTrue(store.isPinned("claude.session"))
@@ -146,16 +146,16 @@ final class LayoutStoreTests: XCTestCase {
         let store = makeStore("UndoMultiStep")
         // Distinct, real changes: enable an off metric, pin an unpinned one, remove an on metric.
         store.setMetricEnabled("cursor.credits", true)  // step 1: enable
-        store.setPinned(true, for: "cursor.usage")      // step 2: pin
+        store.setPinned(true, for: "cursor.today")      // step 2: pin
         store.setMetricEnabled("claude.session", false) // step 3: remove
 
         // Walk back in reverse order, one step per ⌘Z.
         XCTAssertTrue(store.undo())                      // undo remove
         XCTAssertTrue(store.isMetricEnabled("claude.session"))
-        XCTAssertTrue(store.isPinned("cursor.usage"))
+        XCTAssertTrue(store.isPinned("cursor.today"))
 
         XCTAssertTrue(store.undo())                      // undo pin
-        XCTAssertFalse(store.isPinned("cursor.usage"))
+        XCTAssertFalse(store.isPinned("cursor.today"))
         XCTAssertTrue(store.isMetricEnabled("cursor.credits"))
 
         XCTAssertTrue(store.undo())                      // undo enable
@@ -716,7 +716,7 @@ final class LayoutStoreTests: XCTestCase {
             "cursor.cursorModels", "cursor.otherModels", "cursor.grokBotWeekly", "cursor.trend"
         ])
         XCTAssertEqual(expandedByProvider["cursor"], [
-            "cursor.onDemand", "cursor.requests", "cursor.credits",
+            "cursor.onDemand", "cursor.requests", "cursor.credits", "cursor.usage",
             "cursor.today", "cursor.yesterday", "cursor.last30"
         ])
     }

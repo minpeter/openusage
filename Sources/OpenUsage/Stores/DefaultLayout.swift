@@ -84,7 +84,7 @@ enum DefaultLayout {
         // model-specific limits), credits, reset details, and spend rows sit below the caret.
         "codex.spark", "codex.sparkWeekly",
         "codex.credits", "codex.rateLimitResets", "codex.today", "codex.yesterday", "codex.last30",
-        "cursor.onDemand", "cursor.requests", "cursor.credits",
+        "cursor.onDemand", "cursor.requests", "cursor.credits", "cursor.usage",
         "cursor.today", "cursor.yesterday", "cursor.last30",
         // Copilot: Credits (the metered premium pool) + Extra Usage stay above the fold; the org
         // billing pair (org-managed Business/Enterprise seats) and Chat + Completions sit below the
