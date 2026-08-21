@@ -88,10 +88,10 @@ public extension AntigravityUsageFetching {
 public struct AntigravityLinuxProvider: Sendable {
     public static let links: [ProviderLink] = []
     public static let widgets = [
-        WidgetDescriptor(id: "antigravity.geminiPro", title: "Session", metricLabel: "Session"),
-        WidgetDescriptor(id: "antigravity.geminiWeekly", title: "Weekly", metricLabel: "Weekly"),
-        WidgetDescriptor(id: "antigravity.claude", title: "Claude", metricLabel: "Claude"),
-        WidgetDescriptor(id: "antigravity.claudeWeekly", title: "Claude Weekly", metricLabel: "Claude Weekly"),
+        WidgetDescriptor(id: "antigravity.geminiPro", title: AntigravityLinuxMetrics.sessionLabel, metricLabel: AntigravityLinuxMetrics.sessionLabel),
+        WidgetDescriptor(id: "antigravity.geminiWeekly", title: AntigravityLinuxMetrics.weeklyLabel, metricLabel: AntigravityLinuxMetrics.weeklyLabel),
+        WidgetDescriptor(id: "antigravity.claude", title: AntigravityLinuxMetrics.thirdPartyLabel, metricLabel: AntigravityLinuxMetrics.thirdPartyLabel),
+        WidgetDescriptor(id: "antigravity.claudeWeekly", title: AntigravityLinuxMetrics.thirdPartyWeeklyLabel, metricLabel: AntigravityLinuxMetrics.thirdPartyWeeklyLabel),
     ]
 
     private let paths: AntigravityLinuxPaths

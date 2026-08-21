@@ -35,6 +35,6 @@ struct CursorSpendingPoolDecodeTests {
         #expect(CursorSpendingPools.remapLayoutLabel("Auto usage") == "Cursor Models")
         #expect(CursorSpendingPools.remapLayoutLabel("API usage") == "Other Models")
         #expect(CursorSpendingPools.remapLayoutLabel("Total usage") == "Cursor Models")
-        #expect(CursorSpendingPools.remapLayoutLabel("Grok Bot weekly") == "Grok Bot weekly")
+        #expect(CursorSpendingPools.remapLayoutLabel("Grok Bot weekly") == "Grok Bot Weekly")
     }
 }

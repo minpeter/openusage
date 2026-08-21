@@ -78,13 +78,17 @@ struct AntigravityOpenCodeParityTests {
         #expect(snapshot.providerID == "antigravity")
         #expect(snapshot.accountLabel == "dev@example.com")
         #expect(snapshot.plan == "Pro")
-        #expect(snapshot.metrics.map { $0.label } == ["Session", "Weekly", "Claude", "Claude Weekly"])
+        #expect(snapshot.metrics.map { $0.label } == ["Session", "Weekly", "Third-Party", "Third-Party Weekly"])
         #expect(snapshot.metrics.map { $0.used } == [25, 10, 60, 0])
         #expect(snapshot.metrics.allSatisfy { $0.limit == 100 })
         #expect(snapshot.widgets.map { $0.id } == [
             "antigravity.geminiPro", "antigravity.geminiWeekly",
             "antigravity.claude", "antigravity.claudeWeekly",
         ])
+        #expect(snapshot.widgets.map { $0.metricLabel } == [
+            "Session", "Weekly", "Third-Party", "Third-Party Weekly",
+        ])
+        #expect(snapshot.widgets.contains { $0.metricLabel == "Claude" || $0.title == "Claude" } == false)
     }
 
     @Test("Antigravity plan request uses the native AGY discovery contract")

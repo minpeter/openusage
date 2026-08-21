@@ -1,9 +1,30 @@
 import Foundation
 
+/// Linux display names for Antigravity quota buckets. Gemini windows stay
+/// Session/Weekly. The official `3p-*` (third-party) pool is not labeled
+/// "Claude" — that reads as the Claude provider.
+public enum AntigravityLinuxMetrics {
+    public static let sessionLabel = "Session"
+    public static let weeklyLabel = "Weekly"
+    public static let thirdPartyLabel = "Third-Party"
+    public static let thirdPartyWeeklyLabel = "Third-Party Weekly"
+
+    public static let layoutLabelAliases: [String: String] = [
+        "Claude": thirdPartyLabel,
+        "Claude Weekly": thirdPartyWeeklyLabel,
+    ]
+
+    public static func remapLayoutLabel(_ label: String) -> String {
+        layoutLabelAliases[label] ?? label
+    }
+}
+
 public enum AntigravityLinuxUsageMapper {
     private static let buckets: [(String, String)] = [
-        ("gemini-5h", "Session"), ("gemini-weekly", "Weekly"),
-        ("3p-5h", "Claude"), ("3p-weekly", "Claude Weekly"),
+        ("gemini-5h", AntigravityLinuxMetrics.sessionLabel),
+        ("gemini-weekly", AntigravityLinuxMetrics.weeklyLabel),
+        ("3p-5h", AntigravityLinuxMetrics.thirdPartyLabel),
+        ("3p-weekly", AntigravityLinuxMetrics.thirdPartyWeeklyLabel),
     ]
     private static let blacklist: Set<String> = [
         "MODEL_CHAT_20706", "MODEL_CHAT_23310", "MODEL_GOOGLE_GEMINI_2_5_FLASH",
@@ -36,12 +57,17 @@ public enum AntigravityLinuxUsageMapper {
                   let label = ((model["displayName"] as? String) ?? (model["label"] as? String))?.antigravityTrimmedNonEmpty else { continue }
             let quota = model["quotaInfo"] as? [String: Any]
             let remaining = finiteNumber(quota?["remainingFraction"]) ?? 0
-            let pool = label.lowercased().contains("gemini") ? "Session" : "Claude"
+            let pool = label.lowercased().contains("gemini")
+                ? AntigravityLinuxMetrics.sessionLabel
+                : AntigravityLinuxMetrics.thirdPartyLabel
             if pools[pool] == nil || remaining < pools[pool]!.remaining {
                 pools[pool] = (remaining, quota?["resetTime"] as? String)
             }
         }
-        return ["Session", "Claude"].compactMap { label in
+        return [
+            AntigravityLinuxMetrics.sessionLabel,
+            AntigravityLinuxMetrics.thirdPartyLabel,
+        ].compactMap { label in
             pools[label].map { progress(label: label, remaining: $0.remaining, reset: $0.reset) }
         }
     }

@@ -103,6 +103,35 @@ struct GNOMEMetricLayoutTests {
         #expect(layout.entries.contains { $0.key.label == "Total usage" } == false)
     }
 
+    @Test("Persisted Grok Bot weekly and Antigravity Claude labels migrate")
+    func migratesRenamedMetricLabels() throws {
+        let grokBot = MetricPreferenceKey(kind: "progress", label: "Grok Bot weekly")
+        let claude = MetricPreferenceKey(kind: "progress", label: "Claude")
+        let claudeWeekly = MetricPreferenceKey(kind: "progress", label: "Claude Weekly")
+        var settings = GNOMESettings()
+        settings.metricLayouts["cursor"] = ProviderMetricLayout(entries: [
+            .init(key: grokBot, isEnabled: true, section: .alwaysVisible),
+        ])
+        settings.metricLayouts["antigravity"] = ProviderMetricLayout(entries: [
+            .init(key: claude, isEnabled: true, section: .alwaysVisible),
+            .init(key: claudeWeekly, isEnabled: true, section: .onDemand),
+        ])
+        _ = settings.panelMetricPins.pin(grokBot, for: "cursor")
+        _ = settings.panelMetricPins.pin(claudeWeekly, for: "antigravity")
+
+        let decoded = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: JSONEncoder().encode(settings)
+        )
+
+        #expect(decoded.metricLayouts["cursor"]?.entries.map(\.key.label) == ["Grok Bot Weekly"])
+        #expect(decoded.metricLayouts["antigravity"]?.entries.map(\.key.label) == [
+            "Third-Party", "Third-Party Weekly",
+        ])
+        #expect(decoded.panelMetricPins.pins(for: "cursor").map(\.label) == ["Grok Bot Weekly"])
+        #expect(decoded.panelMetricPins.pins(for: "antigravity").map(\.label) == ["Third-Party Weekly"])
+    }
+
     @Test("Provider metric layouts survive GNOME settings round trip")
     func settingsRoundTrip() throws {
         let weekly = MetricPreferenceKey(metric: metric("Weekly"))

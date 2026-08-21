@@ -190,21 +190,10 @@ enum MetricViews {
         let text = metric.text ?? primaryValue(metric)
         let pill = Label(text)
         pill.addCSSClass("ou-pill")
-        pill.addCSSClass(badgeClass(for: text))
+        pill.addCSSClass(GNOMEBadgeStyle.semanticClass(for: text))
         pill.valign = GTK_ALIGN_CENTER
         row.append(pill)
         return row
-    }
-
-    private static func badgeClass(for text: String) -> CSSClass {
-        let lowered = text.lowercased()
-        if lowered.contains("error") || lowered.contains("down") || lowered.contains("fail") {
-            return .error
-        }
-        if lowered.contains("limit") || lowered.contains("warn") || lowered.contains("degraded") {
-            return .warning
-        }
-        return .success
     }
 
     // MARK: - Chart: single Cairo area with accessible tabular copy

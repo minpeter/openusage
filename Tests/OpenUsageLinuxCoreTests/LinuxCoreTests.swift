@@ -63,6 +63,11 @@ struct LinuxCoreTests {
         #expect(ProviderLink(label: "Script", url: "javascript:alert(1)").safeURL == nil)
         #expect(ProviderLink(label: "File", url: "file:///tmp/token").safeURL == nil)
         #expect(ProviderLink(label: " ", url: "https://example.com").safeURL == nil)
+        #expect(ProviderLink(label: "Usage", url: "https://grok.com/?_s=usage").displayHost == "grok.com")
+        #expect(ProviderLink(label: "Status", url: "https://status.cursor.com/").displayHost == "status.cursor.com")
+        #expect(ProviderLink(label: "Dashboard", url: "https://www.cursor.com/dashboard").displayHost == "cursor.com")
+        #expect(ProviderLink(label: "Status", url: "https://status.openai.com/").displayHost == "status.openai.com")
+        #expect(ProviderLink(label: "Script", url: "javascript:alert(1)").displayHost == nil)
     }
 
     @Test("Legacy snapshots gain stable instance defaults")

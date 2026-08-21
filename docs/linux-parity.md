@@ -56,7 +56,9 @@ typed error category, stale-last-good behavior, widget descriptors, and safe ext
 - Overview, Providers, and Settings share one card per provider account. Catalog or file-fallback
   duplicates do not appear twice, and a provider present in Settings also appears in the other views.
 - Overview and provider content uses clamped boxed lists rather than floating macOS-style panels.
-- Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods never appear.
+- Quota window copy is human-readable (`1 week`, `5 hours`). Raw millisecond periods and raw unit tokens (`percent`) never appear.
+- Provider Health and Connected Accounts rows show plan/tier and freshness, never a raw `user_…` id or a full email.
+- Antigravity's official `3p-*` quota pool is labeled Third-Party / Third-Party Weekly so it is not confused with the Claude provider. Session and Weekly stay the Gemini windows.
 - Header bars contain only window-level actions; row actions live in rows or detail pages.
 - Destructive, warning, success, and error states use semantic styling plus text and icons.
 - Keyboard focus, accessible labels/descriptions, system font scaling, dark mode, and high contrast work.
