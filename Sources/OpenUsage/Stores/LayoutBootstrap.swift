@@ -36,8 +36,8 @@ enum LayoutBootstrap {
         defaults: LayoutDefaultSet
     ) -> LayoutInitialState {
         let hasStoredLayout = persistence.hasStoredLayout
-        let savedPlaced = persistence.loadPlaced().map {
-            CursorSpendingPools.remapLayoutIDs($0.map(\.descriptorID)).map(PlacedWidget.init(descriptorID:))
+        let savedPlaced = persistence.loadPlaced().map { placed in
+            CursorSpendingPools.remapLayoutIDs(placed.map(\.descriptorID)).map { PlacedWidget(descriptorID: $0) }
         }?.filter { registry.descriptor(id: $0.descriptorID) != nil }
         let startingPlaced = savedPlaced ?? defaults.metricIDs
             .filter { registry.descriptor(id: $0) != nil }
