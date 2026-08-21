@@ -389,9 +389,14 @@ final class CursorProvider: ProviderRuntime {
         sandUsage: [String: Any]?,
         usageSummary: [String: Any]?
     ) async throws -> CursorMappedUsage {
-        let summary = usageSummary ?? await fetchOptionalJSONObject(label: "usage-summary", request: {
-            try await self.usageClient.fetchUsageSummary(accessToken: accessToken)
-        })
+        let summary: [String: Any]?
+        if let usageSummary {
+            summary = usageSummary
+        } else {
+            summary = await fetchOptionalJSONObject(label: "usage-summary", request: {
+                try await self.usageClient.fetchUsageSummary(accessToken: accessToken)
+            })
+        }
         if let summary, !CursorUsageSummaryMapper.hasUsableSummaryPayload(summary) {
             AppLog.warn(LogTag.plugin("cursor"), "optional usage-summary response contained no usable usage fields")
         }
