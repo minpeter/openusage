@@ -19,7 +19,7 @@ final class OverviewView {
     )
     let spinnerBox = Box(orientation: GTK_ORIENTATION_VERTICAL, spacing: GNOMEStyle.sectionSpacing)
     private let totalSpendView = TotalSpendView()
-    private let urgentGroup = PreferencesGroup(title: "Most Urgent Quotas")
+    private let urgentGroup = PreferencesGroup(title: UsageUrgencyCopy.mostUrgent)
     let healthGroup = PreferencesGroup(title: "Provider Health")
     var onRefresh: () -> Void = {}
     private var urgentRows: [Widget] = []

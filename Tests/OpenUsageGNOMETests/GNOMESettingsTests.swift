@@ -144,4 +144,22 @@ struct GNOMESettingsTests {
             "antigravity", "claude",
         ]))
     }
+
+    @Test("Missing analytics preference decodes to off")
+    func analyticsDefaultsOff() throws {
+        let settings = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: Data(#"{"version":1}"#.utf8)
+        )
+        #expect(settings.analyticsEnabled == nil)
+        #expect(!settings.effectiveAnalyticsEnabled)
+
+        var optedIn = settings
+        optedIn.analyticsEnabled = true
+        let decoded = try JSONDecoder().decode(
+            GNOMESettings.self,
+            from: JSONEncoder().encode(optedIn)
+        )
+        #expect(decoded.effectiveAnalyticsEnabled)
+    }
 }

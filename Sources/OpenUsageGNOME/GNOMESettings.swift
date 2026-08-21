@@ -346,6 +346,10 @@ struct GNOMESettings: Codable, Equatable, Sendable {
     var localAPIEnabled: Bool?
     var localAPIPort: Int?
 
+    var effectiveAnalyticsEnabled: Bool {
+        SettingsAnalyticsPresentation.isEnabled(analyticsEnabled)
+    }
+
     static let minimumInterval = 1
     static let maximumInterval = 60
 

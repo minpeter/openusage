@@ -82,6 +82,9 @@ final class SettingsView {
     let zaiAPIKeyRow = PasswordEntryRow(title: "Z.ai API Key")
     let openRouterAPIKeyStatus = Label("Checking…")
     let zaiAPIKeyStatus = Label("Checking…")
+    let openRouterAPIKeyClear = Button(label: "Clear")
+    let zaiAPIKeyClear = Button(label: "Clear")
+    let providersSectionRow = ComboRow(title: "Section")
     let proxyEnabledRow = SwitchRow(title: "Use Proxy")
     let proxyURLRow = PasswordEntryRow(title: "Proxy URL")
     let proxyBypassRow = EntryRow(title: "Bypass Hosts")
@@ -92,7 +95,11 @@ final class SettingsView {
     )
     let metricCustomizationGroup = PreferencesGroup(
         title: "Metric Customization",
-        description: "Enable, order, reveal on demand, and pin up to two metrics per provider."
+        description: SettingsPanelPresentation.metricCustomizationDescription()
+    )
+    let providersSectionGroup = PreferencesGroup(
+        title: "View",
+        description: "Metric customization is shown first. Provider order stays one switch away."
     )
     let providersPage = PreferencesPage()
     var order: [String] = []
@@ -109,6 +116,7 @@ final class SettingsView {
     var customizationSnapshots: [ProviderUsageSnapshot] = []
     var customizationSettings = GNOMESettings()
     var applyingSettings = false
+    var providersSection = SettingsProvidersPresentation.defaultSection
 
     init(
         settings: GNOMESettings,
@@ -133,7 +141,7 @@ final class SettingsView {
         appearanceGroup.add(appearanceRow)
 
         trayUsageDisplayRow = ComboRow(title: "Show Usage As")
-        trayUsageDisplayRow.setModel(StringList(["Most Urgent Usage", "Icon Only"]))
+        trayUsageDisplayRow.setModel(StringList([UsageUrgencyCopy.mostUrgent, "Icon Only"]))
         let panelIndicatorGroup = PreferencesGroup(
             title: "Panel Indicator",
             description: "Choose whether the GNOME top panel shows the most urgent quota "
@@ -157,9 +165,11 @@ final class SettingsView {
         timeFormatRow.setModel(StringList(TimeFormatSetting.allCases.map(\.label)))
         let displayGroup = PreferencesGroup(
             title: "Usage Display",
-            description: "Control quota values, reset copy, pacing, and top-panel presentation."
+            description: SettingsPanelPresentation.usageDisplayDescription()
         )
-        displayGroup.add(menuBarStyleRow)
+        if SettingsPanelPresentation.showsPanelControls {
+            displayGroup.add(menuBarStyleRow)
+        }
         displayGroup.add(widgetDisplayModeRow)
         displayGroup.add(resetDisplayModeRow)
         displayGroup.add(alwaysShowPacingRow)
@@ -215,7 +225,7 @@ final class SettingsView {
         apiRow.active = settings.localAPIEnabled ?? false
         apiPortRow.value = Double(settings.localAPIPort ?? LoopbackHTTPServer.defaultPort)
         apiPortRow.sensitive = apiRow.active
-        analyticsRow.active = settings.analyticsEnabled ?? true
+        analyticsRow.active = settings.effectiveAnalyticsEnabled
         let apiGroup = PreferencesGroup(title: "Local API")
         apiGroup.add(apiRow)
         apiGroup.add(apiPortRow)
@@ -296,11 +306,13 @@ final class SettingsView {
         addAPIKeyRow(
             openRouterAPIKeyRow,
             status: openRouterAPIKeyStatus,
+            clear: openRouterAPIKeyClear,
             provider: .openRouter
         )
         addAPIKeyRow(
             zaiAPIKeyRow,
             status: zaiAPIKeyStatus,
+            clear: zaiAPIKeyClear,
             provider: .zai
         )
         apiKeyGroup.add(openRouterAPIKeyRow)
@@ -358,13 +370,15 @@ final class SettingsView {
             subtitle: updateDelivery.userMessage
         ))
 
-        let screenSharePrivacyRow = SwitchRow(
-            title: "Hide From Screen Share",
-            subtitle: "Unavailable on GNOME Wayland: no API exposes global capture state or capture exclusion."
-        )
-        screenSharePrivacyRow.active = false
-        screenSharePrivacyRow.sensitive = false
-        privacyGroup.add(screenSharePrivacyRow)
+        if SettingsScreenSharePresentation.showsUnavailableRow {
+            let screenSharePrivacyRow = SwitchRow(
+                title: "Hide From Screen Share",
+                subtitle: "Unavailable on GNOME Wayland: no API exposes global capture state or capture exclusion."
+            )
+            screenSharePrivacyRow.active = false
+            screenSharePrivacyRow.sensitive = false
+            privacyGroup.add(screenSharePrivacyRow)
+        }
 
         // About group
         let aboutGroup = PreferencesGroup(title: "About")
@@ -382,23 +396,30 @@ final class SettingsView {
             shortcutsGroup,
             aboutGroup,
         ])
+        var displayGroups = [appearanceGroup, displayGroup]
+        if SettingsPanelPresentation.showsPanelControls {
+            displayGroups = [appearanceGroup, panelIndicatorGroup, displayGroup]
+        }
         let displayPage = page(
             name: "display",
             title: "Display",
             icon: "video-display-symbolic",
-            groups: [
-            appearanceGroup,
-            panelIndicatorGroup,
-            displayGroup,
-        ])
+            groups: displayGroups
+        )
+        providersSectionRow.setModel(StringList(SettingsProvidersPresentation.sectionTitles))
+        providersSectionRow.selected = SettingsProvidersSection.allCases.firstIndex(
+            of: SettingsProvidersPresentation.defaultSection
+        ) ?? 0
+        providersSectionGroup.add(providersSectionRow)
         configure(
             providersPage,
             name: "providers",
             title: "Providers",
             icon: "system-users-symbolic",
             groups: [
-            orderGroup,
+            providersSectionGroup,
             metricCustomizationGroup,
+            orderGroup,
         ]
         )
         let dataPage = page(
@@ -417,6 +438,10 @@ final class SettingsView {
         dialog.searchEnabled = true
         dialog.contentWidth = 760
         dialog.contentHeight = 680
+        if SettingsDialogClosePolicy.usesFloatingPresentation {
+            dialog.presentationMode = .floating
+        }
+        applyProvidersSection()
         connections.append(dialog.onMap { [weak self] in
             guard let self else { return }
             self.isPresented = true
@@ -457,7 +482,7 @@ final class SettingsView {
         intervalRow.value = Double(settings.refreshIntervalMinutes)
         intervalRow.sensitive = settings.periodicRefreshEnabled
         launchRow.active = settings.launchAtLogin ?? false
-        analyticsRow.active = settings.analyticsEnabled ?? true
+        analyticsRow.active = settings.effectiveAnalyticsEnabled
         apiRow.active = settings.localAPIEnabled ?? false
         apiPortRow.value = Double(settings.localAPIPort ?? LoopbackHTTPServer.defaultPort)
         apiPortRow.sensitive = apiRow.active
@@ -475,6 +500,7 @@ final class SettingsView {
         rebuildOrderRows()
         customizationSettings = settings
         rebuildMetricCustomizationRows()
+        applyProvidersSection()
         applyingSettings = false
     }
 
@@ -490,13 +516,6 @@ final class SettingsView {
     func updateMetricCustomization(_ snapshots: [ProviderUsageSnapshot]) {
         customizationSnapshots = snapshots
         rebuildMetricCustomizationRows()
-    }
-
-    func updateAPIKeyStatus(
-        _ provider: ManagedAPIKeyProvider,
-        text: String
-    ) {
-        apiKeyStatus(for: provider).text = text
     }
 
     func clearAPIKeyEntry(_ provider: ManagedAPIKeyProvider) {
@@ -552,37 +571,4 @@ final class SettingsView {
         groups.forEach(page.add)
     }
 
-    private func addAPIKeyRow(
-        _ row: PasswordEntryRow,
-        status: Label,
-        provider: ManagedAPIKeyProvider
-    ) {
-        status.addCSSClass(.caption)
-        row.addSuffix(status)
-        let clear = Button(label: "Clear", onClicked: { [weak self] in
-            self?.onAPIKeyClear(provider)
-        })
-        clear.addCSSClass(.flat)
-        row.addSuffix(clear)
-        row.onApply { [weak self, weak row] in
-            guard let row else { return }
-            self?.onAPIKeySave(provider, row.text)
-        }
-    }
-
-    private func apiKeyRow(
-        for provider: ManagedAPIKeyProvider
-    ) -> PasswordEntryRow {
-        switch provider {
-        case .openRouter: openRouterAPIKeyRow
-        case .zai: zaiAPIKeyRow
-        }
-    }
-
-    private func apiKeyStatus(for provider: ManagedAPIKeyProvider) -> Label {
-        switch provider {
-        case .openRouter: openRouterAPIKeyStatus
-        case .zai: zaiAPIKeyStatus
-        }
-    }
 }
