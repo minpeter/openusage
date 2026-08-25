@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class CursorOptionalEndpointTests: XCTestCase {
     func testOptionalSchemaAndHTTPFailuresAreLoggedWithoutDiscardingPrimaryUsage() async throws {
-        let accessToken = makeCursorJWT(includeSubject: true)
+        let accessToken = makeCursorJWT()
         let provider = makeProvider(accessToken: accessToken) { request in
             switch request.url {
             case CursorUsageClient.usageURL:
@@ -31,7 +31,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
     }
 
     func testOptionalTransportAndSessionPreparationFailuresAreLogged() async throws {
-        let provider = makeProvider(accessToken: makeCursorJWT(includeSubject: false)) { request in
+        let provider = makeProvider(accessToken: makeCursorJWT(sub: nil)) { request in
             switch request.url {
             case CursorUsageClient.usageURL:
                 return Self.primaryUsageResponse
@@ -51,19 +51,15 @@ final class CursorOptionalEndpointTests: XCTestCase {
         XCTAssertTrue(logs.contains("optional prepaid-balance request could not be prepared from the current session"), logs)
     }
 
-    func testGrokBotRequestFailureDoesNotDiscardPrimaryUsage() async throws {
-        let provider = makeProvider { request in
-            switch request.url {
-            case CursorUsageClient.usageURL:
-                return Self.primaryUsageResponse
-            case CursorUsageClient.planURL:
-                return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"planInfo":{"planName":"Ultra"}}"#.utf8))
-            case CursorUsageClient.grokBotUsageURL:
-                return HTTPResponse(statusCode: 503, headers: [:], body: Data())
-            default:
-                return HTTPResponse(statusCode: 404, headers: [:], body: Data())
-            }
+    /// The optional Grok Bot meter: failures log, ineligible shapes stay silent, and no case may
+    /// discard the primary usage or emit a Grok Bot line.
+    func testGrokBotFailuresAndIneligibleShapesHideTheMeterWithoutDiscardingPrimaryUsage() async throws {
+        struct GrokBotCase {
+            var name: String
+            var response: HTTPResponse
+            var expectedLog: String?  // nil → the invalid-usage warning must NOT appear
         }
+<<<<<<< HEAD
 
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
@@ -130,12 +126,68 @@ final class CursorOptionalEndpointTests: XCTestCase {
                 return HTTPResponse(
                     statusCode: 200,
                     headers: [:],
+=======
+        let invalidUsageLog = "Grok Bot usage response contained invalid usage metadata"
+        let cases = [
+            GrokBotCase(
+                name: "HTTP failure",
+                response: HTTPResponse(statusCode: 503, headers: [:], body: Data()),
+                expectedLog: "optional Grok Bot usage request returned HTTP 503"
+            ),
+            GrokBotCase(
+                name: "invalid usage metadata",
+                response: HTTPResponse(
+                    statusCode: 200, headers: [:],
+                    body: Data(#"{"usagePercent":true,"hasNonZeroIncludedLimit":true}"#.utf8)
+                ),
+                expectedLog: "optional " + invalidUsageLog
+            ),
+            GrokBotCase(
+                name: "ineligible account",
+                response: HTTPResponse(
+                    statusCode: 200, headers: [:],
+                    body: Data(#"{"includedLimitZero":true}"#.utf8)
+                ),
+                expectedLog: nil
+            ),
+            GrokBotCase(
+                name: "zero usage without included allowance",
+                response: HTTPResponse(
+                    statusCode: 200, headers: [:],
+>>>>>>> origin/upstream
                     body: Data(#"{"usagePercent":0,"hasNonZeroIncludedLimit":false}"#.utf8)
-                )
-            default:
-                return HTTPResponse(statusCode: 404, headers: [:], body: Data())
+                ),
+                expectedLog: nil
+            )
+        ]
+
+        for grokBotCase in cases {
+            let response = grokBotCase.response
+            let provider = makeProvider { request in
+                switch request.url {
+                case CursorUsageClient.usageURL:
+                    return Self.primaryUsageResponse
+                case CursorUsageClient.planURL:
+                    return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"planInfo":{"planName":"Pro"}}"#.utf8))
+                case CursorUsageClient.grokBotUsageURL:
+                    return response
+                default:
+                    return HTTPResponse(statusCode: 404, headers: [:], body: Data())
+                }
+            }
+
+            let (snapshot, logs) = try await captureLogs { await provider.refresh() }
+
+            XCTAssertNil(snapshot.errorCategory, grokBotCase.name)
+            XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20, grokBotCase.name)
+            XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" }, grokBotCase.name)
+            if let expectedLog = grokBotCase.expectedLog {
+                XCTAssertTrue(logs.contains(expectedLog), "\(grokBotCase.name): \(logs)")
+            } else {
+                XCTAssertFalse(logs.contains(invalidUsageLog), "\(grokBotCase.name): \(logs)")
             }
         }
+<<<<<<< HEAD
 
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
@@ -143,6 +195,8 @@ final class CursorOptionalEndpointTests: XCTestCase {
         XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
         XCTAssertFalse(logs.contains("Grok Bot usage response contained invalid usage metadata"), logs)
+=======
+>>>>>>> origin/upstream
     }
 
     func testInvalidPlanMetadataStillEnablesRequestBasedFallback() async throws {
@@ -271,12 +325,12 @@ final class CursorOptionalEndpointTests: XCTestCase {
     }
 
     private func makeProvider(
-        accessToken: String = makeCursorJWT(includeSubject: true),
+        accessToken: String = makeCursorJWT(),
         handler: @escaping @Sendable (HTTPRequest) async throws -> HTTPResponse
     ) -> CursorProvider {
         CursorProvider(
             authStore: CursorAuthStore(
-                sqlite: OptionalCursorSQLite(values: [CursorAuthStore.accessTokenKey: accessToken]),
+                sqlite: KeyValueSQLite(values: [CursorAuthStore.accessTokenKey: accessToken]),
                 keychain: FakeKeychain()
             ),
             usageClient: CursorUsageClient(http: RoutingHTTPClient(handler: handler)),
@@ -317,30 +371,4 @@ final class CursorOptionalEndpointTests: XCTestCase {
     }
 }
 
-private func makeCursorJWT(includeSubject: Bool) -> String {
-    let payload = includeSubject
-        ? #"{"exp":9999999999,"sub":"google-oauth2|user"}"#
-        : #"{"exp":9999999999}"#
-    let encoded = Data(payload.utf8).base64EncodedString()
-        .replacingOccurrences(of: "=", with: "")
-        .replacingOccurrences(of: "+", with: "-")
-        .replacingOccurrences(of: "/", with: "_")
-    return "a.\(encoded).c"
-}
-
-private final class OptionalCursorSQLite: SQLiteAccessing, @unchecked Sendable {
-    private let values: [String: String]
-
-    init(values: [String: String]) {
-        self.values = values
-    }
-
-    func queryValue(path: String, sql: String) throws -> String? {
-        for (key, value) in values where sql.contains(key) {
-            return value
-        }
-        return nil
-    }
-
-    func execute(path: String, sql: String) throws {}
-}
+// makeCursorJWT and KeyValueSQLite live in TestSupport.swift.
