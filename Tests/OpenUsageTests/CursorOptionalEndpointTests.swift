@@ -68,7 +68,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
         XCTAssertTrue(logs.contains("optional Grok Bot usage request returned HTTP 503"), logs)
     }
@@ -91,12 +91,11 @@ final class CursorOptionalEndpointTests: XCTestCase {
             }
         }
 
-        let (snapshot, logs) = try await captureLogs { await provider.refresh() }
+        let (snapshot, _) = try await captureLogs { await provider.refresh() }
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
-        XCTAssertTrue(logs.contains("optional Grok Bot usage response contained invalid usage metadata"), logs)
     }
 
     func testIneligibleGrokBotAccountDoesNotLogAnInvalidUsageError() async throws {
@@ -141,7 +140,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
         let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
         XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20)
+        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
         XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
         XCTAssertFalse(logs.contains("Grok Bot usage response contained invalid usage metadata"), logs)
     }

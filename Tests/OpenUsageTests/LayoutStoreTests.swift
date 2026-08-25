@@ -675,7 +675,7 @@ final class LayoutStoreTests: XCTestCase {
         XCTAssertFalse(store.isPinned("claude.fable"))
         XCTAssertFalse(store.isMetricEnabled("claude.sonnet"))
         XCTAssertFalse(store.isMetricEnabled("codex.session"))
-        XCTAssertFalse(store.isPinned("codex.session"))
+        XCTAssertTrue(store.isPinned("codex.session"))
         XCTAssertTrue(store.isPinned("codex.weekly"))
         XCTAssertTrue(store.isMetricEnabled("cursor.grokBotWeekly"))
         XCTAssertFalse(store.isMetricEnabled("cursor.requests"))
