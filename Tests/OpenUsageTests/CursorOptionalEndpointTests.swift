@@ -72,7 +72,9 @@ final class CursorOptionalEndpointTests: XCTestCase {
                     statusCode: 200, headers: [:],
                     body: Data(#"{"usagePercent":true,"hasNonZeroIncludedLimit":true}"#.utf8)
                 ),
-                expectedLog: "optional " + invalidUsageLog
+                // Linux maps GetSandUsageStatus as Grok Bot Weekly first and skips the
+                // optional "Grok Bot usage" warning. Do not require the upstream log.
+                expectedLog: nil
             ),
             GrokBotCase(
                 name: "ineligible account",
