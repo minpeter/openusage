@@ -143,18 +143,20 @@ final class CursorProvider: ProviderRuntime {
                 sandUsage: sandUsage,
                 usageSummary: usageSummary
             )
+            await appendGrokBotUsage(to: &mapped.lines, accessToken: currentToken)
             let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
             return snapshot(mapped, usageHistory: history)
         }
 
         if shouldTryGenericRequestFallback(usage: usage) {
             do {
-                let mapped = try await requestBasedResult(
+                var mapped = try await requestBasedResult(
                     accessToken: currentToken,
                     planName: planName,
                     unavailableMessage: "Cursor request-based usage data unavailable. Try again later.",
                     sandUsage: sandUsage
                 )
+                await appendGrokBotUsage(to: &mapped.lines, accessToken: currentToken)
                 return snapshot(mapped)
             } catch {
                 AppLog.warn(LogTag.plugin("cursor"), "optional request-based usage fallback failed")
@@ -171,8 +173,38 @@ final class CursorProvider: ProviderRuntime {
             sandUsage: sandUsage,
             usageSummary: usageSummary
         )
+        await appendGrokBotUsage(to: &mapped.lines, accessToken: currentToken)
         let history = await appendSpendLines(to: &mapped.lines, accessToken: currentToken)
         return snapshot(mapped, usageHistory: history)
+    }
+
+    /// Grok Bot uses the same Cursor account but keeps a separate weekly allowance. Missing access is
+    /// normal for ineligible accounts; malformed data and request failures remain visible in diagnostics.
+    /// Linux already maps this pool from `GetSandUsageStatus` as "Grok Bot weekly"; skip a second line
+    /// from the same endpoint so ranking/display stay on the port's weekly meter.
+    private func appendGrokBotUsage(to lines: inout [MetricLine], accessToken: String) async {
+        if lines.contains(where: { $0.label == "Grok Bot weekly" || $0.label == "Grok Bot usage" }) {
+            return
+        }
+        guard let usage = await fetchOptionalJSONObject(label: "Grok Bot usage", request: {
+            try await self.usageClient.fetchGrokBotUsage(accessToken: accessToken)
+        }) else {
+            return
+        }
+        guard usage["usesPooledEnterpriseAllowance"] as? Bool != true,
+              usage["hasNonZeroIncludedLimit"] as? Bool != false,
+              usage["includedLimitZero"] as? Bool != true
+        else {
+            return
+        }
+        guard let line = CursorUsageMapper.mapGrokBotUsage(usage) else {
+            if usage["usagePercent"] != nil || usage["hasNonZeroIncludedLimit"] as? Bool == true ||
+                usage["hasAvailableUsage"] as? Bool == true {
+                AppLog.warn(LogTag.plugin("cursor"), "optional Grok Bot usage response contained invalid usage metadata")
+            }
+            return
+        }
+        lines.append(line)
     }
 
     /// Strictly additive: fetch the usage CSV and append the three per-day spend tiles. Any failure
