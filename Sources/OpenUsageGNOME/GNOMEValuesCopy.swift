@@ -87,7 +87,7 @@ enum GNOMEValuesCopy {
     }
 
     private static func soonestExpiryText(_ metric: UsageMetric, now: Date) -> String? {
-        guard isRateLimitResets(metric), let expiry = metric.expiriesAt?.first else {
+        guard showsResetExpiries(metric), let expiry = metric.expiriesAt?.first else {
             return nil
         }
         let count = metric.values?.first?.value ?? metric.used
@@ -127,6 +127,12 @@ enum GNOMEValuesCopy {
 
     private static func isUsageLimitResets(_ metric: UsageMetric) -> Bool {
         metric.label == GrokRemainingResets.metricLabel
+    }
+
+    /// Codex Rate Limit Resets and Grok Usage Limit Resets share the same
+    /// `expiriesAt` caption path (`Expires in …`).
+    private static func showsResetExpiries(_ metric: UsageMetric) -> Bool {
+        isRateLimitResets(metric) || isUsageLimitResets(metric)
     }
 
     private static func creditsPair(_ values: [UsageValue]) -> (dollars: Double, count: Double)? {

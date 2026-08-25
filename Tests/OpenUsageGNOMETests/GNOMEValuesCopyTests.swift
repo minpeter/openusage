@@ -112,6 +112,27 @@ struct GNOMEValuesCopyTests {
         #expect(GNOMEValuesCopy.primary(for: rateNone, now: now) == "—")
     }
 
+    @Test("Usage Limit Resets shows soonest expiry caption like Codex")
+    func usageLimitResetsShowsSoonestExpiry() {
+        let none = UsageMetric(
+            kind: .values,
+            label: GrokRemainingResets.metricLabel,
+            used: 0,
+            values: [UsageValue(label: "available", value: 0, unit: .count)]
+        )
+        let some = UsageMetric(
+            kind: .values,
+            label: GrokRemainingResets.metricLabel,
+            used: 1,
+            values: [UsageValue(label: "available", value: 1, unit: .count)],
+            expiriesAt: [Date(timeIntervalSince1970: 1_786_451_400 + 7_200)]
+        )
+
+        #expect(GNOMEValuesCopy.primary(for: some, now: now) == "1 available")
+        #expect(GNOMEValuesCopy.caption(for: some, presentation: presentation, now: now) == "Expires in 2h")
+        #expect(GNOMEValuesCopy.caption(for: none, presentation: presentation, now: now) == nil)
+    }
+
     @Test("Generic count labels stay human and spend rows stay joined")
     func genericCountsAndSpend() {
         #expect(GNOMEValuesCopy.formatValue(UsageValue(label: "credits", value: 0, unit: .count)) == "0 credits")
