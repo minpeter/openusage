@@ -10,6 +10,12 @@
 # contents:write. `gh workflow run` / workflow_dispatch needs actions:write
 # (or a classic token with the `workflow` scope) and 403s for typical
 # GitHub App / fine-grained agent tokens.
+#
+# Mirror push uses secrets.FACTORY_PAT when that repo secret is set
+# (classic PAT: repo + workflow; fine-grained: Contents + Workflows write).
+# secrets.GITHUB_TOKEN cannot create or update .github/workflows files, so
+# the FF mirror fails when upstream adds or changes a workflow. Fall back
+# to GITHUB_TOKEN only when FACTORY_PAT is unset.
 name: Upstream Sync
 
 on:
@@ -38,12 +44,20 @@ jobs:
       - name: Fast-forward mirror refs
         id: push
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FACTORY_PAT: ${{ secrets.FACTORY_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git config --global --add safe.directory "${PWD}"
           git init
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if [ -n "${FACTORY_PAT:-}" ]; then
+            MIRROR_TOKEN="${FACTORY_PAT}"
+            echo "Using FACTORY_PAT for mirror push"
+          else
+            MIRROR_TOKEN="${GITHUB_TOKEN}"
+            echo "FACTORY_PAT unset; falling back to GITHUB_TOKEN"
+          fi
+          git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git remote add robinebers https://github.com/robinebers/openusage.git
           git fetch --no-tags robinebers main
           UPSTREAM_SHA="$(git rev-parse robinebers/main)"
@@ -67,8 +81,25 @@ jobs:
           require_fast_forward upstream
           require_fast_forward main
 
-          git push origin "${UPSTREAM_SHA}:refs/heads/upstream"
-          git push origin "${UPSTREAM_SHA}:refs/heads/main"
+          push_ff() {
+            local name="$1"
+            local output status
+            set +e
+            output="$(git push origin "${UPSTREAM_SHA}:refs/heads/${name}" 2>&1)"
+            status=$?
+            set -e
+            printf '%s\n' "${output}"
+            if [ "${status}" -eq 0 ]; then
+              return 0
+            fi
+            if printf '%s\n' "${output}" | grep -Fq "without 'workflows' permission"; then
+              echo "::error::Fast-forward of ${name} was rejected because the push token cannot create or update workflow files. Set repository secret FACTORY_PAT (classic PAT with repo + workflow, or fine-grained Contents + Workflows write). secrets.GITHUB_TOKEN cannot introduce or update .github/workflows files."
+              exit 1
+            fi
+            exit "${status}"
+          }
+          push_ff upstream
+          push_ff main
           echo "sha=${UPSTREAM_SHA}" >> "${GITHUB_OUTPUT}"
           echo "Mirrored ${UPSTREAM_SHA} to upstream and main"
 
