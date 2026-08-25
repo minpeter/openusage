@@ -2,7 +2,14 @@
 #
 # This file must live only on `linux`. `main` and `upstream` are wiped to match
 # robinebers/openusage, so a copy on those refs would disappear and cron would die.
-# GitHub runs `on.schedule` only from the repository default branch (`linux`).
+# GitHub runs `on.schedule` and `on.repository_dispatch` only from the repository
+# default branch (`linux`).
+#
+# `workflow_dispatch` stays for the Actions UI. Agents should POST
+# repository_dispatch type `upstream-sync` instead: that endpoint needs
+# contents:write. `gh workflow run` / workflow_dispatch needs actions:write
+# (or a classic token with the `workflow` scope) and 403s for typical
+# GitHub App / fine-grained agent tokens.
 name: Upstream Sync
 
 on:
@@ -10,6 +17,8 @@ on:
     # 09:00 KST on weekdays
     - cron: "0 0 * * 1-5"
   workflow_dispatch:
+  repository_dispatch:
+    types: [upstream-sync]
 
 concurrency:
   group: upstream-sync
