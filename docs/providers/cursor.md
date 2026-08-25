@@ -16,6 +16,10 @@ Tracks your Cursor plan usage using the login from the Cursor app.
 
 When Cursor reports your plan name, OpenUsage shows it beside the provider name.
 
+Grok Bot has its own usage allowance, separate from Cursor's normal billing-cycle meter. Its widget
+is enabled by default in Cursor's On Demand section. It uses your existing Cursor login, so signing
+into the Grok CLI is not required.
+
 ## Where credentials come from
 
 Just be signed into the Cursor app. OpenUsage reads Cursor's local state database (and its keychain entries) for the session tokens; refreshed tokens are persisted back. Nothing extra to install or configure.

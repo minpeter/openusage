@@ -238,6 +238,13 @@ final class CursorEnterpriseProviderTests: XCTestCase {
                 }
                 """.utf8))
             }
+            if request.url == CursorUsageClient.grokBotUsageURL {
+                return HTTPResponse(
+                    statusCode: 200,
+                    headers: [:],
+                    body: Data(#"{"usagePercent":18,"hasNonZeroIncludedLimit":true}"#.utf8)
+                )
+            }
             if request.url.absoluteString.hasPrefix(CursorUsageClient.restUsageURL.absoluteString) {
                 return HTTPResponse(statusCode: 200, headers: [:], body: Data("""
                 {
@@ -267,6 +274,7 @@ final class CursorEnterpriseProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.plan, "Enterprise")
         XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 37)
         XCTAssertEqual(progress(snapshot.lines, "Total usage")?.limit, 750)
+        XCTAssertEqual(progress(snapshot.lines, "Grok Bot weekly")?.used, 18)
         XCTAssertEqual(progress(snapshot.lines, "On-demand")?.limit, 250)
         XCTAssertNotNil(snapshot.lines.first { $0.label == "Usage Trend" })
         XCTAssertNotNil(snapshot.lines.first { $0.label == "Today" })
