@@ -59,74 +59,6 @@ final class CursorOptionalEndpointTests: XCTestCase {
             var response: HTTPResponse
             var expectedLog: String?  // nil → the invalid-usage warning must NOT appear
         }
-<<<<<<< HEAD
-
-        let (snapshot, logs) = try await captureLogs { await provider.refresh() }
-
-        XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
-        XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
-        XCTAssertTrue(logs.contains("optional Grok Bot usage request returned HTTP 503"), logs)
-    }
-
-    func testInvalidGrokBotUsageIsLoggedWithoutDiscardingPrimaryUsage() async throws {
-        let provider = makeProvider { request in
-            switch request.url {
-            case CursorUsageClient.usageURL:
-                return Self.primaryUsageResponse
-            case CursorUsageClient.planURL:
-                return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"planInfo":{"planName":"Ultra"}}"#.utf8))
-            case CursorUsageClient.grokBotUsageURL:
-                return HTTPResponse(
-                    statusCode: 200,
-                    headers: [:],
-                    body: Data(#"{"usagePercent":true,"hasNonZeroIncludedLimit":true}"#.utf8)
-                )
-            default:
-                return HTTPResponse(statusCode: 404, headers: [:], body: Data())
-            }
-        }
-
-        let (snapshot, _) = try await captureLogs { await provider.refresh() }
-
-        XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
-        XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
-    }
-
-    func testIneligibleGrokBotAccountDoesNotLogAnInvalidUsageError() async throws {
-        let provider = makeProvider { request in
-            switch request.url {
-            case CursorUsageClient.usageURL:
-                return Self.primaryUsageResponse
-            case CursorUsageClient.planURL:
-                return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"planInfo":{"planName":"Pro"}}"#.utf8))
-            case CursorUsageClient.grokBotUsageURL:
-                return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"includedLimitZero":true}"#.utf8))
-            default:
-                return HTTPResponse(statusCode: 404, headers: [:], body: Data())
-            }
-        }
-
-        let (snapshot, logs) = try await captureLogs { await provider.refresh() }
-
-        XCTAssertNil(snapshot.errorCategory)
-        XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
-        XCTAssertFalse(logs.contains("Grok Bot usage response contained invalid usage metadata"), logs)
-    }
-
-    func testGrokBotZeroUsageWithoutIncludedAllowanceIsHiddenWithoutWarning() async throws {
-        let provider = makeProvider { request in
-            switch request.url {
-            case CursorUsageClient.usageURL:
-                return Self.primaryUsageResponse
-            case CursorUsageClient.planURL:
-                return HTTPResponse(statusCode: 200, headers: [:], body: Data(#"{"planInfo":{"planName":"Pro"}}"#.utf8))
-            case CursorUsageClient.grokBotUsageURL:
-                return HTTPResponse(
-                    statusCode: 200,
-                    headers: [:],
-=======
         let invalidUsageLog = "Grok Bot usage response contained invalid usage metadata"
         let cases = [
             GrokBotCase(
@@ -154,7 +86,6 @@ final class CursorOptionalEndpointTests: XCTestCase {
                 name: "zero usage without included allowance",
                 response: HTTPResponse(
                     statusCode: 200, headers: [:],
->>>>>>> origin/upstream
                     body: Data(#"{"usagePercent":0,"hasNonZeroIncludedLimit":false}"#.utf8)
                 ),
                 expectedLog: nil
@@ -179,7 +110,7 @@ final class CursorOptionalEndpointTests: XCTestCase {
             let (snapshot, logs) = try await captureLogs { await provider.refresh() }
 
             XCTAssertNil(snapshot.errorCategory, grokBotCase.name)
-            XCTAssertEqual(progress(snapshot.lines, "Total usage")?.used, 20, grokBotCase.name)
+            XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20, grokBotCase.name)
             XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" }, grokBotCase.name)
             if let expectedLog = grokBotCase.expectedLog {
                 XCTAssertTrue(logs.contains(expectedLog), "\(grokBotCase.name): \(logs)")
@@ -187,16 +118,6 @@ final class CursorOptionalEndpointTests: XCTestCase {
                 XCTAssertFalse(logs.contains(invalidUsageLog), "\(grokBotCase.name): \(logs)")
             }
         }
-<<<<<<< HEAD
-
-        let (snapshot, logs) = try await captureLogs { await provider.refresh() }
-
-        XCTAssertNil(snapshot.errorCategory)
-        XCTAssertEqual(progress(snapshot.lines, "Cursor Models")?.used, 20)
-        XCTAssertNil(snapshot.lines.first { $0.label == "Grok Bot usage" })
-        XCTAssertFalse(logs.contains("Grok Bot usage response contained invalid usage metadata"), logs)
-=======
->>>>>>> origin/upstream
     }
 
     func testInvalidPlanMetadataStillEnablesRequestBasedFallback() async throws {

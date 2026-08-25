@@ -63,11 +63,7 @@ enum DefaultLayout {
         "antigravity.geminiPro", "antigravity.geminiWeekly",
         "claude.session", "claude.weekly",
         "codex.session", "codex.weekly",
-<<<<<<< HEAD
         "cursor.cursorModels", "cursor.otherModels",
-=======
-        "cursor.auto", "cursor.api",
->>>>>>> origin/upstream
         "copilot.premium",
         "openrouter.credits",
         "zai.session", "zai.weekly"
