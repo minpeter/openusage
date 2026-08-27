@@ -26,11 +26,19 @@ jobs:
             const { owner, repo } = context.repo;
             const author = pullRequest.user.login;
             const labels = pullRequest.labels ?? [];
+            const headRef = pullRequest.head?.ref ?? "";
+            const title = pullRequest.title ?? "";
+            const isSyncBranch = /^sync\//.test(headRef);
+            const isFactorySyncBot =
+              author === "github-actions[bot]" &&
+              (title.startsWith("sync:") || headRef.startsWith("sync/"));
 
             if (
               ["OWNER", "MEMBER", "COLLABORATOR"].includes(pullRequest.author_association) ||
               author === "dependabot[bot]" ||
-              labels.some(label => label.name.toLowerCase() === "keep-open")
+              labels.some(label => label.name.toLowerCase() === "keep-open") ||
+              isSyncBranch ||
+              isFactorySyncBot
             ) {
               core.info(`Trusted or explicitly exempt pull request from @${author}.`);
               return;
