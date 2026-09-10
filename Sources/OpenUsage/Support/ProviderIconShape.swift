@@ -104,6 +104,7 @@ enum ProviderMarks {
         case "codex": return "circle.hexagongrid"
         case "cursor": return "cube"
         case "grok": return "bolt.fill"
+        case "ollama": return "cloud"
         case "opencode": return "chevron.left.forwardslash.chevron.right"
         case "openrouter": return "point.3.connected.trianglepath.dotted"
         case "zai": return "z.signal"
