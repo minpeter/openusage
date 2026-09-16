@@ -18,6 +18,9 @@ the same account and organization through both Claude Code and Claude Desktop st
 
 Fable is enabled and always visible directly below Weekly by default. Sonnet stays off until you
 enable it in Customize. When Claude reports your plan name, OpenUsage shows it beside the provider name.
+The plan comes from Anthropic's live account profile, so an upgrade (say, Max 5x to Max 20x) shows up on
+the next refresh without signing in to Claude Code again. If the profile can't be read, the badge falls
+back to the plan saved with your login.
 
 ## Where credentials come from
 
@@ -48,6 +51,35 @@ then refresh OpenUsage.
 A `CLAUDE_CODE_OAUTH_TOKEN` — usually a long-lived `claude setup-token` — can run the model but can't read your Session and Weekly limits, and it often lingers in your shell environment. So when a real keychain or file login is present, OpenUsage uses that login for the live meters and keeps the environment token only as a fallback; the Session/Weekly meters no longer go blank just because that token is set. If the environment token is your *only* credential (a headless setup), it's used on its own and the spend tiles still load from local logs.
 
 If one source holds an expired or "locked out" token, OpenUsage falls back to the others — so signing in again with `claude` outside the app is picked up on the next refresh, without restarting OpenUsage. Claude Code tokens are refreshed automatically; rotated tokens are written back only while the ordered login candidates still match the start of the refresh, so a newly added higher-priority login wins. Claude Desktop tokens are never refreshed or written by OpenUsage.
+
+## Claude Swap accounts
+
+OpenUsage discovers the saved accounts in Claude Swap's `~/.claude-swap-backup/sequence.json`
+on launch. Each account gets a card labeled with its organization followed by its email. A login already found through Claude Code
+or Desktop shares the same card when both the account and organization match. Restart OpenUsage after
+adding or removing a saved account.
+
+If the default login identifies an account but has no organization ID, it remains available as a
+separate default card alongside saved Swap accounts. OpenUsage does not guess which saved
+organization it belongs to. Its spending stays excluded while multiple accounts are known, until
+the login identifies its organization.
+
+Saved accounts use the active default login when it names that exact account, followed by their own
+Claude Swap session profile's Keychain entry and credential file. They
+never fall back to another account's default Claude login or an environment token. The saved vault is
+a final, read-only fallback. OpenUsage does not rotate vault tokens or modify Claude Swap's account
+list. If a vault login is stale, launch that account with `cswap run <email>`, then refresh OpenUsage.
+Matching Desktop credentials remain available on the merged card, including when Swap was its
+original source. If a preferred login expires or is rejected, the card tries its other matching
+sources. Every live credential must identify the same account and organization before supplying limits.
+Logins that can read live usage are tried before logins with limited permissions, so a default login
+without `user:profile` does not hide working Session and Weekly limits from a matching saved session.
+Session profile credentials can renew normally, with updates saved back to that same profile.
+
+Local spending includes Claude Swap session histories as well as the default Claude history. Shared
+history is deduplicated and filtered by its recorded account and organization; entries without account
+ownership stay excluded when multiple accounts are known. Broader SDK and Conductor history
+attribution is outside this change's scope; missing ownership is not inferred from the current login.
 
 ## The spend tiles
 
@@ -81,5 +113,7 @@ Local spend does not require a Claude OAuth login. If Claude Code uses an API-ke
 ## Under the hood
 
 `GET https://api.anthropic.com/api/oauth/usage` with the selected OAuth token. Claude Code tokens refresh via `platform.claude.com/v1/oauth/token`; Claude Desktop tokens are read-only and must be renewed by Desktop itself. If a token is expired or revoked, OpenUsage retries with the next credential source before reporting an error.
+
+The plan badge reads `GET https://api.anthropic.com/api/oauth/profile` (the organization's `rate_limit_tier`), because the plan Claude Code saves at sign-in never updates afterwards. To stay clear of Anthropic's rate limits, that lookup runs at most once per access token — after a usage fetch has succeeded — and cards bound to a specific account reuse the profile they already fetched to verify identity, so they make no extra request. Inference-only tokens skip it entirely.
 
 When the five-hour session window hasn't begun (the usage API reports no reset time), the Session row shows **Not started** on the trailing label; hover explains that the session begins after your first message. A reported reset time means the window is running, so the row always shows the countdown then — even when Anthropic's whole-percent numbers still read 0% because less than 1% has been used, which matches what Claude Code itself shows.
