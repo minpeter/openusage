@@ -105,13 +105,18 @@ personal `credits_used`. OpenCode `session`, `weekly`, and `monthly` are `percen
 
 | Provider | Resource keys |
 | --- | --- |
-| Claude | `session`, `weekly`, `sonnet`, `fable`, `extraUsage` |
+| Claude | `session`, `weekly`, `sonnet`, `fable`, `extraUsage`, `rateLimitResets` |
 | Codex | `session`, `weekly`, `spark`, `sparkWeekly`, `credits`, `creditValue`, `rateLimitResets` |
 | Cursor | `cursorModels`, `otherModels`, `totalUsage`, `grokBotWeekly`, `onDemand`, `requests`, `credits` |
 | Antigravity | `geminiSession`, `geminiWeekly`, `nonGeminiSession`, `nonGeminiWeekly` |
 | Copilot | `premiumCredits`, `extraUsage`, `orgCredits`, `orgSpend`, `chat`, `completions` |
 | Devin | `daily`, `weekly`, `extraUsageBalance` |
+<<<<<<< HEAD
 | Grok | `weekly`, `usageLimitResets` |
+=======
+| Grok | `weekly` |
+| Ollama | `session`, `weekly`, `monthly` |
+>>>>>>> origin/upstream
 | OpenCode | `session`, `weekly`, `monthly` |
 | OpenRouter | `credits`, `balance`, `keyLimit` |
 | Z.ai | `session`, `weekly`, `webSearches` |

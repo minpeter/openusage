@@ -204,14 +204,19 @@ final class LocalLimitsAPITests: XCTestCase {
             Set(descriptors.flatMap(\.limitResources).map(\.key))
         }
         let expected: [String: Set<String>] = [
-            "claude": ["session", "weekly", "sonnet", "fable", "extraUsage"],
+            "claude": ["session", "weekly", "sonnet", "fable", "extraUsage", "rateLimitResets"],
             "codex": ["session", "weekly", "spark", "sparkWeekly", "credits", "creditValue", "rateLimitResets"],
             "cursor": ["cursorModels", "otherModels", "totalUsage", "grokBotWeekly", "onDemand", "requests", "credits"],
             "antigravity": ["geminiSession", "geminiWeekly", "nonGeminiSession", "nonGeminiWeekly"],
             "copilot": ["premiumCredits", "extraUsage", "orgCredits", "orgSpend", "chat", "completions"],
             "devin": ["daily", "weekly", "extraUsageBalance"],
+<<<<<<< HEAD
             "grok": ["weekly", "usageLimitResets"],
             "ollama": ["session", "weekly"],
+=======
+            "grok": ["weekly"],
+            "ollama": ["session", "weekly", "monthly"],
+>>>>>>> origin/upstream
             "opencode": ["session", "weekly", "monthly"],
             "openrouter": ["credits", "balance", "keyLimit"],
             "zai": ["session", "weekly", "webSearches"]
