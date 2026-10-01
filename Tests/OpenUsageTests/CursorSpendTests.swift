@@ -365,7 +365,7 @@ final class CursorSpendProviderTests: XCTestCase {
         let elapsed = started.duration(to: clock.now)
 
         XCTAssertTrue(http.requests.contains { $0.url.absoluteString.contains("export-usage-events-csv") })
-        XCTAssertTrue(snapshot.lines.contains { $0.label == "Total usage" })
+        XCTAssertTrue(snapshot.lines.contains { $0.label == "Cursor Models" })
         for label in ["Today", "Yesterday", "Last 30 Days", "Usage Trend"] {
             XCTAssertFalse(snapshot.lines.contains { $0.label == label }, "\(label) line must be absent")
         }
