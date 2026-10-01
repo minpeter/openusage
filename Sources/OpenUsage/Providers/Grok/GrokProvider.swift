@@ -97,14 +97,29 @@ final class GrokProvider: ProviderRuntime {
     private func probe(state: inout GrokAuthState, accessToken: String) async throws -> ProviderSnapshot {
         // The weekly shared-pool meter and pay-as-you-go badge come from the billing endpoint with
         // `?format=credits` — the call the Grok CLI itself makes. This is the provider's primary
-        // remote fetch; a failure here fails the provider like any other usage call.
+        // remote fetch; a failure here fails the provider like any other usage call, except the
+        // documented team-principal 412 which has no weekly pool to show.
         let creditsResponse = try await fetchCreditsConfigWithRetry(accessToken: accessToken, state: &state)
-        let remainingResets = await fetchRemainingResetsBestEffort(accessToken: state.token)
-        var mapped = try GrokUsageMapper.mapCreditsConfig(
-            creditsResponse,
-            remainingResets: remainingResets,
-            now: now()
-        )
+        var mapped: GrokMappedUsage
+        var warning: String?
+        if GrokUsageMapper.isTeamBillingUnavailable(creditsResponse) {
+            // Same shape as Claude's missing-profile-scope path: log it, keep the snapshot
+            // successful, and let local spend tiles load under an amber header warning.
+            AppLog.warn(
+                LogTag.plugin("grok"),
+                "credits config unavailable: team principal has no personal team; weekly/pay-as-you-go omitted, local spend still loads"
+            )
+            mapped = GrokMappedUsage(lines: [])
+            warning = GrokUsageMapper.teamBillingUnavailableWarning
+        } else {
+            // linux: Usage Limit Resets from dedicated GetRemainingResets (not period.end).
+            let remainingResets = await fetchRemainingResetsBestEffort(accessToken: state.token)
+            mapped = try GrokUsageMapper.mapCreditsConfig(
+                creditsResponse,
+                remainingResets: remainingResets,
+                now: now()
+            )
+        }
 
         let plan = await fetchPlanName(accessToken: state.token)
 
@@ -134,7 +149,8 @@ final class GrokProvider: ProviderRuntime {
             plan: plan,
             lines: mapped.lines,
             refreshedAt: now(),
-            usageHistory: usageHistory
+            usageHistory: usageHistory,
+            warning: warning
         )
     }
 
