@@ -100,14 +100,6 @@ final class GrokProvider: ProviderRuntime {
         // remote fetch; a failure here fails the provider like any other usage call, except the
         // documented team-principal 412 which has no weekly pool to show.
         let creditsResponse = try await fetchCreditsConfigWithRetry(accessToken: accessToken, state: &state)
-<<<<<<< HEAD
-        let remainingResets = await fetchRemainingResetsBestEffort(accessToken: state.token)
-        var mapped = try GrokUsageMapper.mapCreditsConfig(
-            creditsResponse,
-            remainingResets: remainingResets,
-            now: now()
-        )
-=======
         var mapped: GrokMappedUsage
         var warning: String?
         if GrokUsageMapper.isTeamBillingUnavailable(creditsResponse) {
@@ -120,9 +112,14 @@ final class GrokProvider: ProviderRuntime {
             mapped = GrokMappedUsage(lines: [])
             warning = GrokUsageMapper.teamBillingUnavailableWarning
         } else {
-            mapped = try GrokUsageMapper.mapCreditsConfig(creditsResponse)
+            // linux: Usage Limit Resets from dedicated GetRemainingResets (not period.end).
+            let remainingResets = await fetchRemainingResetsBestEffort(accessToken: state.token)
+            mapped = try GrokUsageMapper.mapCreditsConfig(
+                creditsResponse,
+                remainingResets: remainingResets,
+                now: now()
+            )
         }
->>>>>>> origin/upstream
 
         let plan = await fetchPlanName(accessToken: state.token)
 
