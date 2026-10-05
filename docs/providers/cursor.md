@@ -14,6 +14,11 @@ Tracks your Cursor plan usage using the login from the Cursor app.
 | Grok Bot Weekly | Cursor dashboard Grok Bot weekly pool (used percent and weekly reset). This is not grok.com / Grok CLI Weekly, not the monthly Cursor Models pool, and not Cursor CSV spend for `cursor-grok-…` model slugs. Accounts without the pool, or responses that omit it, show “No data” — OpenUsage does not invent 0% |
 | Extra Usage | On-demand spend; user-scoped when available, otherwise the team aggregate; shown as a meter when Cursor returns a limit. Separate from the two monthly pools and from Grok Bot weekly |
 
+Teams seats with two usable model-pool percentages use those percentages instead of the legacy
+included-dollar cap. Total Usage uses Cursor's structured total percentage when supplied; it is
+unavailable when Cursor supplies only the two pools. Older team accounts without usable pool data
+keep their dollar meter, including accounts that return zero placeholders beside positive spend.
+
 When Cursor reports your plan name, OpenUsage shows it beside the provider name.
 
 Grok Bot has its own usage allowance, separate from Cursor's normal billing-cycle meter. Its widget
