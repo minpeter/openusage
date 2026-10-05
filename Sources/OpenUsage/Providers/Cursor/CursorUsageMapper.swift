@@ -30,10 +30,7 @@ struct CursorPlanUsageFacts {
         let planUsage = usage["planUsage"] as? [String: Any]
         hasPlanUsage = planUsage != nil
         limit = planUsage.flatMap { ProviderParse.number($0["limit"]) }
-<<<<<<< HEAD
         totalPercentUsed = planUsage.flatMap { CursorSpendingPools.cursorModelsPercent(planUsage: $0) }
-=======
-        totalPercentUsed = planUsage.flatMap { ProviderParse.number($0["totalPercentUsed"]) }
         let auto = planUsage.flatMap { ProviderParse.number($0["autoPercentUsed"]) }
         let api = planUsage.flatMap { ProviderParse.number($0["apiPercentUsed"]) }
         let spent = planUsage.flatMap { ProviderParse.number($0["totalSpend"]) }
@@ -43,7 +40,6 @@ struct CursorPlanUsageFacts {
         } else {
             hasModelPools = false
         }
->>>>>>> origin/upstream
         let spendLimitUsage = usage["spendLimitUsage"] as? [String: Any]
         spendLimitType = (spendLimitUsage?["limitType"] as? String)?.lowercased()
         pooledLimit = ProviderParse.number(spendLimitUsage?["pooledLimit"]) ?? 0
@@ -164,13 +160,9 @@ enum CursorUsageMapper {
 
         if isTeamAccount && facts.hasModelPools {
             // Modern Teams seats still report the old $20 allowance. Structured pool data wins;
-            // never synthesize a total from stale dollars when Cursor omits totalPercentUsed.
-            if let percent = facts.totalPercentUsed {
-                lines.append(.progress(
-                    label: "Total usage", used: percent, limit: 100, format: .percent,
-                    resetsAt: cycle.resetsAt, periodDurationMs: cycle.periodDurationMs
-                ))
-            }
+            // never synthesize a total from stale dollars. Linux renders the pools as the
+            // Cursor Models / Other Models Spending tiles below (Cursor Models already carries
+            // totalPercentUsed), so no separate "Total usage" percent line is emitted here.
         } else if isTeamAccount {
             guard let limitCents = facts.limit else {
                 throw CursorUsageError.requestBasedUnavailable("Cursor request-based usage data unavailable. Try again later.")

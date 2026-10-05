@@ -7,8 +7,10 @@ final class CursorTeamPoolTests: XCTestCase {
             "totalSpend": 1022, "includedSpend": 1022, "remaining": 978, "limit": 2000,
             "autoPercentUsed": 2.6476190476190475, "apiPercentUsed": 11.65, "totalPercentUsed": 4.088
         ])
-        assertPercent(mapped, "Total usage", 4.088)
-        assertPercent(mapped, "Cursor Models", 2.6476190476190475)
+        // Linux Spending semantics: Cursor Models carries totalPercentUsed (never autoPercentUsed),
+        // and no separate "Total usage" tile is emitted beside the pools.
+        XCTAssertNil(mapped.lines.first { $0.label == "Total usage" })
+        assertPercent(mapped, "Cursor Models", 4.088)
         assertPercent(mapped, "Other Models", 11.65)
     }
 
@@ -18,7 +20,8 @@ final class CursorTeamPoolTests: XCTestCase {
             "autoPercentUsed": 0.3728571428571429, "apiPercentUsed": 2.025
         ])
         XCTAssertNil(mapped.lines.first { $0.label == "Total usage" })
-        assertPercent(mapped, "Cursor Models", 0.3728571428571429)
+        // Without totalPercentUsed, linux does not derive Cursor Models from autoPercentUsed.
+        XCTAssertNil(mapped.lines.first { $0.label == "Cursor Models" })
         assertPercent(mapped, "Other Models", 2.025)
     }
 
@@ -37,7 +40,7 @@ final class CursorTeamPoolTests: XCTestCase {
         let mapped = try CursorUsageMapper.mapUsage(
             usage: usage, planName: nil, creditGrants: nil, stripeBalanceCents: 0
         )
-        assertPercent(mapped, "Cursor Models", 0)
+        XCTAssertNil(mapped.lines.first { $0.label == "Cursor Models" })
         assertPercent(mapped, "Other Models", 0)
     }
 

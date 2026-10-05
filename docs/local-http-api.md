@@ -96,19 +96,12 @@ invented as zero. `expiresAt` is always `fetchedAt` plus the same five-minute fr
 the app and CLI; `stale` says whether that instant has passed. Refresh failures appear in `errors` as
 `{"providerId":"…","message":"…"}` while a last-good provider snapshot remains available.
 For bounded progress resources, `unit` follows the provider's live metric format. For example, Cursor
-<<<<<<< HEAD
 `cursorModels` and `otherModels` are `percent` on the individual Spending card. `totalUsage` remains
 `requests` on request-based Enterprise plans and `usd` when Cursor reports a team dollar pool. Copilot
 `premiumCredits` is `percent` on paid plans and a `credits` count on org-managed seats that only report
-personal `credits_used`. OpenCode `session`, `weekly`, and `monthly` are `percent`.
-=======
-`totalUsage` is `percent` on percentage-based plans, `requests` on request-based Enterprise plans, and
-`usd` when Cursor reports a dollar pool. Copilot `premiumCredits` is `percent` on paid plans and a
-`credits` count on org-managed seats that only report personal `credits_used`. OpenCode `session`,
-`weekly`, and `monthly` are `percent`. An untouched OpenCode `session` omits `resetsAt`; the field appears
-with the anchored reset instant after the first model call starts the rolling window, even while `used`
-is still 0 because OpenCode reports whole percentages.
->>>>>>> origin/upstream
+personal `credits_used`. OpenCode `session`, `weekly`, and `monthly` are `percent`. An untouched OpenCode
+`session` omits `resetsAt`; the field appears with the anchored reset instant after the first model call
+starts the rolling window, even while `used` is still 0 because OpenCode reports whole percentages.
 
 ### Public resources
 
