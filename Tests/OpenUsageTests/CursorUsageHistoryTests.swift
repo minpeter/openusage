@@ -136,7 +136,7 @@ final class CursorUsageHistoryTests: XCTestCase {
 
         let snapshot = await provider.refresh()
 
-        XCTAssertTrue(snapshot.lines.contains { $0.label == "Total usage" })
+        XCTAssertTrue(snapshot.lines.contains { $0.label == "Cursor Models" })
         for label in ["Today", "Yesterday", "Last 30 Days", "Usage Trend"] {
             XCTAssertNotNil(snapshot.lines.first { $0.label == label }, "\(label) line must be present")
         }
@@ -293,7 +293,7 @@ final class CursorUsageHistoryTests: XCTestCase {
         let firstSnapshot = await provider.refresh()
         let elapsed = started.duration(to: clock.now)
         let persistedAfterDeadline = store.load(userID: userID, timeZone: Calendar.current.timeZone.identifier)
-        XCTAssertTrue(firstSnapshot.lines.contains { $0.label == "Total usage" }, "live plan usage must survive spend-history timeout")
+        XCTAssertTrue(firstSnapshot.lines.contains { $0.label == "Cursor Models" }, "live plan usage must survive spend-history timeout")
         XCTAssertNil(firstSnapshot.usageHistory)
         XCTAssertLessThan(elapsed, .seconds(2))
         XCTAssertGreaterThan(persistedAfterDeadline.count, 0)
